@@ -1,0 +1,30 @@
+[package]
+name = "bevy_mod_outline"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A mesh outlining plugin for Bevy."
+readme = "README.md"
+homepage = "https://github.com/komadori/bevy_mod_outline/"
+repository = "https://github.com/komadori/bevy_mod_outline/"
+keywords = ["gamedev", "bevy", "outline"]
+categories = ["game-engines", "rendering"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.7", default-features = false, features = [
+    "render",
+] }
+bevy_asset = { version = "0.7", default-features = false }
+
+[dev-dependencies]
+bevy = { version = "0.7", default-features = false, features = [
+    "bevy_winit",
+    "x11",
+] }
+bevy_mod_rounded_box = "0.1"
+
+[[example]]
+name = "cube"
+path = "examples/cube.rs"
