@@ -1,6 +1,7 @@
 # bevy_mod_outline
 
-This crate provides a plugin for drawing outlines around meshes.
+This crate provides a Bevy plugin for drawing outlines around meshes using the
+vertex extrusion method.
 
 ## Dependency
 
@@ -22,3 +23,8 @@ cargo run --example cube
 | This Version | Bevy version |
 |--------------|--------------|
 | 0.1.x        | 0.7.x        |
+
+## Known Issues
+
+Vertex extrusion only works for meshes with smooth surface normals. Hard edges
+will cause visual artefacts.

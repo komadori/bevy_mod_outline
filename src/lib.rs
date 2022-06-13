@@ -26,13 +26,18 @@ use bevy::render::view::ExtractedView;
 use bevy::render::{RenderApp, RenderStage};
 use libm::nextafterf;
 
+// See https://alexanderameye.github.io/notes/rendering-outlines/
+
 const OUTLINE_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
 
+/// An asset for rendering outlines around meshes.
 #[derive(Clone, TypeUuid)]
 #[uuid = "552e416b-2766-4e6a-9ee5-9ebd0e8c0230"]
 pub struct Outline {
+    /// Colour of the outline
     pub colour: Color,
+    /// Width of the outline in pixels
     pub width: f32,
 }
 
@@ -109,6 +114,7 @@ pub struct GpuOutline {
     transparent: bool,
 }
 
+/// Adds support for the [Outline] asset type.
 pub struct OutlinePlugin;
 
 impl Plugin for OutlinePlugin {
