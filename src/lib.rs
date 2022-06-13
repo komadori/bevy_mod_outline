@@ -1,43 +1,115 @@
 use bevy::asset::load_internal_asset;
-use bevy::core_pipeline::Transparent3d;
+use bevy::core_pipeline::{Opaque3d, Transparent3d};
+use bevy::ecs::system::lifetimeless::{Read, SQuery, SRes};
+use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
     DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup, SetMeshViewBindGroup,
 };
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::mesh::{MeshVertexBufferLayout, PrimitiveTopology};
-use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_phase::{AddRenderCommand, DrawFunctions, RenderPhase, SetItemPipeline};
-use bevy::render::render_resource::{
-    Face, PipelineCache, RenderPipelineDescriptor, SpecializedMeshPipeline,
-    SpecializedMeshPipelineError, SpecializedMeshPipelines,
+use bevy::render::render_asset::{RenderAsset, RenderAssetPlugin, RenderAssets};
+use bevy::render::render_component::ExtractComponentPlugin;
+use bevy::render::render_phase::{
+    AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
+    SetItemPipeline, TrackedRenderPass,
 };
+use bevy::render::render_resource::std140::{AsStd140, Std140};
+use bevy::render::render_resource::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferInitDescriptor, BufferSize,
+    BufferUsages, Face, PipelineCache, RenderPipelineDescriptor, ShaderStages,
+    SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+};
+use bevy::render::renderer::RenderDevice;
 use bevy::render::view::ExtractedView;
 use bevy::render::{RenderApp, RenderStage};
+use libm::nextafterf;
 
-pub const OUTLINE_SHADER_HANDLE: HandleUntyped =
+const OUTLINE_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
 
-#[derive(Clone, Component)]
+#[derive(Clone, TypeUuid)]
+#[uuid = "552e416b-2766-4e6a-9ee5-9ebd0e8c0230"]
 pub struct Outline {
     pub colour: Color,
-    pub offset: f32,
+    pub width: f32,
+}
+
+impl RenderAsset for Outline {
+    type ExtractedAsset = Outline;
+
+    type PreparedAsset = GpuOutline;
+
+    type Param = (SRes<RenderDevice>, SRes<OutlinePipeline>);
+
+    fn extract_asset(&self) -> Self::ExtractedAsset {
+        self.clone()
+    }
+
+    fn prepare_asset(
+        outline: Self::ExtractedAsset,
+        (render_device, outline_pipeline): &mut bevy::ecs::system::SystemParamItem<Self::Param>,
+    ) -> Result<
+        Self::PreparedAsset,
+        bevy::render::render_asset::PrepareAssetError<Self::ExtractedAsset>,
+    > {
+        let colour = outline.colour.as_linear_rgba_f32().into();
+        let vbuffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("outline_vertex_stage_uniform_buffer"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            contents: VertexStageData {
+                width: outline.width,
+            }
+            .as_std140()
+            .as_bytes(),
+        });
+        let fbuffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("outline_fragment_stage_uniform_buffer"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            contents: FragmentStageData { colour }.as_std140().as_bytes(),
+        });
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            label: Some("outline_bind_group"),
+            layout: &outline_pipeline.bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: vbuffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: fbuffer.as_entire_binding(),
+                },
+            ],
+        });
+        Ok(GpuOutline {
+            _vertex_stage_buffer: vbuffer,
+            _fragment_stage_buffer: fbuffer,
+            bind_group,
+            transparent: colour.w < 1.0,
+        })
+    }
+}
+
+#[derive(Clone, AsStd140)]
+struct VertexStageData {
+    width: f32,
+}
+
+#[derive(Clone, AsStd140)]
+struct FragmentStageData {
+    colour: Vec4,
+}
+
+pub struct GpuOutline {
+    _vertex_stage_buffer: Buffer,
+    _fragment_stage_buffer: Buffer,
+    bind_group: BindGroup,
+    transparent: bool,
 }
 
 pub struct OutlinePlugin;
-
-fn extract_outline(
-    mut commands: Commands,
-    mut previous_len: Local<usize>,
-    mut query: Query<(Entity, &Outline)>,
-) {
-    let mut values = Vec::with_capacity(*previous_len);
-    for (entity, outline) in query.iter_mut() {
-        values.push((entity, (outline.clone(),)));
-    }
-    *previous_len = values.len();
-    commands.insert_or_spawn_batch(values);
-}
 
 impl Plugin for OutlinePlugin {
     fn build(&self, app: &mut App) {
@@ -47,11 +119,14 @@ impl Plugin for OutlinePlugin {
             "outline.wgsl",
             Shader::from_wgsl
         );
-        app.sub_app_mut(RenderApp)
+        app.add_asset::<Outline>()
+            .add_plugin(ExtractComponentPlugin::<Handle<Outline>>::default())
+            .add_plugin(RenderAssetPlugin::<Outline>::default())
+            .sub_app_mut(RenderApp)
+            .add_render_command::<Opaque3d, DrawOutline>()
             .add_render_command::<Transparent3d, DrawOutline>()
             .init_resource::<OutlinePipeline>()
             .init_resource::<SpecializedMeshPipelines<OutlinePipeline>>()
-            .add_system_to_stage(RenderStage::Extract, extract_outline)
             .add_system_to_stage(RenderStage::Queue, queue_outline);
     }
 }
@@ -60,56 +135,139 @@ type DrawOutline = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
+    SetOutlineBindGroup<2>,
     DrawMesh,
 );
 
+struct SetOutlineBindGroup<const I: usize>();
+
+impl<const I: usize> EntityRenderCommand for SetOutlineBindGroup<I> {
+    type Param = (SRes<RenderAssets<Outline>>, SQuery<Read<Handle<Outline>>>);
+    fn render<'w>(
+        _view: Entity,
+        item: Entity,
+        (outlines, query): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let outline_handle = query.get(item).unwrap();
+        let outline = outlines.into_inner().get(outline_handle).unwrap();
+        pass.set_bind_group(I, &outline.bind_group, &[]);
+        RenderCommandResult::Success
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn queue_outline(
+    opaque_3d_draw_functions: Res<DrawFunctions<Opaque3d>>,
     transparent_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
     outline_pipeline: Res<OutlinePipeline>,
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &Outline)>,
-    mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
+    render_outlines: Res<RenderAssets<Outline>>,
+    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &Handle<Outline>)>,
+    mut views: Query<(
+        &ExtractedView,
+        &mut RenderPhase<Opaque3d>,
+        &mut RenderPhase<Transparent3d>,
+    )>,
 ) {
-    let draw_outline = transparent_3d_draw_functions
+    let draw_opaque_outline = opaque_3d_draw_functions
+        .read()
+        .get_id::<DrawOutline>()
+        .unwrap();
+    let draw_transparent_outline = transparent_3d_draw_functions
         .read()
         .get_id::<DrawOutline>()
         .unwrap();
 
-    let key = MeshPipelineKey::from_msaa_samples(msaa.samples)
+    let base_key = MeshPipelineKey::from_msaa_samples(msaa.samples)
         | MeshPipelineKey::from_primitive_topology(PrimitiveTopology::TriangleList);
 
-    for (view, mut transparent_phase) in views.iter_mut() {
-        let view_matrix = view.transform.compute_matrix();
-        let view_row_2 = view_matrix.row(2);
-        for (entity, mesh_uniform, mesh_handle, _) in material_meshes.iter() {
+    for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
+        let inverse_view_matrix = view.transform.compute_matrix().inverse();
+        let inverse_view_row_2 = inverse_view_matrix.row(2);
+        for (entity, mesh_uniform, mesh_handle, outline_handle) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
-                let pipeline = pipelines
-                    .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
-                    .unwrap();
-                transparent_phase.add(Transparent3d {
-                    entity,
-                    pipeline,
-                    draw_function: draw_outline,
-                    distance: view_row_2.dot(mesh_uniform.transform.col(3)),
-                });
+                if let Some(outline) = render_outlines.get(outline_handle) {
+                    let key = if outline.transparent {
+                        base_key | MeshPipelineKey::TRANSPARENT_MAIN_PASS
+                    } else {
+                        base_key
+                    };
+                    let pipeline = pipelines
+                        .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
+                        .unwrap();
+                    let distance = nextafterf(
+                        inverse_view_row_2.dot(mesh_uniform.transform.col(3)),
+                        f32::NEG_INFINITY,
+                    );
+                    if outline.transparent {
+                        transparent_phase.add(Transparent3d {
+                            entity,
+                            pipeline,
+                            draw_function: draw_transparent_outline,
+                            distance,
+                        });
+                    } else {
+                        opaque_phase.add(Opaque3d {
+                            entity,
+                            pipeline,
+                            draw_function: draw_opaque_outline,
+                            distance: -distance,
+                        });
+                    }
+                }
             }
         }
     }
 }
 
-struct OutlinePipeline {
+pub struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
+    bind_group_layout: BindGroupLayout,
 }
 
 impl FromWorld for OutlinePipeline {
     fn from_world(world: &mut World) -> Self {
         let world = world.cell();
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
-        OutlinePipeline { mesh_pipeline }
+        let render_device = world.get_resource::<RenderDevice>().unwrap();
+        let bind_group_layout =
+            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("outline_pipeline_bind_group_layout"),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::VERTEX,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: BufferSize::new(
+                                VertexStageData::std140_size_static() as u64,
+                            ),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: BufferSize::new(
+                                FragmentStageData::std140_size_static() as u64,
+                            ),
+                        },
+                        count: None,
+                    },
+                ],
+            });
+        OutlinePipeline {
+            mesh_pipeline,
+            bind_group_layout,
+        }
     }
 }
 
@@ -123,13 +281,12 @@ impl SpecializedMeshPipeline for OutlinePipeline {
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
         descriptor.primitive.cull_mode = Some(Face::Front);
-        //descriptor.depth_stencil.as_mut().unwrap().depth_write_enabled = false;
-        //descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         descriptor.vertex.shader = OUTLINE_SHADER_HANDLE.typed();
         descriptor.fragment.as_mut().unwrap().shader = OUTLINE_SHADER_HANDLE.typed();
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),
             self.mesh_pipeline.mesh_layout.clone(),
+            self.bind_group_layout.clone(),
         ]);
         Ok(descriptor)
     }

@@ -22,6 +22,7 @@ struct TheCube();
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut outlines: ResMut<Assets<Outline>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Spawn cube et al.
@@ -35,16 +36,16 @@ fn setup(
             mesh: meshes.add(Mesh::from(RoundedBox {
                 size: Vec3::new(1., 1., 1.),
                 radius: 0.3,
-                subdivisions: 3,
+                subdivisions: 5,
             })),
             material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
         })
-        .insert(Outline {
-            colour: Color::rgb(1.0, 0.0, 0.0),
-            offset: 1.0,
-        })
+        .insert(outlines.add(Outline {
+            colour: Color::rgba(0.0, 1.0, 0.0, 0.5),
+            width: 50.0,
+        }))
         .insert(TheCube());
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
