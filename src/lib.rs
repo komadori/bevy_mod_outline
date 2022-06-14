@@ -302,6 +302,7 @@ fn queue_outline(
                     let pipeline = pipelines
                         .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
                         .unwrap();
+                    // Increase distance to just behind the non-outline mesh
                     let distance = nextafterf(
                         inverse_view_row_2.dot(mesh_uniform.transform.col(3)),
                         f32::NEG_INFINITY,
