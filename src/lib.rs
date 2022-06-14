@@ -181,7 +181,11 @@ impl<const I: usize> EntityRenderCommand for SetViewSizeBindGroup<I> {
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
         let uniform_offset = offset_query.get_inner(view).unwrap();
-        pass.set_bind_group(I, &gpu_view_size.into_inner().bind_group, &[uniform_offset.offset]);
+        pass.set_bind_group(
+            I,
+            &gpu_view_size.into_inner().bind_group,
+            &[uniform_offset.offset],
+        );
 
         RenderCommandResult::Success
     }
@@ -251,9 +255,7 @@ fn prepare_view_size_uniforms(
             label: Some("outline_view_size_bind_group"),
             layout: &outline_pipeline.view_size_bind_group_layout,
         });
-        commands.insert_resource(GpuViewSize {
-            bind_group: bind_group.clone(),
-        });
+        commands.insert_resource(GpuViewSize { bind_group });
     }
 }
 
