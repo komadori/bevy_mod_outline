@@ -113,7 +113,6 @@ struct ViewSizeUniformOffset {
     pub offset: u32,
 }
 
-#[derive(Component)]
 struct GpuViewSize {
     bind_group: BindGroup,
 }
@@ -165,24 +164,24 @@ type DrawOutline = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    SetOutlineViewBindGroup<2>,
+    SetViewSizeBindGroup<2>,
     SetOutlineBindGroup<3>,
     DrawMesh,
 );
 
-struct SetOutlineViewBindGroup<const I: usize>();
+struct SetViewSizeBindGroup<const I: usize>();
 
-impl<const I: usize> EntityRenderCommand for SetOutlineViewBindGroup<I> {
-    type Param = SQuery<(Read<ViewSizeUniformOffset>, Read<GpuViewSize>)>;
+impl<const I: usize> EntityRenderCommand for SetViewSizeBindGroup<I> {
+    type Param = (SRes<GpuViewSize>, SQuery<Read<ViewSizeUniformOffset>>);
     #[inline]
     fn render<'w>(
         view: Entity,
         _item: Entity,
-        view_query: SystemParamItem<'w, '_, Self::Param>,
+        (gpu_view_size, offset_query): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let (view_size_uniform, gpu_view_size) = view_query.get_inner(view).unwrap();
-        pass.set_bind_group(I, &gpu_view_size.bind_group, &[view_size_uniform.offset]);
+        let uniform_offset = offset_query.get_inner(view).unwrap();
+        pass.set_bind_group(I, &gpu_view_size.into_inner().bind_group, &[uniform_offset.offset]);
 
         RenderCommandResult::Success
     }
@@ -236,7 +235,6 @@ fn prepare_view_size_uniforms(
         let view_size_uniforms = ViewSizeUniformOffset {
             offset: view_size_uniforms.uniforms.push(view_size_uniform.clone()),
         };
-
         commands.entity(entity).insert(view_size_uniforms);
     }
 
@@ -253,11 +251,9 @@ fn prepare_view_size_uniforms(
             label: Some("outline_view_size_bind_group"),
             layout: &outline_pipeline.view_size_bind_group_layout,
         });
-        for (entity, _) in views.iter() {
-            commands.entity(entity).insert(GpuViewSize {
-                bind_group: bind_group.clone(),
-            });
-        }
+        commands.insert_resource(GpuViewSize {
+            bind_group: bind_group.clone(),
+        });
     }
 }
 
