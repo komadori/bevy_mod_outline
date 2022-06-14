@@ -9,6 +9,7 @@ use bevy_mod_rounded_box::*;
 fn main() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
+        .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_plugin(OutlinePlugin)
         .add_startup_system(setup)
@@ -44,7 +45,7 @@ fn setup(
         })
         .insert(outlines.add(Outline {
             colour: Color::rgba(0.0, 1.0, 0.0, 0.5),
-            width: 50.0,
+            width: 25.0,
         }))
         .insert(TheCube());
     commands.spawn_bundle(PointLightBundle {

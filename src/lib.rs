@@ -7,6 +7,7 @@ use bevy::pbr::{
 };
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
+use bevy::render::camera::{ActiveCamera, Camera3d};
 use bevy::render::mesh::{MeshVertexBufferLayout, PrimitiveTopology};
 use bevy::render::render_asset::{RenderAsset, RenderAssetPlugin, RenderAssets};
 use bevy::render::render_component::ExtractComponentPlugin;
@@ -18,10 +19,10 @@ use bevy::render::render_resource::std140::{AsStd140, Std140};
 use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferInitDescriptor, BufferSize,
-    BufferUsages, Face, PipelineCache, RenderPipelineDescriptor, ShaderStages,
+    BufferUsages, DynamicUniformVec, Face, PipelineCache, RenderPipelineDescriptor, ShaderStages,
     SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
 };
-use bevy::render::renderer::RenderDevice;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::render::view::ExtractedView;
 use bevy::render::{RenderApp, RenderStage};
 use libm::nextafterf;
@@ -37,7 +38,7 @@ const OUTLINE_SHADER_HANDLE: HandleUntyped =
 pub struct Outline {
     /// Colour of the outline
     pub colour: Color,
-    /// Width of the outline in pixels
+    /// Width of the outline in logical pixels
     pub width: f32,
 }
 
@@ -76,7 +77,7 @@ impl RenderAsset for Outline {
         });
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: Some("outline_bind_group"),
-            layout: &outline_pipeline.bind_group_layout,
+            layout: &outline_pipeline.outline_bind_group_layout,
             entries: &[
                 BindGroupEntry {
                     binding: 0,
@@ -95,6 +96,26 @@ impl RenderAsset for Outline {
             transparent: colour.w < 1.0,
         })
     }
+}
+
+#[derive(Clone, Component, AsStd140)]
+struct ViewSizeUniform {
+    logical_size: Vec2,
+}
+
+#[derive(Default)]
+struct ViewSizeUniforms {
+    pub uniforms: DynamicUniformVec<ViewSizeUniform>,
+}
+
+#[derive(Component)]
+struct ViewSizeUniformOffset {
+    pub offset: u32,
+}
+
+#[derive(Component)]
+struct GpuViewSize {
+    bind_group: BindGroup,
 }
 
 #[derive(Clone, AsStd140)]
@@ -133,6 +154,9 @@ impl Plugin for OutlinePlugin {
             .add_render_command::<Transparent3d, DrawOutline>()
             .init_resource::<OutlinePipeline>()
             .init_resource::<SpecializedMeshPipelines<OutlinePipeline>>()
+            .init_resource::<ViewSizeUniforms>()
+            .add_system_to_stage(RenderStage::Extract, extract_view_size_uniforms)
+            .add_system_to_stage(RenderStage::Prepare, prepare_view_size_uniforms)
             .add_system_to_stage(RenderStage::Queue, queue_outline);
     }
 }
@@ -141,9 +165,28 @@ type DrawOutline = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    SetOutlineBindGroup<2>,
+    SetOutlineViewBindGroup<2>,
+    SetOutlineBindGroup<3>,
     DrawMesh,
 );
+
+struct SetOutlineViewBindGroup<const I: usize>();
+
+impl<const I: usize> EntityRenderCommand for SetOutlineViewBindGroup<I> {
+    type Param = SQuery<(Read<ViewSizeUniformOffset>, Read<GpuViewSize>)>;
+    #[inline]
+    fn render<'w>(
+        view: Entity,
+        _item: Entity,
+        view_query: SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let (view_size_uniform, gpu_view_size) = view_query.get_inner(view).unwrap();
+        pass.set_bind_group(I, &gpu_view_size.bind_group, &[view_size_uniform.offset]);
+
+        RenderCommandResult::Success
+    }
+}
 
 struct SetOutlineBindGroup<const I: usize>();
 
@@ -159,6 +202,62 @@ impl<const I: usize> EntityRenderCommand for SetOutlineBindGroup<I> {
         let outline = outlines.into_inner().get(outline_handle).unwrap();
         pass.set_bind_group(I, &outline.bind_group, &[]);
         RenderCommandResult::Success
+    }
+}
+
+fn extract_view_size_uniforms(
+    mut commands: Commands,
+    windows: Res<Windows>,
+    images: Res<Assets<Image>>,
+    active_camera: Res<ActiveCamera<Camera3d>>,
+    query: Query<&Camera, With<Camera3d>>,
+) {
+    if let Some(entity) = active_camera.get() {
+        if let Ok(camera) = query.get(entity) {
+            if let Some(size) = camera.target.get_logical_size(&windows, &images) {
+                commands
+                    .get_or_spawn(entity)
+                    .insert(ViewSizeUniform { logical_size: size });
+            }
+        }
+    }
+}
+
+fn prepare_view_size_uniforms(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    outline_pipeline: Res<OutlinePipeline>,
+    mut view_size_uniforms: ResMut<ViewSizeUniforms>,
+    views: Query<(Entity, &ViewSizeUniform)>,
+) {
+    view_size_uniforms.uniforms.clear();
+    for (entity, view_size_uniform) in views.iter() {
+        let view_size_uniforms = ViewSizeUniformOffset {
+            offset: view_size_uniforms.uniforms.push(view_size_uniform.clone()),
+        };
+
+        commands.entity(entity).insert(view_size_uniforms);
+    }
+
+    view_size_uniforms
+        .uniforms
+        .write_buffer(&render_device, &render_queue);
+
+    if let Some(view_binding) = view_size_uniforms.uniforms.binding() {
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: view_binding.clone(),
+            }],
+            label: Some("outline_view_size_bind_group"),
+            layout: &outline_pipeline.view_size_bind_group_layout,
+        });
+        for (entity, _) in views.iter() {
+            commands.entity(entity).insert(GpuViewSize {
+                bind_group: bind_group.clone(),
+            });
+        }
     }
 }
 
@@ -232,7 +331,8 @@ fn queue_outline(
 
 pub struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
-    bind_group_layout: BindGroupLayout,
+    view_size_bind_group_layout: BindGroupLayout,
+    outline_bind_group_layout: BindGroupLayout,
 }
 
 impl FromWorld for OutlinePipeline {
@@ -240,9 +340,25 @@ impl FromWorld for OutlinePipeline {
         let world = world.cell();
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let bind_group_layout =
+        let view_size_bind_group_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("outline_pipeline_bind_group_layout"),
+                label: Some("outline_view_size_bind_group_layout"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: BufferSize::new(
+                            ViewSizeUniform::std140_size_static() as u64
+                        ),
+                    },
+                    count: None,
+                }],
+            });
+        let outline_bind_group_layout =
+            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("outline_bind_group_layout"),
                 entries: &[
                     BindGroupLayoutEntry {
                         binding: 0,
@@ -272,7 +388,8 @@ impl FromWorld for OutlinePipeline {
             });
         OutlinePipeline {
             mesh_pipeline,
-            bind_group_layout,
+            view_size_bind_group_layout,
+            outline_bind_group_layout,
         }
     }
 }
@@ -292,7 +409,8 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),
             self.mesh_pipeline.mesh_layout.clone(),
-            self.bind_group_layout.clone(),
+            self.view_size_bind_group_layout.clone(),
+            self.outline_bind_group_layout.clone(),
         ]);
         Ok(descriptor)
     }

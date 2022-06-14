@@ -10,6 +10,10 @@ struct VertexOutput {
     [[builtin(position)]] clip_position: vec4<f32>;
 };
 
+struct ViewSizeUniforms {
+    logical_size: vec2<f32>;
+};
+
 struct VertexStageData {
     width: f32;
 };
@@ -22,9 +26,12 @@ struct FragmentStageData {
 var<uniform> mesh: Mesh;
 
 [[group(2), binding(0)]]
+var<uniform> view_size: ViewSizeUniforms;
+
+[[group(3), binding(0)]]
 var<uniform> vstage: VertexStageData;
 
-[[group(2), binding(1)]]
+[[group(3), binding(1)]]
 var<uniform> fstage: FragmentStageData;
 
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
@@ -38,7 +45,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     var clip_pos = view.view_proj * (mesh.model * vec4<f32>(vertex.position, 1.0));
     var clip_norm = mat4to3(view.view_proj) * (mat4to3(mesh.model) * normalize(vertex.normal));
-    var clip_delta = vec4<f32>(vstage.width * normalize(clip_norm.xy) * clip_pos.w / vec2<f32>(view.width, view.height), 0.0, 0.0);
+    var clip_delta = vec4<f32>(2.0 * vstage.width * normalize(clip_norm.xy) * clip_pos.w / view_size.logical_size, 0.0, 0.0);
     out.clip_position = clip_pos + clip_delta;
     return out;
 }
