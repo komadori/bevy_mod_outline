@@ -1,37 +1,37 @@
-#import bevy_pbr::mesh_view_bind_group
-#import bevy_pbr::mesh_struct
+#import bevy_pbr::mesh_types
+#import bevy_pbr::mesh_view_bindings
 
 struct Vertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] normal: vec3<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
+    @builtin(position) clip_position: vec4<f32>,
 };
 
 struct ViewSizeUniforms {
-    logical_size: vec2<f32>;
+    logical_size: vec2<f32>,
 };
 
 struct VertexStageData {
-    width: f32;
+    width: f32,
 };
 
 struct FragmentStageData {
-    colour: vec4<f32>;
+    colour: vec4<f32>,
 };
 
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var<uniform> mesh: Mesh;
 
-[[group(2), binding(0)]]
+@group(2) @binding(0)
 var<uniform> view_size: ViewSizeUniforms;
 
-[[group(3), binding(0)]]
+@group(3) @binding(0)
 var<uniform> vstage: VertexStageData;
 
-[[group(3), binding(1)]]
+@group(3) @binding(1)
 var<uniform> fstage: FragmentStageData;
 
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
@@ -40,7 +40,7 @@ fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
     );
 }
 
-[[stage(vertex)]]
+@vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     var clip_pos = view.view_proj * (mesh.model * vec4<f32>(vertex.position, 1.0));
@@ -50,11 +50,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     return out;
 }
 
-struct FragmentInput {
-    [[builtin(front_facing)]] is_front: bool;
-};
-
-[[stage(fragment)]]
-fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment() -> @location(0) vec4<f32> {
     return fstage.colour;
 }

@@ -1,9 +1,8 @@
 use std::f32::consts::TAU;
 
-use bevy::prelude::*;
+use bevy::prelude::{shape::Torus, *};
 
 use bevy_mod_outline::*;
-use bevy_mod_rounded_box::*;
 
 #[bevy_main]
 fn main() {
@@ -34,10 +33,11 @@ fn setup(
     });
     commands
         .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(RoundedBox {
-                size: Vec3::new(1., 1., 1.),
-                radius: 0.3,
-                subdivisions: 5,
+            mesh: meshes.add(Mesh::from(Torus {
+                radius: 0.6,
+                ring_radius: 0.2,
+                subdivisions_segments: 20,
+                subdivisions_sides: 10,
             })),
             material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
@@ -57,7 +57,7 @@ fn setup(
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..default()
     });
-    commands.spawn_bundle(PerspectiveCameraBundle {
+    commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });

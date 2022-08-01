@@ -1,5 +1,5 @@
 use bevy::asset::load_internal_asset;
-use bevy::core_pipeline::{Opaque3d, Transparent3d};
+use bevy::core_pipeline::core_3d::{Opaque3d, Transparent3d};
 use bevy::ecs::system::lifetimeless::{Read, SQuery, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
@@ -7,24 +7,24 @@ use bevy::pbr::{
 };
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::camera::{ActiveCamera, Camera3d};
+use bevy::render::extract_component::ExtractComponentPlugin;
 use bevy::render::mesh::{MeshVertexBufferLayout, PrimitiveTopology};
-use bevy::render::render_asset::{RenderAsset, RenderAssetPlugin, RenderAssets};
-use bevy::render::render_component::ExtractComponentPlugin;
+use bevy::render::render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets};
 use bevy::render::render_phase::{
     AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
     SetItemPipeline, TrackedRenderPass,
 };
-use bevy::render::render_resource::std140::{AsStd140, Std140};
 use bevy::render::render_resource::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferInitDescriptor, BufferSize,
-    BufferUsages, DynamicUniformVec, Face, PipelineCache, RenderPipelineDescriptor, ShaderStages,
-    SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+    AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, BufferSize,
+    DynamicUniformBuffer, Face, PipelineCache, PreparedBindGroup, RenderPipelineDescriptor,
+    ShaderSize, ShaderStages, ShaderType, SpecializedMeshPipeline, SpecializedMeshPipelineError,
+    SpecializedMeshPipelines,
 };
 use bevy::render::renderer::{RenderDevice, RenderQueue};
+use bevy::render::texture::FallbackImage;
 use bevy::render::view::ExtractedView;
-use bevy::render::{RenderApp, RenderStage};
+use bevy::render::{Extract, RenderApp, RenderStage};
 use libm::nextafterf;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
@@ -33,12 +33,14 @@ const OUTLINE_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
 
 /// An asset for rendering outlines around meshes.
-#[derive(Clone, TypeUuid)]
+#[derive(Clone, TypeUuid, AsBindGroup)]
 #[uuid = "552e416b-2766-4e6a-9ee5-9ebd0e8c0230"]
 pub struct Outline {
     /// Colour of the outline
+    #[uniform(1, visibility(fragment))]
     pub colour: Color,
     /// Width of the outline in logical pixels
+    #[uniform(0, visibility(vertex))]
     pub width: f32,
 }
 
@@ -47,7 +49,12 @@ impl RenderAsset for Outline {
 
     type PreparedAsset = GpuOutline;
 
-    type Param = (SRes<RenderDevice>, SRes<OutlinePipeline>);
+    type Param = (
+        SRes<RenderDevice>,
+        SRes<OutlinePipeline>,
+        SRes<RenderAssets<Image>>,
+        SRes<FallbackImage>,
+    );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
         self.clone()
@@ -55,57 +62,35 @@ impl RenderAsset for Outline {
 
     fn prepare_asset(
         outline: Self::ExtractedAsset,
-        (render_device, outline_pipeline): &mut bevy::ecs::system::SystemParamItem<Self::Param>,
+        (render_device, outline_pipeline, images, fallback_image): &mut bevy::ecs::system::SystemParamItem<Self::Param>,
     ) -> Result<
         Self::PreparedAsset,
         bevy::render::render_asset::PrepareAssetError<Self::ExtractedAsset>,
     > {
-        let colour = outline.colour.as_linear_rgba_f32().into();
-        let vbuffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("outline_vertex_stage_uniform_buffer"),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            contents: VertexStageData {
-                width: outline.width,
-            }
-            .as_std140()
-            .as_bytes(),
-        });
-        let fbuffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("outline_fragment_stage_uniform_buffer"),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            contents: FragmentStageData { colour }.as_std140().as_bytes(),
-        });
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: Some("outline_bind_group"),
-            layout: &outline_pipeline.outline_bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: vbuffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: fbuffer.as_entire_binding(),
-                },
-            ],
-        });
-        Ok(GpuOutline {
-            _vertex_stage_buffer: vbuffer,
-            _fragment_stage_buffer: fbuffer,
-            bind_group,
-            transparent: colour.w < 1.0,
-        })
+        if let Ok(pbg) = outline.as_bind_group(
+            &outline_pipeline.outline_bind_group_layout,
+            render_device,
+            images,
+            fallback_image,
+        ) {
+            Ok(GpuOutline {
+                bind_group: pbg,
+                transparent: outline.colour.a() < 1.0,
+            })
+        } else {
+            Err(PrepareAssetError::RetryNextUpdate(outline))
+        }
     }
 }
 
-#[derive(Clone, Component, AsStd140)]
+#[derive(Clone, Component, ShaderType)]
 struct ViewSizeUniform {
     logical_size: Vec2,
 }
 
 #[derive(Default)]
 struct ViewSizeUniforms {
-    pub uniforms: DynamicUniformVec<ViewSizeUniform>,
+    pub uniforms: DynamicUniformBuffer<ViewSizeUniform>,
 }
 
 #[derive(Component)]
@@ -117,20 +102,8 @@ struct GpuViewSize {
     bind_group: BindGroup,
 }
 
-#[derive(Clone, AsStd140)]
-struct VertexStageData {
-    width: f32,
-}
-
-#[derive(Clone, AsStd140)]
-struct FragmentStageData {
-    colour: Vec4,
-}
-
 pub struct GpuOutline {
-    _vertex_stage_buffer: Buffer,
-    _fragment_stage_buffer: Buffer,
-    bind_group: BindGroup,
+    bind_group: PreparedBindGroup<Outline>,
     transparent: bool,
 }
 
@@ -203,25 +176,23 @@ impl<const I: usize> EntityRenderCommand for SetOutlineBindGroup<I> {
     ) -> RenderCommandResult {
         let outline_handle = query.get(item).unwrap();
         let outline = outlines.into_inner().get(outline_handle).unwrap();
-        pass.set_bind_group(I, &outline.bind_group, &[]);
+        pass.set_bind_group(I, &outline.bind_group.bind_group, &[]);
         RenderCommandResult::Success
     }
 }
 
 fn extract_view_size_uniforms(
     mut commands: Commands,
-    windows: Res<Windows>,
-    images: Res<Assets<Image>>,
-    active_camera: Res<ActiveCamera<Camera3d>>,
-    query: Query<&Camera, With<Camera3d>>,
+    query: Extract<Query<(Entity, &Camera), With<Camera3d>>>,
 ) {
-    if let Some(entity) = active_camera.get() {
-        if let Ok(camera) = query.get(entity) {
-            if let Some(size) = camera.target.get_logical_size(&windows, &images) {
-                commands
-                    .get_or_spawn(entity)
-                    .insert(ViewSizeUniform { logical_size: size });
-            }
+    for (entity, camera) in query.iter() {
+        if !camera.is_active {
+            continue;
+        }
+        if let Some(size) = camera.logical_viewport_size() {
+            commands
+                .get_or_spawn(entity)
+                .insert(ViewSizeUniform { logical_size: size });
         }
     }
 }
@@ -348,43 +319,12 @@ impl FromWorld for OutlinePipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: true,
-                        min_binding_size: BufferSize::new(
-                            ViewSizeUniform::std140_size_static() as u64
-                        ),
+                        min_binding_size: BufferSize::new(ViewSizeUniform::SHADER_SIZE.get()),
                     },
                     count: None,
                 }],
             });
-        let outline_bind_group_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("outline_bind_group_layout"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::VERTEX,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: BufferSize::new(
-                                VertexStageData::std140_size_static() as u64,
-                            ),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: BufferSize::new(
-                                FragmentStageData::std140_size_static() as u64,
-                            ),
-                        },
-                        count: None,
-                    },
-                ],
-            });
+        let outline_bind_group_layout = Outline::bind_group_layout(&render_device);
         OutlinePipeline {
             mesh_pipeline,
             view_size_bind_group_layout,
