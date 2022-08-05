@@ -118,6 +118,7 @@ impl CachedRenderPipelinePhaseItem for TransparentOutline {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct OutlineNode {
     query: QueryState<
         (

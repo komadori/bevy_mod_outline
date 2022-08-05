@@ -147,7 +147,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 buffers,
             },
             fragment: Some(FragmentState {
-                shader: shader.clone().typed::<Shader>(),
+                shader: shader.typed::<Shader>(),
                 shader_defs: vec![],
                 entry_point: "fragment".into(),
                 targets,
