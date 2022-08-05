@@ -1,7 +1,6 @@
-#import bevy_pbr::mesh_types
-#import bevy_pbr::mesh_view_bindings
+#import bevy_mod_outline::common
 
-struct Vertex {
+struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
 };
@@ -10,29 +9,26 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
 };
 
-struct ViewSizeUniforms {
-    logical_size: vec2<f32>,
+struct OutlineViewUniform {
+    scale: vec2<f32>,
 };
 
-struct VertexStageData {
+struct OutlineVertexUniform {
     width: f32,
 };
 
-struct FragmentStageData {
+struct OutlineFragmentUniform {
     colour: vec4<f32>,
 };
 
-@group(1) @binding(0)
-var<uniform> mesh: Mesh;
-
 @group(2) @binding(0)
-var<uniform> view_size: ViewSizeUniforms;
+var<uniform> view_uniform: OutlineViewUniform;
 
 @group(3) @binding(0)
-var<uniform> vstage: VertexStageData;
+var<uniform> vstage: OutlineVertexUniform;
 
 @group(3) @binding(1)
-var<uniform> fstage: FragmentStageData;
+var<uniform> fstage: OutlineFragmentUniform;
 
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
     return mat3x3<f32>(
@@ -41,12 +37,12 @@ fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
 }
 
 @vertex
-fn vertex(vertex: Vertex) -> VertexOutput {
+fn vertex(vertex: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     var clip_pos = view.view_proj * (mesh.model * vec4<f32>(vertex.position, 1.0));
     var clip_norm = mat4to3(view.view_proj) * (mat4to3(mesh.model) * normalize(vertex.normal));
-    var clip_delta = vec4<f32>(2.0 * vstage.width * normalize(clip_norm.xy) * clip_pos.w / view_size.logical_size, 0.0, 0.0);
-    out.clip_position = clip_pos + clip_delta;
+    var clip_delta = vec2<f32>(vstage.width * normalize(clip_norm.xy) * clip_pos.w * view_uniform.scale);
+    out.clip_position = vec4<f32>((clip_pos.xy + clip_delta) / clip_pos.w, model_origin_z(), 1.0);
     return out;
 }
 

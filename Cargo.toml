@@ -15,7 +15,6 @@ bevy = { version = "0.8", default-features = false, features = [
     "bevy_asset",
     "render",
 ] }
-libm = "0.2"
 
 [dev-dependencies]
 bevy = { version = "0.8", default-features = false, features = [
@@ -24,5 +23,5 @@ bevy = { version = "0.8", default-features = false, features = [
 ] }
 
 [[example]]
-name = "torus"
-path = "examples/torus.rs"
+name = "shapes"
+path = "examples/shapes.rs"
