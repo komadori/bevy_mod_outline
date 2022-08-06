@@ -169,8 +169,8 @@ impl Node for OutlineNode {
                 } // No window
             };
 
-        // Always run stencil pass to ensure depth buffer is cleared
-        {
+        // If drawing anything, run stencil pass to clear the depth buffer
+        if !opaque_phase.items.is_empty() || !transparent_phase.items.is_empty() {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],
