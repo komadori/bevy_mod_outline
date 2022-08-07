@@ -22,6 +22,7 @@ use bevy::{
 
 use crate::uniforms::{OutlineFragmentUniform, OutlineVertexUniform};
 use crate::view_uniforms::OutlineViewUniform;
+use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
 pub const COMMON_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 9448276477068917228);
@@ -108,7 +109,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
     fn specialize(
         &self,
         (key, pass_type): Self::Key,
-        layout: &MeshVertexBufferLayout,
+        mesh_layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
         let mut bind_layouts = vec![
@@ -135,10 +136,17 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 
                 bind_layouts.push(self.outline_view_bind_group_layout.clone());
                 bind_layouts.push(self.outline_bind_group_layout.clone());
-                buffer_attrs.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(1));
+                buffer_attrs.push(
+                    if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
+                        ATTRIBUTE_OUTLINE_NORMAL
+                    } else {
+                        Mesh::ATTRIBUTE_NORMAL
+                    }
+                    .at_shader_location(1),
+                );
             }
         }
-        let buffers = vec![layout.get_layout(&buffer_attrs)?];
+        let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: shader.clone().typed::<Shader>(),

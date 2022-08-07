@@ -4,10 +4,12 @@ use bevy::prelude::*;
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
+use bevy::render::mesh::{MeshVertexAttribute, VertexAttributeValues};
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
-use bevy::render::render_resource::SpecializedMeshPipelines;
+use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
+use bevy::utils::{FloatOrd, HashMap};
 
 use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -27,7 +29,14 @@ mod view_uniforms;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
-/// A component for stenciling meshes during outline rendering
+/// The direction to extrude the vertex when rendering the outline.
+pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute = MeshVertexAttribute::new(
+    "Outline_Normal",
+    1585570526414773879,
+    VertexFormat::Float32x3,
+);
+
+/// A component for stenciling meshes during outline rendering.
 #[derive(Component, Default)]
 pub struct OutlineStencil;
 
@@ -47,6 +56,61 @@ pub struct Outline {
     pub width: f32,
     /// Colour of the outline
     pub colour: Color,
+}
+
+/// Failed to generate outline normals for the mesh.
+#[derive(thiserror::Error, Debug)]
+pub enum GenerateOutlineNormalsError {
+    #[error("missing vertex attributes '{0}'")]
+    MissingVertexAttribute(&'static str),
+    #[error("the '{0}' vertex attribute should have {1:?} format, but had {2:?} format")]
+    InvalidVertexAttributeFormat(&'static str, VertexFormat, VertexFormat),
+}
+
+pub trait OutlineMeshExt {
+    /// Generates outline normals for the mesh by normalising the sum of the regular normals.
+    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
+}
+
+impl OutlineMeshExt for Mesh {
+    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError> {
+        let positions = match self.attribute(Mesh::ATTRIBUTE_POSITION).ok_or(
+            GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
+        )? {
+            VertexAttributeValues::Float32x3(p) => Ok(p),
+            v => Err(GenerateOutlineNormalsError::InvalidVertexAttributeFormat(
+                Mesh::ATTRIBUTE_POSITION.name,
+                VertexFormat::Float32x3,
+                v.into(),
+            )),
+        }?;
+        let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL).ok_or(
+            GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
+        )? {
+            VertexAttributeValues::Float32x3(n) => Ok(n),
+            v => Err(GenerateOutlineNormalsError::InvalidVertexAttributeFormat(
+                Mesh::ATTRIBUTE_NORMAL.name,
+                VertexFormat::Float32x3,
+                v.into(),
+            )),
+        }?;
+        let mut map = HashMap::with_capacity(positions.len());
+        for (p, n) in positions.iter().zip(normals.iter()) {
+            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
+            let value = Vec3::from_array(*n);
+            map.entry(key).and_modify(|e| *e += value).or_insert(value);
+        }
+        let mut outlines = Vec::with_capacity(positions.len());
+        for p in positions.iter() {
+            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
+            outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+        }
+        self.insert_attribute(
+            ATTRIBUTE_OUTLINE_NORMAL,
+            VertexAttributeValues::Float32x3(outlines),
+        );
+        Ok(())
+    }
 }
 
 /// Adds support for rendering outlines.

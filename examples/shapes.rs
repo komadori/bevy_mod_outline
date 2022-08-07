@@ -1,6 +1,9 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::prelude::{shape::Torus, *};
+use bevy::prelude::{
+    shape::{Cube, Torus},
+    *,
+};
 
 use bevy_mod_outline::*;
 
@@ -33,14 +36,11 @@ fn setup(
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
+    let mut cube_mesh = Mesh::from(Cube { size: 1.0 });
+    cube_mesh.generate_outline_normals().unwrap();
     commands
         .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(Torus {
-                radius: 0.6,
-                ring_radius: 0.2,
-                subdivisions_segments: 20,
-                subdivisions_sides: 10,
-            })),
+            mesh: meshes.add(cube_mesh),
             material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
