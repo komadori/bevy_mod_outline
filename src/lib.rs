@@ -83,6 +83,9 @@ pub enum GenerateOutlineNormalsError {
 pub trait OutlineMeshExt {
     /// Generates outline normals for the mesh by normalising the sum of the regular normals.
     ///
+    /// To the extent that outline normals are not perpendicular to the surface of the mesh,
+    /// this may result in non-uniform outline thickness.
+    ///
     /// This function will silently do nothing if the outline normals would be equal to the
     /// regular normals.
     fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
