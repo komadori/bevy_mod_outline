@@ -1,8 +1,11 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::prelude::{
-    shape::{Cube, Torus},
-    *,
+use bevy::{
+    prelude::{
+        shape::{Cube, Torus},
+        *,
+    },
+    window::close_on_esc,
 };
 
 use bevy_mod_outline::*;
@@ -15,6 +18,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(OutlinePlugin)
         .add_startup_system(setup)
+        .add_system(close_on_esc)
         .add_system(wobble)
         .add_system(orbit)
         .run();
@@ -31,12 +35,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
-
+    // Add cube with generated outline normals
     let mut cube_mesh = Mesh::from(Cube { size: 1.0 });
     cube_mesh.generate_outline_normals().unwrap();
     commands
@@ -56,6 +55,7 @@ fn setup(
         })
         .insert(Wobbles);
 
+    // Add torus using the regular surface normals for outlining
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(Torus {
@@ -78,6 +78,13 @@ fn setup(
             ..default()
         })
         .insert(Orbits);
+
+    // Add plane, light source, and camera
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
+        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        ..default()
+    });
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
             intensity: 1500.0,
