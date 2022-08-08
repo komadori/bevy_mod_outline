@@ -67,8 +67,12 @@ pub enum GenerateOutlineNormalsError {
     InvalidVertexAttributeFormat(&'static str, VertexFormat, VertexFormat),
 }
 
+/// Extension methods for [`Mesh`].
 pub trait OutlineMeshExt {
     /// Generates outline normals for the mesh by normalising the sum of the regular normals.
+    ///
+    /// This function will silently do nothing if the outline normals would be equal to the
+    /// regular normals.
     fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
 }
 
@@ -95,20 +99,28 @@ impl OutlineMeshExt for Mesh {
             )),
         }?;
         let mut map = HashMap::with_capacity(positions.len());
+        let mut modified = false;
         for (p, n) in positions.iter().zip(normals.iter()) {
             let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
             let value = Vec3::from_array(*n);
-            map.entry(key).and_modify(|e| *e += value).or_insert(value);
+            map.entry(key)
+                .and_modify(|e| {
+                    modified = true;
+                    *e += value
+                })
+                .or_insert(value);
         }
-        let mut outlines = Vec::with_capacity(positions.len());
-        for p in positions.iter() {
-            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-            outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+        if modified {
+            let mut outlines = Vec::with_capacity(positions.len());
+            for p in positions.iter() {
+                let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
+                outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+            }
+            self.insert_attribute(
+                ATTRIBUTE_OUTLINE_NORMAL,
+                VertexAttributeValues::Float32x3(outlines),
+            );
         }
-        self.insert_attribute(
-            ATTRIBUTE_OUTLINE_NORMAL,
-            VertexAttributeValues::Float32x3(outlines),
-        );
         Ok(())
     }
 }
