@@ -36,6 +36,7 @@ fn setup(
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
+
     let mut cube_mesh = Mesh::from(Cube { size: 1.0 });
     cube_mesh.generate_outline_normals().unwrap();
     commands
@@ -46,11 +47,13 @@ fn setup(
             ..default()
         })
         .insert(Outline {
+            visible: true,
             colour: Color::rgba(0.0, 1.0, 0.0, 1.0),
             width: 25.0,
         })
         .insert(OutlineStencil)
         .insert(Wobbles);
+
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(Torus {
@@ -65,6 +68,7 @@ fn setup(
             ..default()
         })
         .insert(Outline {
+            visible: true,
             colour: Color::rgba(1.0, 0.0, 1.0, 0.3),
             width: 15.0,
         })

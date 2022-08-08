@@ -1,17 +1,15 @@
 use bevy::{
-    ecs::{
-        query::QueryItem,
-        system::{
-            lifetimeless::{Read, SQuery, SRes},
-            SystemParamItem,
-        },
+    ecs::system::{
+        lifetimeless::{Read, SQuery, SRes},
+        SystemParamItem,
     },
     prelude::*,
     render::{
-        extract_component::{ComponentUniforms, DynamicUniformIndex, ExtractComponent},
+        extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
+        Extract,
     },
 };
 
@@ -22,33 +20,29 @@ pub struct OutlineVertexUniform {
     pub width: f32,
 }
 
-impl ExtractComponent for OutlineVertexUniform {
-    type Query = Read<Outline>;
-    type Filter = ();
-
-    fn extract_component(item: QueryItem<Self::Query>) -> Self {
-        OutlineVertexUniform { width: item.width }
-    }
-}
-
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineFragmentUniform {
     pub colour: Vec4,
 }
 
-impl ExtractComponent for OutlineFragmentUniform {
-    type Query = Read<Outline>;
-    type Filter = ();
-
-    fn extract_component(item: QueryItem<Self::Query>) -> Self {
-        OutlineFragmentUniform {
-            colour: item.colour.as_linear_rgba_f32().into(),
-        }
-    }
-}
-
 pub struct OutlineBindGroup {
     pub bind_group: BindGroup,
+}
+
+pub fn extract_outline_uniforms(mut commands: Commands, query: Extract<Query<(Entity, &Outline)>>) {
+    for (entity, outline) in query.iter() {
+        if !outline.visible || outline.colour.a() == 0.0 {
+            continue;
+        }
+        commands
+            .get_or_spawn(entity)
+            .insert(OutlineVertexUniform {
+                width: outline.width,
+            })
+            .insert(OutlineFragmentUniform {
+                colour: outline.colour.as_linear_rgba_f32().into(),
+            });
+    }
 }
 
 pub fn queue_outline_bind_group(

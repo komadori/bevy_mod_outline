@@ -16,7 +16,10 @@ use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline
 use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, OUTLINE_SHADER_HANDLE, STENCIL_SHADER_HANDLE,
 };
-use crate::uniforms::{queue_outline_bind_group, OutlineFragmentUniform, OutlineVertexUniform};
+use crate::uniforms::{
+    extract_outline_uniforms, queue_outline_bind_group, OutlineFragmentUniform,
+    OutlineVertexUniform,
+};
 use crate::view_uniforms::{
     extract_outline_view_uniforms, queue_outline_view_bind_group, OutlineViewUniform,
 };
@@ -52,6 +55,8 @@ impl ExtractComponent for OutlineStencil {
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component)]
 pub struct Outline {
+    /// Enable rendering of the outline
+    pub visible: bool,
     /// Width of the outline in logical pixels
     pub width: f32,
     /// Colour of the outline
@@ -145,8 +150,6 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
-            .add_plugin(ExtractComponentPlugin::<OutlineVertexUniform>::default())
-            .add_plugin(ExtractComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineVertexUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
@@ -160,6 +163,7 @@ impl Plugin for OutlinePlugin {
             .add_render_command::<OpaqueOutline, DrawOutline>()
             .add_render_command::<TransparentOutline, DrawOutline>()
             .add_system_to_stage(RenderStage::Extract, extract_outline_view_uniforms)
+            .add_system_to_stage(RenderStage::Extract, extract_outline_uniforms)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<StencilOutline>)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<OpaqueOutline>)
             .add_system_to_stage(
