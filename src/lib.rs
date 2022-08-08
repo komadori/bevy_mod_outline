@@ -81,10 +81,15 @@ pub enum GenerateOutlineNormalsError {
 
 /// Extension methods for [`Mesh`].
 pub trait OutlineMeshExt {
-    /// Generates outline normals for the mesh by normalising the sum of the regular normals.
+    /// Generates outline normals for the mesh from the regular normals.
     ///
-    /// To the extent that outline normals are not perpendicular to the surface of the mesh,
-    /// this may result in non-uniform outline thickness.
+    /// Vertex extrusion only works for meshes with smooth surface normals. Hard edges cause
+    /// visual artefacts. This function generates faux-smooth normals for outlining purposes
+    /// by grouping vertices by their position and averaging the normals at each point. These
+    /// outline normals are then inserted as a separate vertex attribute so that the regular
+    /// normals remain untouched. However, insofar as the outline normals are not
+    /// perpendicular to the surface of the mesh, this technique may result in non-uniform
+    /// outline thickness.
     ///
     /// This function will silently do nothing if the outline normals would be equal to the
     /// regular normals.
