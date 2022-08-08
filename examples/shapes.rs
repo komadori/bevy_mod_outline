@@ -46,12 +46,14 @@ fn setup(
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
         })
-        .insert(Outline {
-            visible: true,
-            colour: Color::rgba(0.0, 1.0, 0.0, 1.0),
-            width: 25.0,
+        .insert_bundle(OutlineBundle {
+            outline: Outline {
+                visible: true,
+                colour: Color::rgba(0.0, 1.0, 0.0, 1.0),
+                width: 25.0,
+            },
+            ..default()
         })
-        .insert(OutlineStencil)
         .insert(Wobbles);
 
     commands
@@ -67,12 +69,14 @@ fn setup(
                 .with_rotation(Quat::from_rotation_x(0.5 * PI)),
             ..default()
         })
-        .insert(Outline {
-            visible: true,
-            colour: Color::rgba(1.0, 0.0, 1.0, 0.3),
-            width: 15.0,
+        .insert_bundle(OutlineBundle {
+            outline: Outline {
+                visible: true,
+                colour: Color::rgba(1.0, 0.0, 1.0, 0.3),
+                width: 15.0,
+            },
+            ..default()
         })
-        .insert(OutlineStencil)
         .insert(Orbits);
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {

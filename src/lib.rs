@@ -40,7 +40,7 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute = MeshVertexAttribute::n
 );
 
 /// A component for stenciling meshes during outline rendering.
-#[derive(Component, Default)]
+#[derive(Clone, Component, Default)]
 pub struct OutlineStencil;
 
 impl ExtractComponent for OutlineStencil {
@@ -53,7 +53,7 @@ impl ExtractComponent for OutlineStencil {
 }
 
 /// A component for rendering outlines around meshes.
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Default)]
 pub struct Outline {
     /// Enable rendering of the outline
     pub visible: bool,
@@ -61,6 +61,13 @@ pub struct Outline {
     pub width: f32,
     /// Colour of the outline
     pub colour: Color,
+}
+
+/// A bundle for rendering stenciled outlines around meshes.
+#[derive(Bundle, Clone, Component, Default)]
+pub struct OutlineBundle {
+    pub outline: Outline,
+    pub stencil: OutlineStencil,
 }
 
 /// Failed to generate outline normals for the mesh.
