@@ -5,10 +5,6 @@ struct VertexInput {
     @location(1) normal: vec3<f32>,
 };
 
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-};
-
 struct OutlineViewUniform {
     scale: vec2<f32>,
 };
@@ -37,13 +33,12 @@ fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
 }
 
 @vertex
-fn vertex(vertex: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
+fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
     var clip_pos = view.view_proj * (mesh.model * vec4<f32>(vertex.position, 1.0));
     var clip_norm = mat4to3(view.view_proj) * (mat4to3(mesh.model) * vertex.normal);
-    var clip_delta = vec2<f32>(vstage.width * normalize(clip_norm.xy) * clip_pos.w * view_uniform.scale);
-    out.clip_position = vec4<f32>((clip_pos.xy + clip_delta) / clip_pos.w, model_origin_z(), 1.0);
-    return out;
+    var ndc_pos = clip_pos.xy / clip_pos.w;
+    var ndc_delta = vstage.width * normalize(clip_norm.xy) * view_uniform.scale;
+    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(mesh.model, view.view_proj), 1.0);
 }
 
 @fragment

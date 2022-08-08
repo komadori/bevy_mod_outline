@@ -5,11 +5,11 @@
 @group(1) @binding(0)
 var<uniform> mesh: Mesh;
 
-fn model_origin_z() -> f32 {
-    var origin = mesh.model[3]; 
+fn model_origin_z(model: mat4x4<f32>, view_proj: mat4x4<f32>) -> f32 {
+    var origin = model[3]; 
     var proj_zw = mat4x2<f32>(
-        view.view_proj[0].zw, view.view_proj[1].zw,
-        view.view_proj[2].zw, view.view_proj[3].zw);
+        view_proj[0].zw, view_proj[1].zw,
+        view_proj[2].zw, view_proj[3].zw);
     var zw = proj_zw * origin;
     return zw.x / zw.y;
 }
