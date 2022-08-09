@@ -1,3 +1,18 @@
+//! This crate provides a Bevy plugin, [`OutlinePlugin`], and associated components for
+//! rendering outlines around meshes using the vertex extrusion method.
+//! 
+//! Outlines are rendered in a seperate pass following the main 3D pass. The effect of this
+//! pass is to present the outlines in depth sorted order according to the model translation
+//! of each mesh. This ensures that outlines are not clipped by other geometry.
+//! 
+//! The [`Outline`] component will, by itself, cover the original object entirely with the
+//! outline colour. The [`OutlineStencil`] component must also be added to prevent the body of
+//! an object from being filled it. This must be added to any entity which needs to appear on
+//! top of an outline.
+//! 
+//! Vertex extrusion works best with meshes that have smooth surfaces. For meshes with hard
+//! edges, see the [`OutlineMeshExt::generate_outline_normals`] function.
+
 use bevy::asset::load_internal_asset;
 use bevy::ecs::query::QueryItem;
 use bevy::prelude::*;
