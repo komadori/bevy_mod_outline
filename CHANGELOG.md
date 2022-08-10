@@ -1,5 +1,14 @@
 # Changelog
 
+## bevy_mod_outline 0.2.1 (2022-08-10)
+
+### Added
+- Added a constant to expose the outline pass node name.
+
+### Fixed
+- Fixed outlines causing UI to disappear when MSAA is enabled.
+- Fixed bad derive allowing OutlineBundle to be inserted as a component.
+
 ## bevy_mod_outline 0.2.0 (2022-08-09)
 
 ### Added
