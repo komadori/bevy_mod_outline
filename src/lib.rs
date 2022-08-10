@@ -79,7 +79,7 @@ pub struct Outline {
 }
 
 /// A bundle for rendering stenciled outlines around meshes.
-#[derive(Bundle, Clone, Component, Default)]
+#[derive(Bundle, Clone, Default)]
 pub struct OutlineBundle {
     pub outline: Outline,
     pub stencil: OutlineStencil,
