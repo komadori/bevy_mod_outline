@@ -54,6 +54,12 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute = MeshVertexAttribute::n
     VertexFormat::Float32x3,
 );
 
+/// Name of the render graph node which draws the outlines.
+///
+/// This node runs after the main 3D passes and before the UI pass. The name can be used to
+/// add additional constrants on node execution order with respect to other passes.
+pub const OUTLINE_PASS_NODE_NAME: &str = "bevy_mod_outline_node";
+
 /// A component for stenciling meshes during outline rendering.
 #[derive(Clone, Component, Default)]
 pub struct OutlineStencil;
@@ -213,12 +219,12 @@ impl Plugin for OutlinePlugin {
         let draw_3d_graph = graph
             .get_sub_graph_mut(bevy::core_pipeline::core_3d::graph::NAME)
             .unwrap();
-        draw_3d_graph.add_node(OutlineNode::NAME, node);
+        draw_3d_graph.add_node(OUTLINE_PASS_NODE_NAME, node);
         draw_3d_graph
             .add_slot_edge(
                 draw_3d_graph.input_node().unwrap().id,
                 bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
-                OutlineNode::NAME,
+                OUTLINE_PASS_NODE_NAME,
                 OutlineNode::IN_VIEW,
             )
             .unwrap();
@@ -227,11 +233,14 @@ impl Plugin for OutlinePlugin {
         draw_3d_graph
             .add_node_edge(
                 bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
-                OutlineNode::NAME,
+                OUTLINE_PASS_NODE_NAME,
             )
             .unwrap();
         draw_3d_graph
-            .add_node_edge(OutlineNode::NAME, bevy::ui::draw_ui_graph::node::UI_PASS)
+            .add_node_edge(
+                OUTLINE_PASS_NODE_NAME,
+                bevy::ui::draw_ui_graph::node::UI_PASS,
+            )
             .unwrap();
     }
 }

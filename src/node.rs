@@ -135,7 +135,6 @@ pub struct OutlineNode {
 }
 
 impl OutlineNode {
-    pub const NAME: &'static str = "outline_node";
     pub const IN_VIEW: &'static str = "view";
 
     pub fn new(world: &mut World) -> Self {
