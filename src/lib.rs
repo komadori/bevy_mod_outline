@@ -215,18 +215,23 @@ impl Plugin for OutlinePlugin {
             .unwrap();
         draw_3d_graph.add_node(OutlineNode::NAME, node);
         draw_3d_graph
-            .add_node_edge(
-                bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
-                OutlineNode::NAME,
-            )
-            .unwrap();
-        draw_3d_graph
             .add_slot_edge(
                 draw_3d_graph.input_node().unwrap().id,
                 bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
                 OutlineNode::NAME,
                 OutlineNode::IN_VIEW,
             )
+            .unwrap();
+
+        // Run after main 3D pass, but before UI psss
+        draw_3d_graph
+            .add_node_edge(
+                bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
+                OutlineNode::NAME,
+            )
+            .unwrap();
+        draw_3d_graph
+            .add_node_edge(OutlineNode::NAME, bevy::ui::draw_ui_graph::node::UI_PASS)
             .unwrap();
     }
 }
