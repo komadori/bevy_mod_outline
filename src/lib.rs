@@ -57,7 +57,7 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute = MeshVertexAttribute::n
 /// Name of the render graph node which draws the outlines.
 ///
 /// This node runs after the main 3D passes and before the UI pass. The name can be used to
-/// add additional constrants on node execution order with respect to other passes.
+/// add additional constraints on node execution order with respect to other passes.
 pub const OUTLINE_PASS_NODE_NAME: &str = "bevy_mod_outline_node";
 
 /// A component for stenciling meshes during outline rendering.
