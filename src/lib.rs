@@ -236,6 +236,7 @@ impl Plugin for OutlinePlugin {
                 OUTLINE_PASS_NODE_NAME,
             )
             .unwrap();
+        #[cfg(feature = "bevy_ui")]
         draw_3d_graph
             .add_node_edge(
                 OUTLINE_PASS_NODE_NAME,
