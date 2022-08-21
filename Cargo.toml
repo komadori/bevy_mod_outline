@@ -13,7 +13,9 @@ categories = ["game-engines", "rendering"]
 [dependencies]
 bevy = { version = "0.8", default-features = false, features = [
     "bevy_asset",
-    "render",
+    "bevy_render",
+    "bevy_pbr",
+    "bevy_core_pipeline",
 ] }
 thiserror = "1.0"
 
@@ -22,6 +24,10 @@ bevy = { version = "0.8", default-features = false, features = [
     "bevy_winit",
     "x11",
 ] }
+
+[features]
+default = ["bevy_ui"]
+bevy_ui = ["bevy/bevy_ui"]
 
 [[example]]
 name = "shapes"
