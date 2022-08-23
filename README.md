@@ -28,6 +28,13 @@ cargo run --example shapes
 | 0.1.x        | 0.7.x        |
 | 0.2.x        | 0.8.x        |
 
+## Features
+
+- `align16` _(default)_ - Aligns uniform structs to 16-byte boundaries.
+This is required by WebGL and some downlevel GPUs.
+- `bevy_ui` _(default)_ - Adds a render graph edge to prevent clashing with the UI.
+This adds a dependency on the `bevy_ui` crate and can disabled if it is not used.
+
 ## Licence
 
 This crate is licensed under the Apache License, Version 2.0 (see
