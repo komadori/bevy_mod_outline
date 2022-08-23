@@ -146,17 +146,22 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 );
             }
         }
+        let shader_defs = if cfg!(feature = "align16") {
+            vec!["ALIGN_16".to_string()]
+        } else {
+            vec![]
+        };
         let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: shader.clone().typed::<Shader>(),
                 entry_point: "vertex".into(),
-                shader_defs: vec![],
+                shader_defs: shader_defs.clone(),
                 buffers,
             },
             fragment: Some(FragmentState {
                 shader: shader.typed::<Shader>(),
-                shader_defs: vec![],
+                shader_defs,
                 entry_point: "fragment".into(),
                 targets,
             }),

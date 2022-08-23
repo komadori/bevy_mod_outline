@@ -26,7 +26,8 @@ bevy = { version = "0.8", default-features = false, features = [
 ] }
 
 [features]
-default = ["bevy_ui"]
+default = ["align16", "bevy_ui"]
+align16 = []
 bevy_ui = ["bevy/bevy_ui", "bevy/bevy_sprite", "bevy/bevy_text"]
 
 [[example]]

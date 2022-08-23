@@ -17,7 +17,7 @@ use crate::{pipeline::OutlinePipeline, Outline};
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineVertexUniform {
-    #[align(16)]
+    #[cfg_attr(feature = "align16", align(16))]
     pub width: f32,
 }
 

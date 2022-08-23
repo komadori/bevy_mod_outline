@@ -6,17 +6,23 @@ struct VertexInput {
 };
 
 struct OutlineViewUniform {
+#ifdef ALIGN_16
     @align(16)
+#endif
     scale: vec2<f32>,
 };
 
 struct OutlineVertexUniform {
+#ifdef ALIGN_16
     @align(16)
+#endif
     width: f32,
 };
 
 struct OutlineFragmentUniform {
+#ifdef ALIGN_16
     @align(16)
+#endif
     colour: vec4<f32>,
 };
 
