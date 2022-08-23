@@ -17,11 +17,13 @@ use crate::{pipeline::OutlinePipeline, Outline};
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineVertexUniform {
+    #[align(16)]
     pub width: f32,
 }
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineFragmentUniform {
+    #[align(16)]
     pub colour: Vec4,
 }
 
