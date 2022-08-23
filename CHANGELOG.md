@@ -1,5 +1,18 @@
 # Changelog
 
+## bevy_mod_outline 0.2.2 (2022-08-23)
+
+### Added
+- Added a feature flag to control the dependency on bevy_ui (@Shatur).
+- Added a feature flag to control uniform struct alignment.
+
+### Fixed
+- Fixed compilation on 32-bit platforms.
+- Fixed insufficient alignment causing errors with WebGL.
+
+### Changed
+- Removed dependency on bevy's monolithic render feature flag (@Shatur).
+
 ## bevy_mod_outline 0.2.1 (2022-08-10)
 
 ### Added
