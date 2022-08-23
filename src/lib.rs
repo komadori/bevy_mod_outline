@@ -48,11 +48,8 @@ mod view_uniforms;
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
 /// The direction to extrude the vertex when rendering the outline.
-pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute = MeshVertexAttribute::new(
-    "Outline_Normal",
-    1585570526414773879,
-    VertexFormat::Float32x3,
-);
+pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
+    MeshVertexAttribute::new("Outline_Normal", 1585570526, VertexFormat::Float32x3);
 
 /// Name of the render graph node which draws the outlines.
 ///
