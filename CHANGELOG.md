@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.2.3 (2022-08-28)
+
+### Added
+- Added AutoGenerateOutlineNormalsPlugin.
+
 ## bevy_mod_outline 0.2.2 (2022-08-23)
 
 ### Added
