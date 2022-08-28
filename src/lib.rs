@@ -10,8 +10,10 @@
 //! an object from being filled it. This must be added to any entity which needs to appear on
 //! top of an outline.
 //!
-//! Vertex extrusion works best with meshes that have smooth surfaces. For meshes with hard
-//! edges, see the [`OutlineMeshExt::generate_outline_normals`] function.
+//! Vertex extrusion works best with meshes that have smooth surfaces. To avoid visual
+//! artefacts when outlining meshes with hard edges, see the
+//! [`OutlineMeshExt::generate_outline_normals`] function and the
+//! [`AutoGenerateOutlineNormalsPlugin`].
 
 use bevy::asset::load_internal_asset;
 use bevy::ecs::query::QueryItem;
@@ -19,12 +21,11 @@ use bevy::prelude::*;
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
-use bevy::render::mesh::{MeshVertexAttribute, VertexAttributeValues};
+use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
-use bevy::utils::{FloatOrd, HashMap};
 
 use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -40,10 +41,13 @@ use crate::view_uniforms::{
 };
 
 mod draw;
+mod generate;
 mod node;
 mod pipeline;
 mod uniforms;
 mod view_uniforms;
+
+pub use generate::*;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
@@ -86,81 +90,6 @@ pub struct Outline {
 pub struct OutlineBundle {
     pub outline: Outline,
     pub stencil: OutlineStencil,
-}
-
-/// Failed to generate outline normals for the mesh.
-#[derive(thiserror::Error, Debug)]
-pub enum GenerateOutlineNormalsError {
-    #[error("missing vertex attributes '{0}'")]
-    MissingVertexAttribute(&'static str),
-    #[error("the '{0}' vertex attribute should have {1:?} format, but had {2:?} format")]
-    InvalidVertexAttributeFormat(&'static str, VertexFormat, VertexFormat),
-}
-
-/// Extension methods for [`Mesh`].
-pub trait OutlineMeshExt {
-    /// Generates outline normals for the mesh from the regular normals.
-    ///
-    /// Vertex extrusion only works for meshes with smooth surface normals. Hard edges cause
-    /// visual artefacts. This function generates faux-smooth normals for outlining purposes
-    /// by grouping vertices by their position and averaging the normals at each point. These
-    /// outline normals are then inserted as a separate vertex attribute so that the regular
-    /// normals remain untouched. However, insofar as the outline normals are not
-    /// perpendicular to the surface of the mesh, this technique may result in non-uniform
-    /// outline thickness.
-    ///
-    /// This function will silently do nothing if the outline normals would be equal to the
-    /// regular normals.
-    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
-}
-
-impl OutlineMeshExt for Mesh {
-    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError> {
-        let positions = match self.attribute(Mesh::ATTRIBUTE_POSITION).ok_or(
-            GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
-        )? {
-            VertexAttributeValues::Float32x3(p) => Ok(p),
-            v => Err(GenerateOutlineNormalsError::InvalidVertexAttributeFormat(
-                Mesh::ATTRIBUTE_POSITION.name,
-                VertexFormat::Float32x3,
-                v.into(),
-            )),
-        }?;
-        let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL).ok_or(
-            GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
-        )? {
-            VertexAttributeValues::Float32x3(n) => Ok(n),
-            v => Err(GenerateOutlineNormalsError::InvalidVertexAttributeFormat(
-                Mesh::ATTRIBUTE_NORMAL.name,
-                VertexFormat::Float32x3,
-                v.into(),
-            )),
-        }?;
-        let mut map = HashMap::with_capacity(positions.len());
-        let mut modified = false;
-        for (p, n) in positions.iter().zip(normals.iter()) {
-            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-            let value = Vec3::from_array(*n);
-            map.entry(key)
-                .and_modify(|e| {
-                    modified = true;
-                    *e += value
-                })
-                .or_insert(value);
-        }
-        if modified {
-            let mut outlines = Vec::with_capacity(positions.len());
-            for p in positions.iter() {
-                let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-                outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
-            }
-            self.insert_attribute(
-                ATTRIBUTE_OUTLINE_NORMAL,
-                VertexAttributeValues::Float32x3(outlines),
-            );
-        }
-        Ok(())
-    }
 }
 
 /// Adds support for rendering outlines.
