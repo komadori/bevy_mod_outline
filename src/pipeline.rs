@@ -112,11 +112,25 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         mesh_layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
-        let mut bind_layouts = vec![
-            self.mesh_pipeline.view_layout.clone(),
-            self.mesh_pipeline.mesh_layout.clone(),
-        ];
+        let mut bind_layouts = vec![self.mesh_pipeline.view_layout.clone()];
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
+        let mut shader_defs = if cfg!(feature = "align16") {
+            vec!["ALIGN_16".to_string()]
+        } else {
+            vec![]
+        };
+        bind_layouts.push(
+            if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
+                && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
+            {
+                shader_defs.push("SKINNED".to_string());
+                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(2));
+                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(3));
+                self.mesh_pipeline.skinned_mesh_layout.clone()
+            } else {
+                self.mesh_pipeline.mesh_layout.clone()
+            },
+        );
         let shader;
         match pass_type {
             PassType::Stencil => {
@@ -146,11 +160,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 );
             }
         }
-        let shader_defs = if cfg!(feature = "align16") {
-            vec!["ALIGN_16".to_string()]
-        } else {
-            vec![]
-        };
         let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
