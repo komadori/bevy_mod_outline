@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.2.4 (2022-10-12)
+
+### Fixed
+- Fixed adding outlines to jointed (skinned) meshes.
+
 ## bevy_mod_outline 0.2.3 (2022-08-28)
 
 ### Added
