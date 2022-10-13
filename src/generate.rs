@@ -87,7 +87,6 @@ fn auto_generate_outline_normals(
     mut squelch: Local<HashSet<Handle<Mesh>>>,
 ) {
     for event in events.iter() {
-        println!("{:?}", event);
         match event {
             AssetEvent::Created { handle } | AssetEvent::Modified { handle } => {
                 if squelch.contains(handle) {
