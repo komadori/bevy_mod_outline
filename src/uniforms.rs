@@ -17,7 +17,7 @@ use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, Outline, OutlineSte
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineStencilUniform {
-    #[cfg_attr(feature = "align16", align(16))]
+    #[align(16)]
     pub plane: Vec3,
 }
 
