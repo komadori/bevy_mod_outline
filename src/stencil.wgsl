@@ -8,6 +8,14 @@ struct VertexInput {
 #endif
 };
 
+struct OutlineStencilUniform {
+    @align(16)
+    plane: vec3<f32>,
+};
+
+@group(2) @binding(0)
+var<uniform> vstage: OutlineStencilUniform;
+
 @vertex
 fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
 #ifdef SKINNED
@@ -17,7 +25,7 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
 #endif
     var clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
     var ndc_pos = clip_pos.xy / clip_pos.w;
-    return vec4<f32>(ndc_pos, model_origin_z(mesh.model, view.view_proj), 1.0);
+    return vec4<f32>(ndc_pos, model_origin_z(vstage.plane, view.view_proj), 1.0);
 }
 
 @fragment

@@ -20,7 +20,7 @@ use bevy::{
     },
 };
 
-use crate::uniforms::{OutlineFragmentUniform, OutlineVertexUniform};
+use crate::uniforms::{OutlineFragmentUniform, OutlineStencilUniform, OutlineVertexUniform};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
@@ -43,6 +43,7 @@ pub enum PassType {
 pub struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
     pub outline_view_bind_group_layout: BindGroupLayout,
+    pub outline_stencil_bind_group_layout: BindGroupLayout,
     pub outline_bind_group_layout: BindGroupLayout,
 }
 
@@ -95,9 +96,24 @@ impl FromWorld for OutlinePipeline {
                     },
                 ],
             });
+        let outline_stencil_bind_group_layout =
+            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("outline_stencil_bind_group_layout"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: BufferSize::new(OutlineStencilUniform::SHADER_SIZE.get()),
+                    },
+                    count: None,
+                }],
+            });
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,
+            outline_stencil_bind_group_layout,
             outline_bind_group_layout,
         }
     }
@@ -114,11 +130,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         let mut targets = vec![];
         let mut bind_layouts = vec![self.mesh_pipeline.view_layout.clone()];
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut shader_defs = if cfg!(feature = "align16") {
-            vec!["ALIGN_16".to_string()]
-        } else {
-            vec![]
-        };
+        let mut shader_defs = vec![];
         bind_layouts.push(
             if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
                 && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
@@ -135,6 +147,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         match pass_type {
             PassType::Stencil => {
                 shader = STENCIL_SHADER_HANDLE;
+                bind_layouts.push(self.outline_stencil_bind_group_layout.clone());
             }
             PassType::Opaque | PassType::Transparent => {
                 shader = OUTLINE_SHADER_HANDLE;

@@ -26,6 +26,7 @@ use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
+use bevy::transform::TransformSystem;
 
 use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -33,13 +34,15 @@ use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, OUTLINE_SHADER_HANDLE, STENCIL_SHADER_HANDLE,
 };
 use crate::uniforms::{
-    extract_outline_uniforms, queue_outline_bind_group, OutlineFragmentUniform,
+    extract_outline_stencil_uniforms, extract_outline_uniforms, queue_outline_bind_group,
+    queue_outline_stencil_bind_group, OutlineFragmentUniform, OutlineStencilUniform,
     OutlineVertexUniform,
 };
 use crate::view_uniforms::{
     extract_outline_view_uniforms, queue_outline_view_bind_group, OutlineViewUniform,
 };
 
+mod computed;
 mod draw;
 mod generate;
 mod node;
@@ -47,6 +50,7 @@ mod pipeline;
 mod uniforms;
 mod view_uniforms;
 
+pub use computed::*;
 pub use generate::*;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
@@ -90,6 +94,14 @@ pub struct Outline {
 pub struct OutlineBundle {
     pub outline: Outline,
     pub stencil: OutlineStencil,
+    pub plane: ComputedOutlinePlane,
+}
+
+/// A bundle for stenciling meshes in the outlining pass.
+#[derive(Bundle, Clone, Default)]
+pub struct OutlineStencilBundle {
+    pub stencil: OutlineStencil,
+    pub plane: ComputedOutlinePlane,
 }
 
 /// Adds support for rendering outlines.
@@ -112,9 +124,14 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
+            .add_plugin(UniformComponentPlugin::<OutlineStencilUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineVertexUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
+            .add_system_to_stage(
+                CoreStage::PostUpdate,
+                compute_outline_plane.after(TransformSystem::TransformPropagate),
+            )
             .sub_app_mut(RenderApp)
             .init_resource::<DrawFunctions<StencilOutline>>()
             .init_resource::<DrawFunctions<OpaqueOutline>>()
@@ -125,6 +142,7 @@ impl Plugin for OutlinePlugin {
             .add_render_command::<OpaqueOutline, DrawOutline>()
             .add_render_command::<TransparentOutline, DrawOutline>()
             .add_system_to_stage(RenderStage::Extract, extract_outline_view_uniforms)
+            .add_system_to_stage(RenderStage::Extract, extract_outline_stencil_uniforms)
             .add_system_to_stage(RenderStage::Extract, extract_outline_uniforms)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<StencilOutline>)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<OpaqueOutline>)
@@ -133,6 +151,7 @@ impl Plugin for OutlinePlugin {
                 sort_phase_system::<TransparentOutline>,
             )
             .add_system_to_stage(RenderStage::Queue, queue_outline_view_bind_group)
+            .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_bind_group)
             .add_system_to_stage(RenderStage::Queue, queue_outline_bind_group)
             .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_mesh)
             .add_system_to_stage(RenderStage::Queue, queue_outline_mesh);

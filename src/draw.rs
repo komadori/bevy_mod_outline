@@ -7,7 +7,7 @@ use bevy::render::view::ExtractedView;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType};
-use crate::uniforms::{OutlineFragmentUniform, SetOutlineBindGroup};
+use crate::uniforms::{OutlineFragmentUniform, SetOutlineBindGroup, SetOutlineStencilBindGroup};
 use crate::view_uniforms::SetOutlineViewBindGroup;
 use crate::OutlineStencil;
 
@@ -15,6 +15,7 @@ pub type DrawStencil = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
+    SetOutlineStencilBindGroup<2>,
     DrawMesh,
 );
 

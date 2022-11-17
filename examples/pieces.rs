@@ -1,0 +1,139 @@
+use std::f32::consts::TAU;
+
+use bevy::{
+    prelude::{
+        shape::{Capsule, Torus, UVSphere},
+        *,
+    },
+    window::close_on_esc,
+};
+
+use bevy_mod_outline::*;
+
+#[bevy_main]
+fn main() {
+    App::new()
+        .insert_resource(Msaa { samples: 4 })
+        .insert_resource(ClearColor(Color::BLACK))
+        .add_plugins(DefaultPlugins)
+        .add_plugin(OutlinePlugin)
+        .add_startup_system(setup)
+        .add_system(close_on_esc)
+        .add_system(rotates)
+        .run();
+}
+
+#[derive(Component)]
+struct Rotates;
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Add sphere with child meshes sticking out of it
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(
+                UVSphere {
+                    radius: 0.75,
+                    sectors: 30,
+                    stacks: 30,
+                }
+                .into(),
+            ),
+            material: materials.add(Color::rgb(0.9, 0.1, 0.1).into()),
+            transform: Transform::from_translation(Vec3::new(0.0, 1.0, 0.0)),
+
+            ..default()
+        })
+        .insert_bundle(OutlineBundle {
+            outline: Outline {
+                visible: true,
+                colour: Color::WHITE,
+                width: 10.0,
+            },
+            ..default()
+        })
+        .insert(Rotates)
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(PbrBundle {
+                    mesh: meshes.add(
+                        Capsule {
+                            radius: 0.2,
+                            rings: 15,
+                            depth: 1.0,
+                            latitudes: 15,
+                            longitudes: 15,
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::X, TAU / 4.0))
+                        .with_translation(Vec3::new(0.0, 0.0, 0.75)),
+                    ..default()
+                })
+                .insert_bundle(OutlineBundle {
+                    outline: Outline {
+                        visible: true,
+                        colour: Color::WHITE,
+                        width: 10.0,
+                    },
+                    ..default()
+                })
+                .insert(InheritOutlinePlane);
+            parent
+                .spawn_bundle(PbrBundle {
+                    mesh: meshes.add(
+                        Torus {
+                            radius: 0.5,
+                            ring_radius: 0.1,
+                            subdivisions_segments: 30,
+                            subdivisions_sides: 15,
+                        }
+                        .into(),
+                    ),
+                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, TAU / 4.0))
+                        .with_translation(Vec3::new(0.0, 0.0, -0.75)),
+                    ..default()
+                })
+                .insert_bundle(OutlineBundle {
+                    outline: Outline {
+                        visible: true,
+                        colour: Color::WHITE,
+                        width: 10.0,
+                    },
+                    ..default()
+                })
+                .insert(InheritOutlinePlane);
+        });
+
+    // Add plane, light source, and camera
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
+        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        ..default()
+    });
+    commands.spawn_bundle(PointLightBundle {
+        point_light: PointLight {
+            intensity: 1500.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        ..default()
+    });
+    commands.spawn_bundle(Camera3dBundle {
+        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..default()
+    });
+}
+
+fn rotates(mut query: Query<&mut Transform, With<Rotates>>, timer: Res<Time>) {
+    for mut transform in query.iter_mut() {
+        transform.rotate_axis(Vec3::Y, 0.75 * timer.delta_seconds());
+    }
+}

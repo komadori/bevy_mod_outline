@@ -5,17 +5,10 @@
 @group(1) @binding(0)
 var<uniform> mesh: Mesh;
 
-#ifdef SKINNED
-@group(1) @binding(1)
-var<uniform> joint_matrices: SkinnedMesh;
-#import bevy_pbr::skinning
-#endif
-
-fn model_origin_z(model: mat4x4<f32>, view_proj: mat4x4<f32>) -> f32 {
-    var origin = model[3]; 
+fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
     var proj_zw = mat4x2<f32>(
         view_proj[0].zw, view_proj[1].zw,
         view_proj[2].zw, view_proj[3].zw);
-    var zw = proj_zw * origin;
+    var zw = proj_zw * vec4<f32>(plane, 1.0);
     return zw.x / zw.y;
 }

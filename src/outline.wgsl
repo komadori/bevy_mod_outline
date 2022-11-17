@@ -17,16 +17,13 @@ struct OutlineViewUniform {
 };
 
 struct OutlineVertexUniform {
-#ifdef ALIGN_16
     @align(16)
-#endif
+    plane: vec3<f32>,
     width: f32,
 };
 
 struct OutlineFragmentUniform {
-#ifdef ALIGN_16
     @align(16)
-#endif
     colour: vec4<f32>,
 };
 
@@ -56,7 +53,7 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
     var clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.normal);
     var ndc_pos = clip_pos.xy / clip_pos.w;
     var ndc_delta = vstage.width * normalize(clip_norm.xy) * view_uniform.scale;
-    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(mesh.model, view.view_proj), 1.0);
+    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(vstage.plane, view.view_proj), 1.0);
 }
 
 @fragment

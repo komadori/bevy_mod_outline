@@ -15,7 +15,7 @@ use crate::pipeline::OutlinePipeline;
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineViewUniform {
-    #[cfg_attr(feature = "align16", align(16))]
+    #[align(16)]
     scale: Vec2,
 }
 

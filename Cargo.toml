@@ -1,6 +1,6 @@
 [package]
 name = "bevy_mod_outline"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A mesh outlining plugin for Bevy."
@@ -26,13 +26,16 @@ bevy = { version = "0.8", default-features = false, features = [
 ] }
 
 [features]
-default = ["align16", "bevy_ui"]
-align16 = []
+default = ["bevy_ui"]
 bevy_ui = ["bevy/bevy_ui", "bevy/bevy_sprite", "bevy/bevy_text"]
 
 [[example]]
 name = "shapes"
 path = "examples/shapes.rs"
+
+[[example]]
+name = "pieces"
+path = "examples/pieces.rs"
 
 [[example]]
 name = "animated_fox"
