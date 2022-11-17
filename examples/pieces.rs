@@ -83,7 +83,7 @@ fn setup(
                     },
                     ..default()
                 })
-                .insert(InheritOutlinePlane);
+                .insert(InheritOutlineDepth);
             parent
                 .spawn_bundle(PbrBundle {
                     mesh: meshes.add(
@@ -108,7 +108,7 @@ fn setup(
                     },
                     ..default()
                 })
-                .insert(InheritOutlinePlane);
+                .insert(InheritOutlineDepth);
         });
 
     // Add plane, light source, and camera

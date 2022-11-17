@@ -94,14 +94,14 @@ pub struct Outline {
 pub struct OutlineBundle {
     pub outline: Outline,
     pub stencil: OutlineStencil,
-    pub plane: ComputedOutlinePlane,
+    pub plane: ComputedOutlineDepth,
 }
 
 /// A bundle for stenciling meshes in the outlining pass.
 #[derive(Bundle, Clone, Default)]
 pub struct OutlineStencilBundle {
     pub stencil: OutlineStencil,
-    pub plane: ComputedOutlinePlane,
+    pub plane: ComputedOutlineDepth,
 }
 
 /// Adds support for rendering outlines.
@@ -130,7 +130,7 @@ impl Plugin for OutlinePlugin {
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
             .add_system_to_stage(
                 CoreStage::PostUpdate,
-                compute_outline_plane.after(TransformSystem::TransformPropagate),
+                compute_outline_depth.after(TransformSystem::TransformPropagate),
             )
             .sub_app_mut(RenderApp)
             .init_resource::<DrawFunctions<StencilOutline>>()

@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::{pipeline::OutlinePipeline, ComputedOutlinePlane, Outline, OutlineStencil};
+use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, Outline, OutlineStencil};
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineStencilUniform {
@@ -44,7 +44,7 @@ pub struct OutlineBindGroup {
 
 pub fn extract_outline_stencil_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &ComputedOutlinePlane), With<OutlineStencil>>>,
+    query: Extract<Query<(Entity, &ComputedOutlineDepth), With<OutlineStencil>>>,
 ) {
     for (entity, computed) in query.iter() {
         commands.get_or_spawn(entity).insert(OutlineStencilUniform {
@@ -55,7 +55,7 @@ pub fn extract_outline_stencil_uniforms(
 
 pub fn extract_outline_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &Outline, &ComputedOutlinePlane)>>,
+    query: Extract<Query<(Entity, &Outline, &ComputedOutlineDepth)>>,
 ) {
     for (entity, outline, computed) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {
