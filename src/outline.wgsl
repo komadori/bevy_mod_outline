@@ -1,8 +1,11 @@
-#import bevy_mod_outline::common
+#import bevy_pbr::mesh_view_bindings
+#import bevy_pbr::mesh_types
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
+#ifndef OFFSET_ZERO
     @location(1) normal: vec3<f32>,
+#endif
 #ifdef SKINNED
     @location(2) joint_indexes: vec4<u32>,
     @location(3) joint_weights: vec4<f32>,
@@ -10,22 +13,18 @@ struct VertexInput {
 };
 
 struct OutlineViewUniform {
-#ifdef ALIGN_16
     @align(16)
-#endif
     scale: vec2<f32>,
 };
 
 struct OutlineVertexUniform {
     @align(16)
-    plane: vec3<f32>,
-    width: f32,
+    origin: vec3<f32>,
+    offset: f32,
 };
 
-struct OutlineFragmentUniform {
-    @align(16)
-    colour: vec4<f32>,
-};
+@group(1) @binding(0)
+var<uniform> mesh: Mesh;
 
 @group(2) @binding(0)
 var<uniform> view_uniform: OutlineViewUniform;
@@ -33,13 +32,18 @@ var<uniform> view_uniform: OutlineViewUniform;
 @group(3) @binding(0)
 var<uniform> vstage: OutlineVertexUniform;
 
-@group(3) @binding(1)
-var<uniform> fstage: OutlineFragmentUniform;
-
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
     return mat3x3<f32>(
         m[0].xyz, m[1].xyz, m[2].xyz
     );
+}
+
+fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
+    var proj_zw = mat4x2<f32>(
+        view_proj[0].zw, view_proj[1].zw,
+        view_proj[2].zw, view_proj[3].zw);
+    var zw = proj_zw * vec4<f32>(plane, 1.0);
+    return zw.x / zw.y;
 }
 
 @vertex
@@ -49,14 +53,13 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
 #else
     let model = mesh.model;
 #endif
-    var clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
-    var clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.normal);
-    var ndc_pos = clip_pos.xy / clip_pos.w;
-    var ndc_delta = vstage.width * normalize(clip_norm.xy) * view_uniform.scale;
-    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(vstage.plane, view.view_proj), 1.0);
-}
-
-@fragment
-fn fragment() -> @location(0) vec4<f32> {
-    return fstage.colour;
+    let clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
+    let ndc_pos = clip_pos.xy / clip_pos.w;
+#ifdef OFFSET_ZERO
+    let ndc_delta = vec2<f32>(0.0, 0.0);
+#else
+    let clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.normal);
+    let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale;
+#endif
+    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(vstage.origin, view.view_proj), 1.0);
 }

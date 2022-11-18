@@ -15,18 +15,19 @@ use bevy::{
 
 use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, Outline, OutlineStencil};
 
-#[derive(Clone, Component, ShaderType)]
-pub struct OutlineStencilUniform {
-    #[align(16)]
-    pub plane: Vec3,
+macro_rules! outline_vertex_uniform {
+    ($x:ident) => {
+        #[derive(Clone, Component, ShaderType)]
+        pub struct $x {
+            #[align(16)]
+            pub origin: Vec3,
+            pub offset: f32,
+        }
+    };
 }
 
-#[derive(Clone, Component, ShaderType)]
-pub struct OutlineVertexUniform {
-    #[align(16)]
-    pub plane: Vec3,
-    pub width: f32,
-}
+outline_vertex_uniform!(OutlineStencilUniform);
+outline_vertex_uniform!(OutlineVolumeUniform);
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineFragmentUniform {
@@ -38,7 +39,7 @@ pub struct OutlineStencilBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub struct OutlineBindGroup {
+pub struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }
 
@@ -48,12 +49,13 @@ pub fn extract_outline_stencil_uniforms(
 ) {
     for (entity, computed) in query.iter() {
         commands.get_or_spawn(entity).insert(OutlineStencilUniform {
-            plane: computed.plane,
+            origin: computed.origin,
+            offset: 0.0,
         });
     }
 }
 
-pub fn extract_outline_uniforms(
+pub fn extract_outline_volume_uniforms(
     mut commands: Commands,
     query: Extract<Query<(Entity, &Outline, &ComputedOutlineDepth)>>,
 ) {
@@ -63,9 +65,9 @@ pub fn extract_outline_uniforms(
         }
         commands
             .get_or_spawn(entity)
-            .insert(OutlineVertexUniform {
-                width: outline.width,
-                plane: computed.plane,
+            .insert(OutlineVolumeUniform {
+                origin: computed.origin,
+                offset: outline.width,
             })
             .insert(OutlineFragmentUniform {
                 colour: outline.colour.as_linear_rgba_f32().into(),
@@ -92,11 +94,11 @@ pub fn queue_outline_stencil_bind_group(
     }
 }
 
-pub fn queue_outline_bind_group(
+pub fn queue_outline_volume_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
-    vertex: Res<ComponentUniforms<OutlineVertexUniform>>,
+    vertex: Res<ComponentUniforms<OutlineVolumeUniform>>,
     fragment: Res<ComponentUniforms<OutlineFragmentUniform>>,
 ) {
     if let (Some(vertex_binding), Some(fragment_binding)) = (vertex.binding(), fragment.binding()) {
@@ -111,10 +113,10 @@ pub fn queue_outline_bind_group(
                     resource: fragment_binding.clone(),
                 },
             ],
-            label: Some("outline_bind_group"),
-            layout: &outline_pipeline.outline_bind_group_layout,
+            label: Some("outline_volume_bind_group"),
+            layout: &outline_pipeline.outline_volume_bind_group_layout,
         });
-        commands.insert_resource(OutlineBindGroup { bind_group });
+        commands.insert_resource(OutlineVolumeBindGroup { bind_group });
     }
 }
 
@@ -137,13 +139,13 @@ impl<const I: usize> EntityRenderCommand for SetOutlineStencilBindGroup<I> {
     }
 }
 
-pub struct SetOutlineBindGroup<const I: usize>();
+pub struct SetOutlineVolumeBindGroup<const I: usize>();
 
-impl<const I: usize> EntityRenderCommand for SetOutlineBindGroup<I> {
+impl<const I: usize> EntityRenderCommand for SetOutlineVolumeBindGroup<I> {
     type Param = (
-        SRes<OutlineBindGroup>,
+        SRes<OutlineVolumeBindGroup>,
         SQuery<(
-            Read<DynamicUniformIndex<OutlineVertexUniform>>,
+            Read<DynamicUniformIndex<OutlineVolumeUniform>>,
             Read<DynamicUniformIndex<OutlineFragmentUniform>>,
         )>,
     );

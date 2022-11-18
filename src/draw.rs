@@ -7,7 +7,9 @@ use bevy::render::view::ExtractedView;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType};
-use crate::uniforms::{OutlineFragmentUniform, SetOutlineBindGroup, SetOutlineStencilBindGroup};
+use crate::uniforms::{
+    OutlineFragmentUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
+};
 use crate::view_uniforms::SetOutlineViewBindGroup;
 use crate::OutlineStencil;
 
@@ -15,7 +17,8 @@ pub type DrawStencil = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    SetOutlineStencilBindGroup<2>,
+    SetOutlineViewBindGroup<2>,
+    SetOutlineStencilBindGroup<3>,
     DrawMesh,
 );
 
@@ -68,12 +71,12 @@ pub type DrawOutline = (
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
     SetOutlineViewBindGroup<2>,
-    SetOutlineBindGroup<3>,
+    SetOutlineVolumeBindGroup<3>,
     DrawMesh,
 );
 
 #[allow(clippy::too_many_arguments)]
-pub fn queue_outline_mesh(
+pub fn queue_outline_volume_mesh(
     opaque_draw_functions: Res<DrawFunctions<OpaqueOutline>>,
     transparent_draw_functions: Res<DrawFunctions<TransparentOutline>>,
     outline_pipeline: Res<OutlinePipeline>,

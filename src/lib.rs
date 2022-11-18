@@ -28,15 +28,15 @@ use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
 use bevy::transform::TransformSystem;
 
-use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
-use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
-use crate::pipeline::{
-    OutlinePipeline, COMMON_SHADER_HANDLE, OUTLINE_SHADER_HANDLE, STENCIL_SHADER_HANDLE,
+use crate::draw::{
+    queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
 };
+use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
+use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
 use crate::uniforms::{
-    extract_outline_stencil_uniforms, extract_outline_uniforms, queue_outline_bind_group,
-    queue_outline_stencil_bind_group, OutlineFragmentUniform, OutlineStencilUniform,
-    OutlineVertexUniform,
+    extract_outline_stencil_uniforms, extract_outline_volume_uniforms,
+    queue_outline_stencil_bind_group, queue_outline_volume_bind_group, OutlineFragmentUniform,
+    OutlineStencilUniform, OutlineVolumeUniform,
 };
 use crate::view_uniforms::{
     extract_outline_view_uniforms, queue_outline_view_bind_group, OutlineViewUniform,
@@ -109,23 +109,22 @@ pub struct OutlinePlugin;
 
 impl Plugin for OutlinePlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(app, COMMON_SHADER_HANDLE, "common.wgsl", Shader::from_wgsl);
-        load_internal_asset!(
-            app,
-            STENCIL_SHADER_HANDLE,
-            "stencil.wgsl",
-            Shader::from_wgsl
-        );
         load_internal_asset!(
             app,
             OUTLINE_SHADER_HANDLE,
             "outline.wgsl",
             Shader::from_wgsl
         );
+        load_internal_asset!(
+            app,
+            FRAGMENT_SHADER_HANDLE,
+            "fragment.wgsl",
+            Shader::from_wgsl
+        );
 
         app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
             .add_plugin(UniformComponentPlugin::<OutlineStencilUniform>::default())
-            .add_plugin(UniformComponentPlugin::<OutlineVertexUniform>::default())
+            .add_plugin(UniformComponentPlugin::<OutlineVolumeUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
             .add_system_to_stage(
@@ -143,7 +142,7 @@ impl Plugin for OutlinePlugin {
             .add_render_command::<TransparentOutline, DrawOutline>()
             .add_system_to_stage(RenderStage::Extract, extract_outline_view_uniforms)
             .add_system_to_stage(RenderStage::Extract, extract_outline_stencil_uniforms)
-            .add_system_to_stage(RenderStage::Extract, extract_outline_uniforms)
+            .add_system_to_stage(RenderStage::Extract, extract_outline_volume_uniforms)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<StencilOutline>)
             .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<OpaqueOutline>)
             .add_system_to_stage(
@@ -152,9 +151,9 @@ impl Plugin for OutlinePlugin {
             )
             .add_system_to_stage(RenderStage::Queue, queue_outline_view_bind_group)
             .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_bind_group)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_bind_group)
+            .add_system_to_stage(RenderStage::Queue, queue_outline_volume_bind_group)
             .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_mesh)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_mesh);
+            .add_system_to_stage(RenderStage::Queue, queue_outline_volume_mesh);
 
         let world = &mut app.sub_app_mut(RenderApp).world;
         let node = OutlineNode::new(world);
