@@ -26,6 +26,12 @@ struct OutlineVertexUniform {
 @group(1) @binding(0)
 var<uniform> mesh: Mesh;
 
+#ifdef SKINNED
+@group(1) @binding(1)
+var<uniform> joint_matrices: SkinnedMesh;
+#import bevy_pbr::skinning
+#endif
+
 @group(2) @binding(0)
 var<uniform> view_uniform: OutlineViewUniform;
 

@@ -79,6 +79,7 @@ fn setup_scene_once_loaded(
                         colour: Color::RED,
                     },
                     stencil: OutlineStencil,
+                    ..default()
                 });
             }
             *done = true;
