@@ -6,12 +6,13 @@ use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PolygonMode,
-    PrimitiveState, ShaderSize, ShaderStages, StencilState, TextureFormat, VertexState,
+    PrimitiveState, PrimitiveTopology, ShaderSize, ShaderStages, StencilState, TextureFormat,
+    VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::texture::BevyDefault;
 use bevy::{
-    pbr::{MeshPipeline, MeshPipelineKey},
+    pbr::MeshPipeline,
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -19,6 +20,7 @@ use bevy::{
         },
     },
 };
+use bitfield::{bitfield_bitrange, bitfield_fields};
 
 use crate::uniforms::{OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform};
 use crate::view_uniforms::OutlineViewUniform;
@@ -30,11 +32,67 @@ pub const OUTLINE_SHADER_HANDLE: HandleUntyped =
 pub const FRAGMENT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12033806834125368121);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PassType {
-    Stencil,
-    Opaque,
-    Transparent,
+    Stencil = 1,
+    Opaque = 2,
+    Transparent = 3,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct PipelineKey(u32);
+bitfield_bitrange! {struct PipelineKey(u32)}
+
+impl PipelineKey {
+    bitfield_fields! {
+        u32;
+        msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
+        primitive_topology_int, set_primitive_topology_int: 8, 6;
+        pass_type_int, set_pass_type_int: 10, 9;
+    }
+
+    pub fn new() -> Self {
+        PipelineKey(0)
+    }
+
+    pub fn with_msaa_samples(mut self, msaa_samples: u32) -> Self {
+        self.set_msaa_samples_minus_one(msaa_samples - 1);
+        self
+    }
+
+    pub fn msaa_samples(&self) -> u32 {
+        self.msaa_samples_minus_one() + 1
+    }
+
+    pub fn with_primitive_topology(mut self, primitive_topology: PrimitiveTopology) -> Self {
+        self.set_primitive_topology_int(primitive_topology as u32);
+        self
+    }
+
+    pub fn primitive_topology(&self) -> PrimitiveTopology {
+        match self.primitive_topology_int() {
+            x if x == PrimitiveTopology::PointList as u32 => PrimitiveTopology::PointList,
+            x if x == PrimitiveTopology::LineList as u32 => PrimitiveTopology::LineList,
+            x if x == PrimitiveTopology::LineStrip as u32 => PrimitiveTopology::LineStrip,
+            x if x == PrimitiveTopology::TriangleList as u32 => PrimitiveTopology::TriangleList,
+            x if x == PrimitiveTopology::TriangleStrip as u32 => PrimitiveTopology::TriangleStrip,
+            x => panic!("Invalid value for PrimitiveTopology: {}", x),
+        }
+    }
+
+    pub fn with_pass_type(mut self, pass_type: PassType) -> Self {
+        self.set_pass_type_int(pass_type as u32);
+        self
+    }
+
+    pub fn pass_type(&self) -> PassType {
+        match self.pass_type_int() {
+            x if x == PassType::Stencil as u32 => PassType::Stencil,
+            x if x == PassType::Opaque as u32 => PassType::Opaque,
+            x if x == PassType::Transparent as u32 => PassType::Transparent,
+            x => panic!("Invalid value for PassType: {}", x),
+        }
+    }
 }
 
 pub struct OutlinePipeline {
@@ -117,11 +175,11 @@ impl FromWorld for OutlinePipeline {
 }
 
 impl SpecializedMeshPipeline for OutlinePipeline {
-    type Key = (MeshPipelineKey, PassType);
+    type Key = PipelineKey;
 
     fn specialize(
         &self,
-        (key, pass_type): Self::Key,
+        key: Self::Key,
         mesh_layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
@@ -142,7 +200,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             },
         );
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
-        match pass_type {
+        match key.pass_type() {
             PassType::Stencil => {
                 vertex_defs.push("OFFSET_ZERO".to_string());
                 bind_layouts.push(self.outline_stencil_bind_group_layout.clone());
@@ -151,7 +209,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 fragment_defs.push("VOLUME".to_string());
                 targets.push(Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
-                    blend: Some(if pass_type == PassType::Transparent {
+                    blend: Some(if key.pass_type() == PassType::Transparent {
                         BlendState::ALPHA_BLENDING
                     } else {
                         BlendState::REPLACE

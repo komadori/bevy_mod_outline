@@ -17,6 +17,7 @@ bevy = { version = "0.8", default-features = false, features = [
     "bevy_pbr",
     "bevy_core_pipeline",
 ] }
+bitfield = "0.14"
 thiserror = "1.0"
 
 [dev-dependencies]

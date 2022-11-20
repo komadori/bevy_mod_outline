@@ -1,4 +1,4 @@
-use bevy::pbr::{DrawMesh, MeshPipelineKey, MeshUniform, SetMeshBindGroup, SetMeshViewBindGroup};
+use bevy::pbr::{DrawMesh, MeshUniform, SetMeshBindGroup, SetMeshViewBindGroup};
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
@@ -6,7 +6,7 @@ use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::view::ExtractedView;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
-use crate::pipeline::{OutlinePipeline, PassType};
+use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::uniforms::{
     OutlineFragmentUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
 };
@@ -38,21 +38,17 @@ pub fn queue_outline_stencil_mesh(
         .get_id::<DrawStencil>()
         .unwrap();
 
-    let base_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
+    let base_key = PipelineKey::new()
+        .with_msaa_samples(msaa.samples)
+        .with_pass_type(PassType::Stencil);
 
     for (view, mut stencil_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
         for (entity, mesh_uniform, mesh_handle) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
-                let key =
-                    base_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology);
+                let key = base_key.with_primitive_topology(mesh.primitive_topology);
                 let pipeline = pipelines
-                    .specialize(
-                        &mut pipeline_cache,
-                        &stencil_pipeline,
-                        (key, PassType::Stencil),
-                        &mesh.layout,
-                    )
+                    .specialize(&mut pipeline_cache, &stencil_pipeline, key, &mesh.layout)
                     .unwrap();
                 let distance = rangefinder.distance(&mesh_uniform.transform);
                 stencil_phase.add(StencilOutline {
@@ -100,30 +96,22 @@ pub fn queue_outline_volume_mesh(
         .get_id::<DrawOutline>()
         .unwrap();
 
-    let base_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
+    let base_key = PipelineKey::new().with_msaa_samples(msaa.samples);
 
     for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
         for (entity, mesh_uniform, mesh_handle, outline_fragment) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = outline_fragment.colour[3] < 1.0;
-                let pass_type;
                 let key = base_key
-                    | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                    | if transparent {
-                        pass_type = PassType::Transparent;
-                        MeshPipelineKey::TRANSPARENT_MAIN_PASS
+                    .with_primitive_topology(mesh.primitive_topology)
+                    .with_pass_type(if transparent {
+                        PassType::Transparent
                     } else {
-                        pass_type = PassType::Opaque;
-                        MeshPipelineKey::NONE
-                    };
+                        PassType::Opaque
+                    });
                 let pipeline = pipelines
-                    .specialize(
-                        &mut pipeline_cache,
-                        &outline_pipeline,
-                        (key, pass_type),
-                        &mesh.layout,
-                    )
+                    .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
                     .unwrap();
                 let distance = rangefinder.distance(&mesh_uniform.transform);
                 if transparent {
