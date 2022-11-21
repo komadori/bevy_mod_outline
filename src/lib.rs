@@ -67,14 +67,17 @@ pub const OUTLINE_PASS_NODE_NAME: &str = "bevy_mod_outline_node";
 
 /// A component for stenciling meshes during outline rendering.
 #[derive(Clone, Component, Default)]
-pub struct OutlineStencil;
+pub struct OutlineStencil {
+    /// Offset of the stencil in logical pixels
+    pub offset: f32,
+}
 
 impl ExtractComponent for OutlineStencil {
-    type Query = ();
-    type Filter = With<OutlineStencil>;
+    type Query = &'static OutlineStencil;
+    type Filter = ();
 
-    fn extract_component(_item: QueryItem<Self::Query>) -> Self {
-        OutlineStencil
+    fn extract_component(item: QueryItem<Self::Query>) -> Self {
+        item.clone()
     }
 }
 

@@ -45,12 +45,12 @@ pub struct OutlineVolumeBindGroup {
 
 pub fn extract_outline_stencil_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &ComputedOutlineDepth), With<OutlineStencil>>>,
+    query: Extract<Query<(Entity, &OutlineStencil, &ComputedOutlineDepth)>>,
 ) {
-    for (entity, computed) in query.iter() {
+    for (entity, stencil, computed) in query.iter() {
         commands.get_or_spawn(entity).insert(OutlineStencilUniform {
             origin: computed.origin,
-            offset: 0.0,
+            offset: stencil.offset,
         });
     }
 }

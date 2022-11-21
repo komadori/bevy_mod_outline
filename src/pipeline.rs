@@ -49,6 +49,7 @@ impl PipelineKey {
         msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
         primitive_topology_int, set_primitive_topology_int: 8, 6;
         pass_type_int, set_pass_type_int: 10, 9;
+        pub offset_zero, set_offset_zero: 11;
     }
 
     pub fn new() -> Self {
@@ -92,6 +93,11 @@ impl PipelineKey {
             x if x == PassType::Transparent as u32 => PassType::Transparent,
             x => panic!("Invalid value for PassType: {}", x),
         }
+    }
+
+    pub fn with_offset_zero(mut self, offset_zero: bool) -> Self {
+        self.set_offset_zero(offset_zero);
+        self
     }
 }
 
@@ -200,9 +206,20 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             },
         );
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
+        if key.offset_zero() {
+            vertex_defs.push("OFFSET_ZERO".to_string());
+        } else {
+            buffer_attrs.push(
+                if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
+                    ATTRIBUTE_OUTLINE_NORMAL
+                } else {
+                    Mesh::ATTRIBUTE_NORMAL
+                }
+                .at_shader_location(1),
+            );
+        }
         match key.pass_type() {
             PassType::Stencil => {
-                vertex_defs.push("OFFSET_ZERO".to_string());
                 bind_layouts.push(self.outline_stencil_bind_group_layout.clone());
             }
             PassType::Opaque | PassType::Transparent => {
@@ -218,14 +235,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 }));
 
                 bind_layouts.push(self.outline_volume_bind_group_layout.clone());
-                buffer_attrs.push(
-                    if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
-                        ATTRIBUTE_OUTLINE_NORMAL
-                    } else {
-                        Mesh::ATTRIBUTE_NORMAL
-                    }
-                    .at_shader_location(1),
-                );
             }
         }
         let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];

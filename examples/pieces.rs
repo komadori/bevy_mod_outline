@@ -53,6 +53,7 @@ fn setup(
                 colour: Color::WHITE,
                 width: 10.0,
             },
+            stencil: OutlineStencil { offset: 5.0 },
             ..default()
         })
         .insert(Rotates)
@@ -81,6 +82,7 @@ fn setup(
                         colour: Color::WHITE,
                         width: 10.0,
                     },
+                    stencil: OutlineStencil { offset: 5.0 },
                     ..default()
                 })
                 .insert(InheritOutlineDepth);
@@ -106,6 +108,7 @@ fn setup(
                         colour: Color::WHITE,
                         width: 10.0,
                     },
+                    stencil: OutlineStencil { offset: 5.0 },
                     ..default()
                 })
                 .insert(InheritOutlineDepth);
