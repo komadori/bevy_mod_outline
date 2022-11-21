@@ -1,4 +1,4 @@
-use bevy::pbr::{DrawMesh, MeshUniform, SetMeshBindGroup, SetMeshViewBindGroup};
+use bevy::pbr::{DrawMesh, SetMeshBindGroup, SetMeshViewBindGroup};
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
@@ -30,7 +30,7 @@ pub fn queue_outline_stencil_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &OutlineStencilUniform)>,
+    material_meshes: Query<(Entity, &Handle<Mesh>, &OutlineStencilUniform)>,
     mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>)>,
 ) {
     let draw_stencil = stencil_draw_functions
@@ -44,7 +44,7 @@ pub fn queue_outline_stencil_mesh(
 
     for (view, mut stencil_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_uniform, mesh_handle, stencil_uniform) in material_meshes.iter() {
+        for (entity, mesh_handle, stencil_uniform) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key = base_key
                     .with_primitive_topology(mesh.primitive_topology)
@@ -52,7 +52,8 @@ pub fn queue_outline_stencil_mesh(
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &stencil_pipeline, key, &mesh.layout)
                     .unwrap();
-                let distance = rangefinder.distance(&mesh_uniform.transform);
+                let distance =
+                    rangefinder.distance(&Mat4::from_translation(stencil_uniform.origin));
                 stencil_phase.add(StencilOutline {
                     entity,
                     pipeline,
@@ -84,7 +85,6 @@ pub fn queue_outline_volume_mesh(
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<(
         Entity,
-        &MeshUniform,
         &Handle<Mesh>,
         &OutlineVolumeUniform,
         &OutlineFragmentUniform,
@@ -108,9 +108,7 @@ pub fn queue_outline_volume_mesh(
 
     for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_uniform, mesh_handle, volume_uniform, fragment_uniform) in
-            material_meshes.iter()
-        {
+        for (entity, mesh_handle, volume_uniform, fragment_uniform) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = fragment_uniform.colour[3] < 1.0;
                 let key = base_key
@@ -124,7 +122,7 @@ pub fn queue_outline_volume_mesh(
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
                     .unwrap();
-                let distance = rangefinder.distance(&mesh_uniform.transform);
+                let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
                 if transparent {
                     transparent_phase.add(TransparentOutline {
                         entity,
