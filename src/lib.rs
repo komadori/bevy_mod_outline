@@ -5,11 +5,16 @@
 //! pass is to present the outlines in depth sorted order according to the model translation
 //! of each mesh. This ensures that outlines are not clipped by other geometry.
 //!
-//! The [`Outline`] component will, by itself, cover the original object entirely with the
-//! outline colour. The [`OutlineStencil`] component must also be added to prevent the body of
-//! an object from being filled it. This must be added to any entity which needs to appear on
+//! The [`OutlineVolume`] component will, by itself, cover the original object entirely with
+//! the outline colour. The [`OutlineStencil`] component must also be added to prevent the body
+//! of an object from being filled it. This must be added to any entity which needs to appear on
 //! top of an outline.
 //!
+//! The [`OutlineBundle`] and [`OutlineStencilBundle`] bundles can be used to add the right
+//! components, including the required [`ComputedOutlineDepth`] component. Optionally, the
+//! [`SetOutlineDepth`] and [`InheritOutlineDepth`] components may also be added to control the
+//! depth ordering of outlines.
+//! 
 //! Vertex extrusion works best with meshes that have smooth surfaces. To avoid visual
 //! artefacts when outlining meshes with hard edges, see the
 //! [`OutlineMeshExt::generate_outline_normals`] function and the
