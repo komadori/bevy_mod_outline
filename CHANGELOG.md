@@ -1,5 +1,22 @@
 # Changelog
 
+## bevy_mod_outline 0.3.0 (2022-11-22)
+
+### Added
+- Added ComputedOutlineDepth, SetOutlineDepth, and InheritOutlineDepth.
+- Added offset field to OutlineStencil.
+- Added pieces example.
+
+### Removed
+- Removed align16 feature.
+
+### Fixed
+- Fixed errant debug println in AutoGenerateOutlineNormalsPlugin.
+
+### Changed
+- Updated Bevy dependency to 0.9.
+- Renamed Outline component to OutlineVolume.
+
 ## bevy_mod_outline 0.2.4 (2022-10-12)
 
 ### Fixed

@@ -10,15 +10,22 @@ vertex extrusion method.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.2"
+bevy_mod_outline = "0.3"
 ```
 
 ## Example
 
-A rotating cube and torus with outlines.
+A rotating cube and torus with opaque and transparent outlines.
 
 ```shell
 cargo run --example shapes
+```
+
+Multiple intersecting meshes sharing an outline plane. The outline stencil is offset to create
+a gap between the object and its outline.
+
+```shell
+cargo run --example pieces
 ```
 
 ## Versions
@@ -27,11 +34,10 @@ cargo run --example shapes
 |--------------|--------------|
 | 0.1.x        | 0.7.x        |
 | 0.2.x        | 0.8.x        |
+| 0.3.x        | 0.9.x        |
 
 ## Features
 
-- `align16` _(default)_ - Aligns uniform structs to 16-byte boundaries. This is
-required by WebGL and some downlevel GPUs.
 - `bevy_ui` _(default)_ - Adds a render graph edge to prevent clashing with the
 UI. This adds a dependency on the `bevy_ui` crate and can be disabled if it is
 not used.
