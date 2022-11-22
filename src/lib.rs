@@ -14,7 +14,7 @@
 //! components, including the required [`ComputedOutlineDepth`] component. Optionally, the
 //! [`SetOutlineDepth`] and [`InheritOutlineDepth`] components may also be added to control the
 //! depth ordering of outlines.
-//! 
+//!
 //! Vertex extrusion works best with meshes that have smooth surfaces. To avoid visual
 //! artefacts when outlining meshes with hard edges, see the
 //! [`OutlineMeshExt::generate_outline_normals`] function and the
