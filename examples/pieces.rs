@@ -48,7 +48,7 @@ fn setup(
             ..default()
         })
         .insert(OutlineBundle {
-            outline: Outline {
+            outline: OutlineVolume {
                 visible: true,
                 colour: Color::WHITE,
                 width: 10.0,
@@ -77,7 +77,7 @@ fn setup(
                     ..default()
                 })
                 .insert(OutlineBundle {
-                    outline: Outline {
+                    outline: OutlineVolume {
                         visible: true,
                         colour: Color::WHITE,
                         width: 10.0,
@@ -103,7 +103,7 @@ fn setup(
                     ..default()
                 })
                 .insert(OutlineBundle {
-                    outline: Outline {
+                    outline: OutlineVolume {
                         visible: true,
                         colour: Color::WHITE,
                         width: 10.0,

@@ -1,7 +1,9 @@
 use std::f32::consts::PI;
 
 use bevy::{prelude::*, window::close_on_esc};
-use bevy_mod_outline::{AutoGenerateOutlineNormalsPlugin, Outline, OutlineBundle, OutlinePlugin};
+use bevy_mod_outline::{
+    AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
+};
 
 #[derive(Resource)]
 struct Fox(Handle<AnimationClip>);
@@ -74,7 +76,7 @@ fn setup_scene_once_loaded(
             player.play(animation.0.clone_weak()).repeat();
             for entity in entities.iter() {
                 commands.entity(entity).insert(OutlineBundle {
-                    outline: Outline {
+                    outline: OutlineVolume {
                         visible: true,
                         width: 3.0,
                         colour: Color::RED,

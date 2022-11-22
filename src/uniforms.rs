@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, Outline, OutlineStencil};
+use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil, OutlineVolume};
 
 macro_rules! outline_vertex_uniform {
     ($x:ident) => {
@@ -59,7 +59,7 @@ pub fn extract_outline_stencil_uniforms(
 
 pub fn extract_outline_volume_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &Outline, &ComputedOutlineDepth)>>,
+    query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth)>>,
 ) {
     for (entity, outline, computed) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {

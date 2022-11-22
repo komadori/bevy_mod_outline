@@ -83,7 +83,7 @@ impl ExtractComponent for OutlineStencil {
 
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Default)]
-pub struct Outline {
+pub struct OutlineVolume {
     /// Enable rendering of the outline
     pub visible: bool,
     /// Width of the outline in logical pixels
@@ -95,7 +95,7 @@ pub struct Outline {
 /// A bundle for rendering stenciled outlines around meshes.
 #[derive(Bundle, Clone, Default)]
 pub struct OutlineBundle {
-    pub outline: Outline,
+    pub outline: OutlineVolume,
     pub stencil: OutlineStencil,
     pub plane: ComputedOutlineDepth,
 }
