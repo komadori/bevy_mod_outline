@@ -1,9 +1,10 @@
 use std::f32::consts::PI;
 
 use bevy::{prelude::*, window::close_on_esc};
-use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, Outline, OutlineBundle, OutlinePlugin, OutlineStencil,
-};
+use bevy_mod_outline::{AutoGenerateOutlineNormalsPlugin, Outline, OutlineBundle, OutlinePlugin};
+
+#[derive(Resource)]
+struct Fox(Handle<AnimationClip>);
 
 fn main() {
     App::new()
@@ -27,24 +28,24 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Insert a resource with the current animation
-    commands.insert_resource::<Handle<AnimationClip>>(asset_server.load("Fox.glb#Animation0"));
+    commands.insert_resource(Fox(asset_server.load("Fox.glb#Animation0")));
 
     // Camera
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(100.0, 100.0, 150.0)
             .looking_at(Vec3::new(0.0, 20.0, 0.0), Vec3::Y),
         ..default()
     });
 
     // Plane
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 500000.0 })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
 
     // Light
-    commands.spawn_bundle(DirectionalLightBundle {
+    commands.spawn(DirectionalLightBundle {
         transform: Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
         directional_light: DirectionalLight {
             shadows_enabled: true,
@@ -54,7 +55,7 @@ fn setup(
     });
 
     // Fox
-    commands.spawn_bundle(SceneBundle {
+    commands.spawn(SceneBundle {
         scene: asset_server.load("Fox.glb#Scene0"),
         ..default()
     });
@@ -63,22 +64,21 @@ fn setup(
 // Once the scene is loaded, start the animation and add an outline
 fn setup_scene_once_loaded(
     mut commands: Commands,
-    animation: Res<Handle<AnimationClip>>,
+    animation: Res<Fox>,
     mut player: Query<&mut AnimationPlayer>,
     entities: Query<Entity, With<Handle<Mesh>>>,
     mut done: Local<bool>,
 ) {
     if !*done {
         if let Ok(mut player) = player.get_single_mut() {
-            player.play(animation.clone_weak()).repeat();
+            player.play(animation.0.clone_weak()).repeat();
             for entity in entities.iter() {
-                commands.entity(entity).insert_bundle(OutlineBundle {
+                commands.entity(entity).insert(OutlineBundle {
                     outline: Outline {
                         visible: true,
                         width: 3.0,
                         colour: Color::RED,
                     },
-                    stencil: OutlineStencil,
                     ..default()
                 });
             }

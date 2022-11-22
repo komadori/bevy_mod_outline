@@ -33,7 +33,7 @@ fn setup(
 ) {
     // Add sphere with child meshes sticking out of it
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(
                 UVSphere {
                     radius: 0.75,
@@ -47,7 +47,7 @@ fn setup(
 
             ..default()
         })
-        .insert_bundle(OutlineBundle {
+        .insert(OutlineBundle {
             outline: Outline {
                 visible: true,
                 colour: Color::WHITE,
@@ -59,7 +59,7 @@ fn setup(
         .insert(Rotates)
         .with_children(|parent| {
             parent
-                .spawn_bundle(PbrBundle {
+                .spawn(PbrBundle {
                     mesh: meshes.add(
                         Capsule {
                             radius: 0.2,
@@ -76,7 +76,7 @@ fn setup(
                         .with_translation(Vec3::new(0.0, 0.0, 0.75)),
                     ..default()
                 })
-                .insert_bundle(OutlineBundle {
+                .insert(OutlineBundle {
                     outline: Outline {
                         visible: true,
                         colour: Color::WHITE,
@@ -87,7 +87,7 @@ fn setup(
                 })
                 .insert(InheritOutlineDepth);
             parent
-                .spawn_bundle(PbrBundle {
+                .spawn(PbrBundle {
                     mesh: meshes.add(
                         Torus {
                             radius: 0.5,
@@ -102,7 +102,7 @@ fn setup(
                         .with_translation(Vec3::new(0.0, 0.0, -0.75)),
                     ..default()
                 })
-                .insert_bundle(OutlineBundle {
+                .insert(OutlineBundle {
                     outline: Outline {
                         visible: true,
                         colour: Color::WHITE,
@@ -115,12 +115,12 @@ fn setup(
         });
 
     // Add plane, light source, and camera
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 1500.0,
             shadows_enabled: true,
@@ -129,7 +129,7 @@ fn setup(
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..default()
     });
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });

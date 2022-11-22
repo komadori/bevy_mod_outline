@@ -101,6 +101,7 @@ impl PipelineKey {
     }
 }
 
+#[derive(Resource)]
 pub struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
     pub outline_view_bind_group_layout: BindGroupLayout,

@@ -39,13 +39,13 @@ fn setup(
     let mut cube_mesh = Mesh::from(Cube { size: 1.0 });
     cube_mesh.generate_outline_normals().unwrap();
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(cube_mesh),
             material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
         })
-        .insert_bundle(OutlineBundle {
+        .insert(OutlineBundle {
             outline: Outline {
                 visible: true,
                 colour: Color::rgba(0.0, 1.0, 0.0, 1.0),
@@ -57,7 +57,7 @@ fn setup(
 
     // Add torus using the regular surface normals for outlining
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(Torus {
                 radius: 0.3,
                 ring_radius: 0.1,
@@ -69,7 +69,7 @@ fn setup(
                 .with_rotation(Quat::from_rotation_x(0.5 * PI)),
             ..default()
         })
-        .insert_bundle(OutlineBundle {
+        .insert(OutlineBundle {
             outline: Outline {
                 visible: true,
                 colour: Color::rgba(1.0, 0.0, 1.0, 0.3),
@@ -80,12 +80,12 @@ fn setup(
         .insert(Orbits);
 
     // Add plane, light source, and camera
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 1500.0,
             shadows_enabled: true,
@@ -94,7 +94,7 @@ fn setup(
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..default()
     });
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });

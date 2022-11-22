@@ -35,10 +35,12 @@ pub struct OutlineFragmentUniform {
     pub colour: Vec4,
 }
 
+#[derive(Resource)]
 pub struct OutlineStencilBindGroup {
     pub bind_group: BindGroup,
 }
 
+#[derive(Resource)]
 pub struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }

@@ -19,6 +19,7 @@ pub struct OutlineViewUniform {
     scale: Vec2,
 }
 
+#[derive(Resource)]
 pub struct OutlineViewBindGroup {
     bind_group: BindGroup,
 }
