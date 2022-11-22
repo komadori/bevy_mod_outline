@@ -26,21 +26,21 @@ use crate::uniforms::{OutlineFragmentUniform, OutlineStencilUniform, OutlineVolu
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
-pub const OUTLINE_SHADER_HANDLE: HandleUntyped =
+pub(crate) const OUTLINE_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
 
-pub const FRAGMENT_SHADER_HANDLE: HandleUntyped =
+pub(crate) const FRAGMENT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12033806834125368121);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PassType {
+pub(crate) enum PassType {
     Stencil = 1,
     Opaque = 2,
     Transparent = 3,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct PipelineKey(u32);
+pub(crate) struct PipelineKey(u32);
 bitfield_bitrange! {struct PipelineKey(u32)}
 
 impl PipelineKey {
@@ -52,25 +52,25 @@ impl PipelineKey {
         pub offset_zero, set_offset_zero: 11;
     }
 
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         PipelineKey(0)
     }
 
-    pub fn with_msaa_samples(mut self, msaa_samples: u32) -> Self {
+    pub(crate) fn with_msaa_samples(mut self, msaa_samples: u32) -> Self {
         self.set_msaa_samples_minus_one(msaa_samples - 1);
         self
     }
 
-    pub fn msaa_samples(&self) -> u32 {
+    pub(crate) fn msaa_samples(&self) -> u32 {
         self.msaa_samples_minus_one() + 1
     }
 
-    pub fn with_primitive_topology(mut self, primitive_topology: PrimitiveTopology) -> Self {
+    pub(crate) fn with_primitive_topology(mut self, primitive_topology: PrimitiveTopology) -> Self {
         self.set_primitive_topology_int(primitive_topology as u32);
         self
     }
 
-    pub fn primitive_topology(&self) -> PrimitiveTopology {
+    pub(crate) fn primitive_topology(&self) -> PrimitiveTopology {
         match self.primitive_topology_int() {
             x if x == PrimitiveTopology::PointList as u32 => PrimitiveTopology::PointList,
             x if x == PrimitiveTopology::LineList as u32 => PrimitiveTopology::LineList,
@@ -81,12 +81,12 @@ impl PipelineKey {
         }
     }
 
-    pub fn with_pass_type(mut self, pass_type: PassType) -> Self {
+    pub(crate) fn with_pass_type(mut self, pass_type: PassType) -> Self {
         self.set_pass_type_int(pass_type as u32);
         self
     }
 
-    pub fn pass_type(&self) -> PassType {
+    pub(crate) fn pass_type(&self) -> PassType {
         match self.pass_type_int() {
             x if x == PassType::Stencil as u32 => PassType::Stencil,
             x if x == PassType::Opaque as u32 => PassType::Opaque,
@@ -95,14 +95,14 @@ impl PipelineKey {
         }
     }
 
-    pub fn with_offset_zero(mut self, offset_zero: bool) -> Self {
+    pub(crate) fn with_offset_zero(mut self, offset_zero: bool) -> Self {
         self.set_offset_zero(offset_zero);
         self
     }
 }
 
 #[derive(Resource)]
-pub struct OutlinePipeline {
+pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
     pub outline_view_bind_group_layout: BindGroupLayout,
     pub outline_stencil_bind_group_layout: BindGroupLayout,

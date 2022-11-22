@@ -18,7 +18,7 @@ use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil, Out
 macro_rules! outline_vertex_uniform {
     ($x:ident) => {
         #[derive(Clone, Component, ShaderType)]
-        pub struct $x {
+        pub(crate) struct $x {
             #[align(16)]
             pub origin: Vec3,
             pub offset: f32,
@@ -30,22 +30,22 @@ outline_vertex_uniform!(OutlineStencilUniform);
 outline_vertex_uniform!(OutlineVolumeUniform);
 
 #[derive(Clone, Component, ShaderType)]
-pub struct OutlineFragmentUniform {
+pub(crate) struct OutlineFragmentUniform {
     #[align(16)]
     pub colour: Vec4,
 }
 
 #[derive(Resource)]
-pub struct OutlineStencilBindGroup {
+pub(crate) struct OutlineStencilBindGroup {
     pub bind_group: BindGroup,
 }
 
 #[derive(Resource)]
-pub struct OutlineVolumeBindGroup {
+pub(crate) struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub fn extract_outline_stencil_uniforms(
+pub(crate) fn extract_outline_stencil_uniforms(
     mut commands: Commands,
     query: Extract<Query<(Entity, &OutlineStencil, &ComputedOutlineDepth)>>,
 ) {
@@ -57,7 +57,7 @@ pub fn extract_outline_stencil_uniforms(
     }
 }
 
-pub fn extract_outline_volume_uniforms(
+pub(crate) fn extract_outline_volume_uniforms(
     mut commands: Commands,
     query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth)>>,
 ) {
@@ -77,7 +77,7 @@ pub fn extract_outline_volume_uniforms(
     }
 }
 
-pub fn queue_outline_stencil_bind_group(
+pub(crate) fn queue_outline_stencil_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
@@ -96,7 +96,7 @@ pub fn queue_outline_stencil_bind_group(
     }
 }
 
-pub fn queue_outline_volume_bind_group(
+pub(crate) fn queue_outline_volume_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
@@ -122,7 +122,7 @@ pub fn queue_outline_volume_bind_group(
     }
 }
 
-pub struct SetOutlineStencilBindGroup<const I: usize>();
+pub(crate) struct SetOutlineStencilBindGroup<const I: usize>();
 
 impl<const I: usize> EntityRenderCommand for SetOutlineStencilBindGroup<I> {
     type Param = (
@@ -141,7 +141,7 @@ impl<const I: usize> EntityRenderCommand for SetOutlineStencilBindGroup<I> {
     }
 }
 
-pub struct SetOutlineVolumeBindGroup<const I: usize>();
+pub(crate) struct SetOutlineVolumeBindGroup<const I: usize>();
 
 impl<const I: usize> EntityRenderCommand for SetOutlineVolumeBindGroup<I> {
     type Param = (

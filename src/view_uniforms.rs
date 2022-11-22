@@ -14,17 +14,17 @@ use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::OutlinePipeline;
 
 #[derive(Clone, Component, ShaderType)]
-pub struct OutlineViewUniform {
+pub(crate) struct OutlineViewUniform {
     #[align(16)]
     scale: Vec2,
 }
 
 #[derive(Resource)]
-pub struct OutlineViewBindGroup {
+pub(crate) struct OutlineViewBindGroup {
     bind_group: BindGroup,
 }
 
-pub fn extract_outline_view_uniforms(
+pub(crate) fn extract_outline_view_uniforms(
     mut commands: Commands,
     query: Extract<Query<(Entity, &Camera), With<Camera3d>>>,
 ) {
@@ -43,7 +43,7 @@ pub fn extract_outline_view_uniforms(
     }
 }
 
-pub fn queue_outline_view_bind_group(
+pub(crate) fn queue_outline_view_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
@@ -62,7 +62,7 @@ pub fn queue_outline_view_bind_group(
     }
 }
 
-pub struct SetOutlineViewBindGroup<const I: usize>();
+pub(crate) struct SetOutlineViewBindGroup<const I: usize>();
 
 impl<const I: usize> EntityRenderCommand for SetOutlineViewBindGroup<I> {
     type Param = (

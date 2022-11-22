@@ -13,7 +13,7 @@ use crate::uniforms::{
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
 
-pub type DrawStencil = (
+pub(crate) type DrawStencil = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
@@ -23,7 +23,7 @@ pub type DrawStencil = (
 );
 
 #[allow(clippy::too_many_arguments)]
-pub fn queue_outline_stencil_mesh(
+pub(crate) fn queue_outline_stencil_mesh(
     stencil_draw_functions: Res<DrawFunctions<StencilOutline>>,
     stencil_pipeline: Res<OutlinePipeline>,
     msaa: Res<Msaa>,
@@ -65,7 +65,7 @@ pub fn queue_outline_stencil_mesh(
     }
 }
 
-pub type DrawOutline = (
+pub(crate) type DrawOutline = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
@@ -75,7 +75,7 @@ pub type DrawOutline = (
 );
 
 #[allow(clippy::too_many_arguments)]
-pub fn queue_outline_volume_mesh(
+pub(crate) fn queue_outline_volume_mesh(
     opaque_draw_functions: Res<DrawFunctions<OpaqueOutline>>,
     transparent_draw_functions: Res<DrawFunctions<TransparentOutline>>,
     outline_pipeline: Res<OutlinePipeline>,

@@ -19,7 +19,7 @@ use bevy::render::{
 };
 use bevy::utils::FloatOrd;
 
-pub struct StencilOutline {
+pub(crate) struct StencilOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
@@ -52,7 +52,7 @@ impl CachedRenderPipelinePhaseItem for StencilOutline {
     }
 }
 
-pub struct OpaqueOutline {
+pub(crate) struct OpaqueOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
@@ -85,7 +85,7 @@ impl CachedRenderPipelinePhaseItem for OpaqueOutline {
     }
 }
 
-pub struct TransparentOutline {
+pub(crate) struct TransparentOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
@@ -119,7 +119,7 @@ impl CachedRenderPipelinePhaseItem for TransparentOutline {
 }
 
 #[allow(clippy::type_complexity)]
-pub struct OutlineNode {
+pub(crate) struct OutlineNode {
     query: QueryState<
         (
             Read<ExtractedCamera>,
@@ -135,9 +135,9 @@ pub struct OutlineNode {
 }
 
 impl OutlineNode {
-    pub const IN_VIEW: &'static str = "view";
+    pub(crate) const IN_VIEW: &'static str = "view";
 
-    pub fn new(world: &mut World) -> Self {
+    pub(crate) fn new(world: &mut World) -> Self {
         Self {
             query: world.query_filtered(),
         }
