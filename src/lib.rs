@@ -32,6 +32,7 @@ use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFuncti
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
 use bevy::transform::TransformSystem;
+use interpolation::Lerp;
 
 use crate::draw::{
     queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
@@ -86,6 +87,16 @@ impl ExtractComponent for OutlineStencil {
     }
 }
 
+impl Lerp for OutlineStencil {
+    type Scalar = f32;
+
+    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+        OutlineStencil {
+            offset: self.offset.lerp(&other.offset, scalar),
+        }
+    }
+}
+
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Default)]
 pub struct OutlineVolume {
@@ -95,6 +106,28 @@ pub struct OutlineVolume {
     pub width: f32,
     /// Colour of the outline
     pub colour: Color,
+}
+
+impl Lerp for OutlineVolume {
+    type Scalar = f32;
+
+    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+        OutlineVolume {
+            visible: if *scalar >= 0.5 {
+                other.visible
+            } else {
+                self.visible
+            },
+            width: self.width.lerp(&other.width, scalar),
+            colour: {
+                let [r, g, b, a] = self
+                    .colour
+                    .as_linear_rgba_f32()
+                    .lerp(&other.colour.as_linear_rgba_f32(), scalar);
+                Color::rgba_linear(r, g, b, a)
+            },
+        }
+    }
 }
 
 /// A bundle for rendering stenciled outlines around meshes.

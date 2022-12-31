@@ -18,6 +18,7 @@ bevy = { version = "0.9", default-features = false, features = [
     "bevy_core_pipeline",
 ] }
 bitfield = "0.14"
+interpolation = "0.2"
 thiserror = "1.0"
 
 [dev-dependencies]
