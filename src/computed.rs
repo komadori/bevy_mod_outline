@@ -4,6 +4,7 @@ use bevy::prelude::*;
 #[derive(Clone, Component, Default)]
 pub struct ComputedOutlineDepth {
     pub(crate) origin: Vec3,
+    pub(crate) flat: bool,
 }
 
 /// A component which specifies how the outline depth should be computed.
@@ -12,6 +13,8 @@ pub struct ComputedOutlineDepth {
 pub enum SetOutlineDepth {
     /// A flat plane facing the camera and intersecting the specified point in model-space.
     Flat { model_origin: Vec3 },
+    /// Real model-space.
+    Real,
 }
 
 /// A component which specifies that this outline lies at the same depth as its parent.
@@ -36,18 +39,20 @@ pub(crate) fn compute_outline_depth(
     for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
         let mut changed = changed_transform;
         if changed {
-            let origin = if let Some((sd, sd_changed)) = set_depth {
+            let (origin, flat) = if let Some((sd, sd_changed)) = set_depth {
                 changed |= sd_changed;
                 match sd {
                     SetOutlineDepth::Flat {
                         model_origin: origin,
-                    } => *origin,
+                    } => (*origin, true),
+                    SetOutlineDepth::Real => (Vec3::NAN, false),
                 }
             } else {
-                Vec3::ZERO
+                (Vec3::ZERO, true)
             };
             let matrix = transform.compute_matrix();
             computed.origin = matrix.project_point3(origin);
+            computed.flat = flat;
         }
         if let Some((cs, changed_children)) = children {
             changed |= changed_children;

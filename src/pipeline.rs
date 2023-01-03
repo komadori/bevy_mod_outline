@@ -49,7 +49,8 @@ impl PipelineKey {
         msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
         primitive_topology_int, set_primitive_topology_int: 8, 6;
         pass_type_int, set_pass_type_int: 10, 9;
-        pub offset_zero, set_offset_zero: 11;
+        pub flat_depth, set_flat_depth: 11;
+        pub offset_zero, set_offset_zero: 12;
     }
 
     pub(crate) fn new() -> Self {
@@ -97,6 +98,11 @@ impl PipelineKey {
 
     pub(crate) fn with_offset_zero(mut self, offset_zero: bool) -> Self {
         self.set_offset_zero(offset_zero);
+        self
+    }
+
+    pub(crate) fn with_flat_depth(mut self, flat_depth: bool) -> Self {
+        self.set_flat_depth(flat_depth);
         self
     }
 }
@@ -207,6 +213,15 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             },
         );
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
+        let cull_mode;
+        if key.flat_depth() {
+            vertex_defs.push("FLAT_DEPTH".to_string());
+            cull_mode = Some(Face::Back);
+        } else if key.pass_type() == PassType::Stencil {
+            cull_mode = Some(Face::Back);
+        } else {
+            cull_mode = Some(Face::Front);
+        }
         if key.offset_zero() {
             vertex_defs.push("OFFSET_ZERO".to_string());
         } else {
@@ -255,7 +270,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             layout: Some(bind_layouts),
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
+                cull_mode,
                 unclipped_depth: false,
                 polygon_mode: PolygonMode::Fill,
                 conservative: false,

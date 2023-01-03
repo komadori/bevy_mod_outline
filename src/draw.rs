@@ -8,8 +8,8 @@ use bevy::render::view::ExtractedView;
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::uniforms::{
-    OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
-    SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
+    OutlineFragmentUniform, OutlineStencilFlags, OutlineStencilUniform, OutlineVolumeFlags,
+    OutlineVolumeUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
 
@@ -30,7 +30,12 @@ pub(crate) fn queue_outline_stencil_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &Handle<Mesh>, &OutlineStencilUniform)>,
+    material_meshes: Query<(
+        Entity,
+        &Handle<Mesh>,
+        &OutlineStencilUniform,
+        &OutlineStencilFlags,
+    )>,
     mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>)>,
 ) {
     let draw_stencil = stencil_draw_functions
@@ -44,10 +49,11 @@ pub(crate) fn queue_outline_stencil_mesh(
 
     for (view, mut stencil_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_handle, stencil_uniform) in material_meshes.iter() {
+        for (entity, mesh_handle, stencil_uniform, stencil_flags) in material_meshes.iter() {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key = base_key
                     .with_primitive_topology(mesh.primitive_topology)
+                    .with_flat_depth(stencil_flags.flat_depth)
                     .with_offset_zero(stencil_uniform.offset == 0.0);
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &stencil_pipeline, key, &mesh.layout)
@@ -87,6 +93,7 @@ pub(crate) fn queue_outline_volume_mesh(
         Entity,
         &Handle<Mesh>,
         &OutlineVolumeUniform,
+        &OutlineVolumeFlags,
         &OutlineFragmentUniform,
     )>,
     mut views: Query<(
@@ -108,7 +115,9 @@ pub(crate) fn queue_outline_volume_mesh(
 
     for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_handle, volume_uniform, fragment_uniform) in material_meshes.iter() {
+        for (entity, mesh_handle, volume_uniform, volume_flags, fragment_uniform) in
+            material_meshes.iter()
+        {
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = fragment_uniform.colour[3] < 1.0;
                 let key = base_key
@@ -118,6 +127,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     } else {
                         PassType::Opaque
                     })
+                    .with_flat_depth(volume_flags.flat_depth)
                     .with_offset_zero(volume_uniform.offset == 0.0);
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)

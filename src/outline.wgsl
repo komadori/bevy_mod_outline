@@ -60,12 +60,19 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
     let model = mesh.model;
 #endif
     let clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
+#ifdef FLAT_DEPTH
     let ndc_pos = clip_pos.xy / clip_pos.w;
+    let out_zw = vec2<f32>(model_origin_z(vstage.origin, view.view_proj), 1.0);
+#else
+    let ndc_pos = clip_pos.xy;
+    let out_zw = clip_pos.zw;
+#endif
 #ifdef OFFSET_ZERO
-    let ndc_delta = vec2<f32>(0.0, 0.0);
+    let out_xy = ndc_pos;
 #else
     let clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.normal);
-    let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale;
+    let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale * out_zw.y;
+    let out_xy = ndc_pos + ndc_delta;
 #endif
-    return vec4<f32>(ndc_pos + ndc_delta, model_origin_z(vstage.origin, view.view_proj), 1.0);
+    return vec4<f32>(out_xy, out_zw);
 }

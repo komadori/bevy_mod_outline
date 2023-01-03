@@ -15,24 +15,34 @@ use bevy::{
 
 use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil, OutlineVolume};
 
-macro_rules! outline_vertex_uniform {
-    ($x:ident) => {
-        #[derive(Clone, Component, ShaderType)]
-        pub(crate) struct $x {
-            #[align(16)]
-            pub origin: Vec3,
-            pub offset: f32,
-        }
-    };
+#[derive(Clone, Component, ShaderType)]
+pub(crate) struct OutlineStencilUniform {
+    #[align(16)]
+    pub origin: Vec3,
+    pub offset: f32,
 }
 
-outline_vertex_uniform!(OutlineStencilUniform);
-outline_vertex_uniform!(OutlineVolumeUniform);
+#[derive(Clone, Component, ShaderType)]
+pub(crate) struct OutlineVolumeUniform {
+    #[align(16)]
+    pub origin: Vec3,
+    pub offset: f32,
+}
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineFragmentUniform {
     #[align(16)]
     pub colour: Vec4,
+}
+
+#[derive(Component)]
+pub(crate) struct OutlineStencilFlags {
+    pub flat_depth: bool,
+}
+
+#[derive(Component)]
+pub(crate) struct OutlineVolumeFlags {
+    pub flat_depth: bool,
 }
 
 #[derive(Resource)]
@@ -50,10 +60,15 @@ pub(crate) fn extract_outline_stencil_uniforms(
     query: Extract<Query<(Entity, &OutlineStencil, &ComputedOutlineDepth)>>,
 ) {
     for (entity, stencil, computed) in query.iter() {
-        commands.get_or_spawn(entity).insert(OutlineStencilUniform {
-            origin: computed.origin,
-            offset: stencil.offset,
-        });
+        commands
+            .get_or_spawn(entity)
+            .insert(OutlineStencilUniform {
+                origin: computed.origin,
+                offset: stencil.offset,
+            })
+            .insert(OutlineStencilFlags {
+                flat_depth: computed.flat,
+            });
     }
 }
 
@@ -73,6 +88,9 @@ pub(crate) fn extract_outline_volume_uniforms(
             })
             .insert(OutlineFragmentUniform {
                 colour: outline.colour.as_linear_rgba_f32().into(),
+            })
+            .insert(OutlineVolumeFlags {
+                flat_depth: computed.flat,
             });
     }
 }
