@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.3.1 (2023-01-05)
+
+### Added
+- Added Lerp impls for OutlineVolume and OutlineStencil.
+- Added Real mode to SetOutlineDepth enum.
+
 ## bevy_mod_outline 0.3.0 (2022-11-22)
 
 ### Added
