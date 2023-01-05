@@ -113,10 +113,12 @@ impl Lerp for OutlineVolume {
 
     fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
         OutlineVolume {
-            visible: if *scalar >= 0.5 {
+            visible: if *scalar <= 0.0 {
+                self.visible
+            } else if *scalar >= 1.0 {
                 other.visible
             } else {
-                self.visible
+                self.visible | other.visible
             },
             width: self.width.lerp(&other.width, scalar),
             colour: {
