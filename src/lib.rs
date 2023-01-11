@@ -87,7 +87,7 @@ pub struct Outline {
 }
 
 /// A component for specifying what layer(s) the outline should be rendered for
-#[derive(Clone, Copy, Component, Default, Deref, DerefMut)]
+#[derive(Component, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 /// A bundle for rendering stenciled outlines around meshes.
