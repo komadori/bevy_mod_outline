@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::{pipeline::OutlinePipeline, Outline};
+use crate::{pipeline::OutlinePipeline, Outline, OutlineRenderLayers};
 
 #[derive(Clone, Component, ShaderType)]
 pub struct OutlineVertexUniform {
@@ -31,19 +31,23 @@ pub struct OutlineBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub fn extract_outline_uniforms(mut commands: Commands, query: Extract<Query<(Entity, &Outline)>>) {
-    for (entity, outline) in query.iter() {
+pub fn extract_outline_uniforms(mut commands: Commands, query: Extract<Query<(Entity, &Outline, Option<&OutlineRenderLayers>)>>) {
+    for (entity, outline, outline_mask) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {
             continue;
         }
-        commands
-            .get_or_spawn(entity)
+        let mut entity_commands = commands.get_or_spawn(entity);
+        entity_commands
             .insert(OutlineVertexUniform {
                 width: outline.width,
             })
             .insert(OutlineFragmentUniform {
                 colour: outline.colour.as_linear_rgba_f32().into(),
             });
+
+        if let Some(outline_mask) = outline_mask {
+            entity_commands.insert(*outline_mask);
+        }
     }
 }
 

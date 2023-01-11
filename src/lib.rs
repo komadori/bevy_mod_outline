@@ -26,6 +26,7 @@ use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::{RenderApp, RenderStage};
+use bevy::render::view::RenderLayers;
 
 use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -84,6 +85,10 @@ pub struct Outline {
     /// Colour of the outline
     pub colour: Color,
 }
+
+/// A component for specifying what layer(s) the outline should be rendered for
+#[derive(Clone, Copy, Component, Default, Deref, DerefMut)]
+pub struct OutlineRenderLayers(pub RenderLayers);
 
 /// A bundle for rendering stenciled outlines around meshes.
 #[derive(Bundle, Clone, Default)]

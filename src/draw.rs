@@ -3,8 +3,9 @@ use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
-use bevy::render::view::ExtractedView;
+use bevy::render::view::{ExtractedView, RenderLayers};
 
+use crate::OutlineRenderLayers;
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType};
 use crate::uniforms::{OutlineFragmentUniform, SetOutlineBindGroup};
@@ -26,8 +27,8 @@ pub fn queue_outline_stencil_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>), With<OutlineStencil>>,
-    mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>)>,
+    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, Option<&OutlineRenderLayers>), With<OutlineStencil>>,
+    mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>, Option<&RenderLayers>)>,
 ) {
     let draw_stencil = stencil_draw_functions
         .read()
@@ -36,9 +37,14 @@ pub fn queue_outline_stencil_mesh(
 
     let base_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
 
-    for (view, mut stencil_phase) in views.iter_mut() {
+    for (view, mut stencil_phase, view_mask) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_uniform, mesh_handle) in material_meshes.iter() {
+        let view_mask = view_mask.copied().unwrap_or_default();
+        for (entity, mesh_uniform, mesh_handle, outline_mask) in material_meshes.iter() {
+            let outline_mask = outline_mask.copied().unwrap_or_default();
+            if !view_mask.intersects(&outline_mask) {
+                continue;
+            }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key =
                     base_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology);
@@ -80,11 +86,12 @@ pub fn queue_outline_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &OutlineFragmentUniform)>,
+    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &OutlineFragmentUniform, Option<&OutlineRenderLayers>)>,
     mut views: Query<(
         &ExtractedView,
         &mut RenderPhase<OpaqueOutline>,
         &mut RenderPhase<TransparentOutline>,
+        Option<&RenderLayers>,
     )>,
 ) {
     let draw_opaque_outline = opaque_draw_functions
@@ -98,9 +105,14 @@ pub fn queue_outline_mesh(
 
     let base_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
 
-    for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
+    for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
+        let view_mask = view_mask.copied().unwrap_or_default();
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_uniform, mesh_handle, outline_fragment) in material_meshes.iter() {
+        for (entity, mesh_uniform, mesh_handle, outline_fragment, outline_mask) in material_meshes.iter() {
+            let outline_mask = outline_mask.copied().unwrap_or_default();
+            if !view_mask.intersects(&outline_mask) {
+                continue;
+            }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = outline_fragment.colour[3] < 1.0;
                 let pass_type;
