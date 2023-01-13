@@ -90,6 +90,15 @@ pub struct Outline {
 #[derive(Component, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
+impl ExtractComponent for OutlineRenderLayers {
+    type Query = &'static OutlineRenderLayers;
+    type Filter = ();
+
+    fn extract_component(item: &OutlineRenderLayers) -> Self {
+        *item
+    }
+}
+
 /// A bundle for rendering stenciled outlines around meshes.
 #[derive(Bundle, Clone, Default)]
 pub struct OutlineBundle {
@@ -117,6 +126,7 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
+            .add_plugin(ExtractComponentPlugin::<OutlineRenderLayers>::default())
             .add_plugin(UniformComponentPlugin::<OutlineVertexUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
