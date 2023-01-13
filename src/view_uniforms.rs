@@ -24,6 +24,7 @@ pub struct OutlineViewBindGroup {
     bind_group: BindGroup,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn extract_outline_view_uniforms(
     mut commands: Commands,
     query: Extract<Query<(Entity, &Camera, Option<&RenderLayers>), With<Camera3d>>>,

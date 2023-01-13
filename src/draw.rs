@@ -19,7 +19,7 @@ pub type DrawStencil = (
     DrawMesh,
 );
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn queue_outline_stencil_mesh(
     stencil_draw_functions: Res<DrawFunctions<StencilOutline>>,
     stencil_pipeline: Res<OutlinePipeline>,
@@ -77,7 +77,7 @@ pub type DrawOutline = (
     DrawMesh,
 );
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn queue_outline_mesh(
     opaque_draw_functions: Res<DrawFunctions<OpaqueOutline>>,
     transparent_draw_functions: Res<DrawFunctions<TransparentOutline>>,
