@@ -31,7 +31,10 @@ pub struct OutlineBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub fn extract_outline_uniforms(mut commands: Commands, query: Extract<Query<(Entity, &Outline, Option<&OutlineRenderLayers>)>>) {
+pub fn extract_outline_uniforms(
+    mut commands: Commands,
+    query: Extract<Query<(Entity, &Outline, Option<&OutlineRenderLayers>)>>,
+) {
     for (entity, outline, outline_mask) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {
             continue;

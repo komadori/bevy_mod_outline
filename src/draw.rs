@@ -5,11 +5,11 @@ use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::view::{ExtractedView, RenderLayers};
 
-use crate::OutlineRenderLayers;
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType};
 use crate::uniforms::{OutlineFragmentUniform, SetOutlineBindGroup};
 use crate::view_uniforms::SetOutlineViewBindGroup;
+use crate::OutlineRenderLayers;
 use crate::OutlineStencil;
 
 pub type DrawStencil = (
@@ -27,8 +27,20 @@ pub fn queue_outline_stencil_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, Option<&OutlineRenderLayers>), With<OutlineStencil>>,
-    mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>, Option<&RenderLayers>)>,
+    material_meshes: Query<
+        (
+            Entity,
+            &MeshUniform,
+            &Handle<Mesh>,
+            Option<&OutlineRenderLayers>,
+        ),
+        With<OutlineStencil>,
+    >,
+    mut views: Query<(
+        &ExtractedView,
+        &mut RenderPhase<StencilOutline>,
+        Option<&RenderLayers>,
+    )>,
 ) {
     let draw_stencil = stencil_draw_functions
         .read()
@@ -86,7 +98,13 @@ pub fn queue_outline_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>, &OutlineFragmentUniform, Option<&OutlineRenderLayers>)>,
+    material_meshes: Query<(
+        Entity,
+        &MeshUniform,
+        &Handle<Mesh>,
+        &OutlineFragmentUniform,
+        Option<&OutlineRenderLayers>,
+    )>,
     mut views: Query<(
         &ExtractedView,
         &mut RenderPhase<OpaqueOutline>,
@@ -108,7 +126,9 @@ pub fn queue_outline_mesh(
     for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
         let view_mask = view_mask.copied().unwrap_or_default();
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_uniform, mesh_handle, outline_fragment, outline_mask) in material_meshes.iter() {
+        for (entity, mesh_uniform, mesh_handle, outline_fragment, outline_mask) in
+            material_meshes.iter()
+        {
             let outline_mask = outline_mask.copied().unwrap_or_default();
             if !view_mask.intersects(&outline_mask) {
                 continue;
