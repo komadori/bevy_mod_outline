@@ -8,6 +8,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
+use bevy::render::view::RenderLayers;
 use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
@@ -23,21 +24,26 @@ pub struct OutlineViewBindGroup {
     bind_group: BindGroup,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn extract_outline_view_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &Camera), With<Camera3d>>>,
+    query: Extract<Query<(Entity, &Camera, Option<&RenderLayers>), With<Camera3d>>>,
 ) {
-    for (entity, camera) in query.iter() {
+    for (entity, camera, view_mask) in query.iter() {
         if !camera.is_active {
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
-            commands
-                .get_or_spawn(entity)
+            let mut entity_commands = commands.get_or_spawn(entity);
+            entity_commands
                 .insert(OutlineViewUniform { scale: 2.0 / size })
                 .insert(RenderPhase::<StencilOutline>::default())
                 .insert(RenderPhase::<OpaqueOutline>::default())
                 .insert(RenderPhase::<TransparentOutline>::default());
+
+            if let Some(view_mask) = view_mask {
+                entity_commands.insert(*view_mask);
+            }
         }
     }
 }

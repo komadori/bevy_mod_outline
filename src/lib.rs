@@ -25,6 +25,7 @@ use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
+use bevy::render::view::RenderLayers;
 use bevy::render::{RenderApp, RenderStage};
 
 use crate::draw::{queue_outline_mesh, queue_outline_stencil_mesh, DrawOutline, DrawStencil};
@@ -85,6 +86,19 @@ pub struct Outline {
     pub colour: Color,
 }
 
+/// A component for specifying what layer(s) the outline should be rendered for
+#[derive(Component, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
+pub struct OutlineRenderLayers(pub RenderLayers);
+
+impl ExtractComponent for OutlineRenderLayers {
+    type Query = &'static OutlineRenderLayers;
+    type Filter = ();
+
+    fn extract_component(item: &OutlineRenderLayers) -> Self {
+        *item
+    }
+}
+
 /// A bundle for rendering stenciled outlines around meshes.
 #[derive(Bundle, Clone, Default)]
 pub struct OutlineBundle {
@@ -112,6 +126,7 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
+            .add_plugin(ExtractComponentPlugin::<OutlineRenderLayers>::default())
             .add_plugin(UniformComponentPlugin::<OutlineVertexUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
