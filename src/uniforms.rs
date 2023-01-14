@@ -36,8 +36,8 @@ pub fn extract_outline_uniforms(mut commands: Commands, query: Extract<Query<(En
         if !outline.visible || outline.colour.a() == 0.0 {
             continue;
         }
-        let mut entity_commands = commands.get_or_spawn(entity);
-        entity_commands
+        commands
+            .get_or_spawn(entity)
             .insert(OutlineVertexUniform {
                 width: outline.width,
             })
