@@ -36,7 +36,7 @@ pub(crate) fn queue_outline_stencil_mesh(
         &Handle<Mesh>,
         &OutlineStencilUniform,
         &OutlineStencilFlags,
-        Option<&OutlineRenderLayers>,
+        &OutlineRenderLayers,
     )>,
     mut views: Query<(
         &ExtractedView,
@@ -59,8 +59,7 @@ pub(crate) fn queue_outline_stencil_mesh(
         for (entity, mesh_handle, stencil_uniform, stencil_flags, outline_mask) in
             material_meshes.iter()
         {
-            let outline_mask = outline_mask.copied().unwrap_or_default();
-            if !view_mask.intersects(&outline_mask) {
+            if !view_mask.intersects(outline_mask) {
                 continue;
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
@@ -108,7 +107,7 @@ pub(crate) fn queue_outline_volume_mesh(
         &OutlineVolumeUniform,
         &OutlineVolumeFlags,
         &OutlineFragmentUniform,
-        Option<&OutlineRenderLayers>,
+        &OutlineRenderLayers,
     )>,
     mut views: Query<(
         &ExtractedView,
@@ -134,8 +133,7 @@ pub(crate) fn queue_outline_volume_mesh(
         for (entity, mesh_handle, volume_uniform, volume_flags, fragment_uniform, outline_mask) in
             material_meshes.iter()
         {
-            let outline_mask = outline_mask.copied().unwrap_or_default();
-            if !view_mask.intersects(&outline_mask) {
+            if !view_mask.intersects(outline_mask) {
                 continue;
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
