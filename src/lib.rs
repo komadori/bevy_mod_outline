@@ -91,11 +91,19 @@ pub struct Outline {
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 impl ExtractComponent for OutlineRenderLayers {
-    type Query = &'static OutlineRenderLayers;
-    type Filter = ();
+    type Query = (
+        Option<&'static OutlineRenderLayers>,
+        Option<&'static RenderLayers>,
+    );
+    type Filter = Or<(With<Outline>, With<OutlineStencil>)>;
 
-    fn extract_component(item: &OutlineRenderLayers) -> Self {
-        *item
+    fn extract_component(
+        (outline_mask, object_mask): (Option<&OutlineRenderLayers>, Option<&RenderLayers>),
+    ) -> Self {
+        outline_mask
+            .copied()
+            .or_else(|| object_mask.copied().map(OutlineRenderLayers))
+            .unwrap_or_default()
     }
 }
 

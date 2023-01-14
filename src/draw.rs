@@ -28,12 +28,7 @@ pub fn queue_outline_stencil_mesh(
     mut pipeline_cache: ResMut<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<
-        (
-            Entity,
-            &MeshUniform,
-            &Handle<Mesh>,
-            Option<&OutlineRenderLayers>,
-        ),
+        (Entity, &MeshUniform, &Handle<Mesh>, &OutlineRenderLayers),
         With<OutlineStencil>,
     >,
     mut views: Query<(
@@ -53,8 +48,7 @@ pub fn queue_outline_stencil_mesh(
         let rangefinder = view.rangefinder3d();
         let view_mask = view_mask.copied().unwrap_or_default();
         for (entity, mesh_uniform, mesh_handle, outline_mask) in material_meshes.iter() {
-            let outline_mask = outline_mask.copied().unwrap_or_default();
-            if !view_mask.intersects(&outline_mask) {
+            if !view_mask.intersects(outline_mask) {
                 continue;
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
@@ -103,7 +97,7 @@ pub fn queue_outline_mesh(
         &MeshUniform,
         &Handle<Mesh>,
         &OutlineFragmentUniform,
-        Option<&OutlineRenderLayers>,
+        &OutlineRenderLayers,
     )>,
     mut views: Query<(
         &ExtractedView,
@@ -129,8 +123,7 @@ pub fn queue_outline_mesh(
         for (entity, mesh_uniform, mesh_handle, outline_fragment, outline_mask) in
             material_meshes.iter()
         {
-            let outline_mask = outline_mask.copied().unwrap_or_default();
-            if !view_mask.intersects(&outline_mask) {
+            if !view_mask.intersects(outline_mask) {
                 continue;
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
