@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.3.2 (2023-01-15)
+
+### Added
+- Added support for (Outline)RenderLayers components (@mxgrey).
+- Added render_layers example.
+
 ## bevy_mod_outline 0.3.1 (2023-01-05)
 
 ### Added
@@ -22,6 +28,15 @@
 ### Changed
 - Updated Bevy dependency to 0.9.
 - Renamed Outline component to OutlineVolume.
+
+## bevy_mod_outline 0.2.5 (2023-01-14)
+
+### Added
+- Added support for (Outline)RenderLayers components (@mxgrey) (back-port from 0.3.2).
+- Added render_layers example (back-port from 0.3.2).
+
+### Fixed
+- Fixed errant debug println in AutoGenerateOutlineNormalsPlugin (back-port from 0.3.0).
 
 ## bevy_mod_outline 0.2.4 (2022-10-12)
 
