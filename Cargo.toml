@@ -40,6 +40,10 @@ name = "pieces"
 path = "examples/pieces.rs"
 
 [[example]]
+name = "render_layers"
+path = "examples/render_layers.rs"
+
+[[example]]
 name = "animated_fox"
 path = "examples/animated_fox.rs"
 required-features = [
