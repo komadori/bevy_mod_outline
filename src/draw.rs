@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
-use bevy::render::view::ExtractedView;
+use bevy::render::view::{ExtractedView, RenderLayers};
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
@@ -12,6 +12,7 @@ use crate::uniforms::{
     OutlineVolumeUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
+use crate::OutlineRenderLayers;
 
 pub(crate) type DrawStencil = (
     SetItemPipeline,
@@ -22,7 +23,7 @@ pub(crate) type DrawStencil = (
     DrawMesh,
 );
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn queue_outline_stencil_mesh(
     stencil_draw_functions: Res<DrawFunctions<StencilOutline>>,
     stencil_pipeline: Res<OutlinePipeline>,
@@ -35,8 +36,13 @@ pub(crate) fn queue_outline_stencil_mesh(
         &Handle<Mesh>,
         &OutlineStencilUniform,
         &OutlineStencilFlags,
+        Option<&OutlineRenderLayers>,
     )>,
-    mut views: Query<(&ExtractedView, &mut RenderPhase<StencilOutline>)>,
+    mut views: Query<(
+        &ExtractedView,
+        &mut RenderPhase<StencilOutline>,
+        Option<&RenderLayers>,
+    )>,
 ) {
     let draw_stencil = stencil_draw_functions
         .read()
@@ -47,9 +53,16 @@ pub(crate) fn queue_outline_stencil_mesh(
         .with_msaa_samples(msaa.samples)
         .with_pass_type(PassType::Stencil);
 
-    for (view, mut stencil_phase) in views.iter_mut() {
+    for (view, mut stencil_phase, view_mask) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_handle, stencil_uniform, stencil_flags) in material_meshes.iter() {
+        let view_mask = view_mask.copied().unwrap_or_default();
+        for (entity, mesh_handle, stencil_uniform, stencil_flags, outline_mask) in
+            material_meshes.iter()
+        {
+            let outline_mask = outline_mask.copied().unwrap_or_default();
+            if !view_mask.intersects(&outline_mask) {
+                continue;
+            }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key = base_key
                     .with_primitive_topology(mesh.primitive_topology)
@@ -80,7 +93,7 @@ pub(crate) type DrawOutline = (
     DrawMesh,
 );
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn queue_outline_volume_mesh(
     opaque_draw_functions: Res<DrawFunctions<OpaqueOutline>>,
     transparent_draw_functions: Res<DrawFunctions<TransparentOutline>>,
@@ -95,11 +108,13 @@ pub(crate) fn queue_outline_volume_mesh(
         &OutlineVolumeUniform,
         &OutlineVolumeFlags,
         &OutlineFragmentUniform,
+        Option<&OutlineRenderLayers>,
     )>,
     mut views: Query<(
         &ExtractedView,
         &mut RenderPhase<OpaqueOutline>,
         &mut RenderPhase<TransparentOutline>,
+        Option<&RenderLayers>,
     )>,
 ) {
     let draw_opaque_outline = opaque_draw_functions
@@ -113,11 +128,16 @@ pub(crate) fn queue_outline_volume_mesh(
 
     let base_key = PipelineKey::new().with_msaa_samples(msaa.samples);
 
-    for (view, mut opaque_phase, mut transparent_phase) in views.iter_mut() {
+    for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
+        let view_mask = view_mask.copied().unwrap_or_default();
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_handle, volume_uniform, volume_flags, fragment_uniform) in
+        for (entity, mesh_handle, volume_uniform, volume_flags, fragment_uniform, outline_mask) in
             material_meshes.iter()
         {
+            let outline_mask = outline_mask.copied().unwrap_or_default();
+            if !view_mask.intersects(&outline_mask) {
+                continue;
+            }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = fragment_uniform.colour[3] < 1.0;
                 let key = base_key
