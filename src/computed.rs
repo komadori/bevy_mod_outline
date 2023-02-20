@@ -37,10 +37,9 @@ pub(crate) fn compute_outline_depth(
     child_query: Query<(&Children, Changed<Children>)>,
 ) {
     for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
-        let mut changed = changed_transform;
+        let mut changed = changed_transform || set_depth.filter(|(_, c)| *c).is_some();
         if changed {
-            let (origin, flat) = if let Some((sd, sd_changed)) = set_depth {
-                changed |= sd_changed;
+            let (origin, flat) = if let Some((sd, _)) = set_depth {
                 match sd {
                     SetOutlineDepth::Flat {
                         model_origin: origin,
