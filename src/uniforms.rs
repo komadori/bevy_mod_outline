@@ -35,14 +35,22 @@ pub(crate) struct OutlineFragmentUniform {
     pub colour: Vec4,
 }
 
+#[derive(Clone, Copy, Default, PartialEq)]
+pub(crate) enum DepthMode {
+    #[default]
+    Invalid = 0,
+    Flat = 1,
+    Real = 2,
+}
+
 #[derive(Component)]
 pub(crate) struct OutlineStencilFlags {
-    pub flat_depth: bool,
+    pub depth_mode: DepthMode,
 }
 
 #[derive(Component)]
 pub(crate) struct OutlineVolumeFlags {
-    pub flat_depth: bool,
+    pub depth_mode: DepthMode,
 }
 
 #[derive(Resource)]
@@ -63,11 +71,11 @@ pub(crate) fn extract_outline_stencil_uniforms(
         commands
             .get_or_spawn(entity)
             .insert(OutlineStencilUniform {
-                origin: computed.origin,
+                origin: computed.world_origin,
                 offset: stencil.offset,
             })
             .insert(OutlineStencilFlags {
-                flat_depth: computed.flat,
+                depth_mode: computed.depth_mode,
             });
     }
 }
@@ -83,14 +91,14 @@ pub(crate) fn extract_outline_volume_uniforms(
         commands
             .get_or_spawn(entity)
             .insert(OutlineVolumeUniform {
-                origin: computed.origin,
+                origin: computed.world_origin,
                 offset: outline.width,
             })
             .insert(OutlineFragmentUniform {
                 colour: outline.colour.as_linear_rgba_f32().into(),
             })
             .insert(OutlineVolumeFlags {
-                flat_depth: computed.flat,
+                depth_mode: computed.depth_mode,
             });
     }
 }

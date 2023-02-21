@@ -65,7 +65,7 @@ pub(crate) fn queue_outline_stencil_mesh(
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key = base_key
                     .with_primitive_topology(mesh.primitive_topology)
-                    .with_flat_depth(stencil_flags.flat_depth)
+                    .with_depth_mode(stencil_flags.depth_mode)
                     .with_offset_zero(stencil_uniform.offset == 0.0);
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &stencil_pipeline, key, &mesh.layout)
@@ -145,7 +145,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     } else {
                         PassType::Opaque
                     })
-                    .with_flat_depth(volume_flags.flat_depth)
+                    .with_depth_mode(volume_flags.depth_mode)
                     .with_offset_zero(volume_uniform.offset == 0.0);
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)

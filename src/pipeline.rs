@@ -22,7 +22,9 @@ use bevy::{
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
 
-use crate::uniforms::{OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform};
+use crate::uniforms::{
+    DepthMode, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
@@ -49,8 +51,8 @@ impl PipelineKey {
         msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
         primitive_topology_int, set_primitive_topology_int: 8, 6;
         pass_type_int, set_pass_type_int: 10, 9;
-        pub flat_depth, set_flat_depth: 11;
-        pub offset_zero, set_offset_zero: 12;
+        depth_mode_int, set_depth_mode_int: 12, 11;
+        pub offset_zero, set_offset_zero: 13;
     }
 
     pub(crate) fn new() -> Self {
@@ -101,9 +103,17 @@ impl PipelineKey {
         self
     }
 
-    pub(crate) fn with_flat_depth(mut self, flat_depth: bool) -> Self {
-        self.set_flat_depth(flat_depth);
+    pub(crate) fn with_depth_mode(mut self, depth_mode: DepthMode) -> Self {
+        self.set_depth_mode_int(depth_mode as u32);
         self
+    }
+
+    pub(crate) fn depth_mode(&self) -> DepthMode {
+        match self.depth_mode_int() {
+            x if x == DepthMode::Flat as u32 => DepthMode::Flat,
+            x if x == DepthMode::Real as u32 => DepthMode::Real,
+            x => panic!("Invalid value for DepthMode: {}", x),
+        }
     }
 }
 
@@ -214,7 +224,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         );
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
         let cull_mode;
-        if key.flat_depth() {
+        if key.depth_mode() == DepthMode::Flat {
             vertex_defs.push("FLAT_DEPTH".to_string());
             cull_mode = Some(Face::Back);
         } else if key.pass_type() == PassType::Stencil {

@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 
+use crate::uniforms::DepthMode;
+
 /// A component for storing the computed depth at which the outline lies.
 #[derive(Clone, Component, Default)]
 pub struct ComputedOutlineDepth {
-    pub(crate) origin: Vec3,
-    pub(crate) flat: bool,
+    pub(crate) world_origin: Vec3,
+    pub(crate) depth_mode: DepthMode,
 }
 
 /// A component which specifies how the outline depth should be computed.
@@ -37,21 +39,22 @@ pub(crate) fn compute_outline_depth(
     child_query: Query<(&Children, Changed<Children>)>,
 ) {
     for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
-        let mut changed = computed.is_added() || changed_transform || set_depth.filter(|(_, c)| *c).is_some();
+        let mut changed =
+            computed.is_added() || changed_transform || set_depth.filter(|(_, c)| *c).is_some();
         if changed {
-            let (origin, flat) = if let Some((sd, _)) = set_depth {
+            let (origin, depth_mode) = if let Some((sd, _)) = set_depth {
                 match sd {
                     SetOutlineDepth::Flat {
                         model_origin: origin,
-                    } => (*origin, true),
-                    SetOutlineDepth::Real => (Vec3::NAN, false),
+                    } => (*origin, DepthMode::Flat),
+                    SetOutlineDepth::Real => (Vec3::NAN, DepthMode::Real),
                 }
             } else {
-                (Vec3::ZERO, true)
+                (Vec3::ZERO, DepthMode::Flat)
             };
             let matrix = transform.compute_matrix();
-            computed.origin = matrix.project_point3(origin);
-            computed.flat = flat;
+            computed.world_origin = matrix.project_point3(origin);
+            computed.depth_mode = depth_mode;
         }
         if let Some((cs, changed_children)) = children {
             changed |= changed_children;
