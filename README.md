@@ -13,7 +13,7 @@ vertex extrusion method.
 bevy_mod_outline = "0.3"
 ```
 
-## Example
+## Examples
 
 A rotating cube and torus with opaque and transparent outlines.
 
