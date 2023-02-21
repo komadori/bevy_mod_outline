@@ -37,7 +37,7 @@ pub(crate) fn compute_outline_depth(
     child_query: Query<(&Children, Changed<Children>)>,
 ) {
     for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
-        let mut changed = changed_transform || set_depth.filter(|(_, c)| *c).is_some();
+        let mut changed = computed.is_added() || changed_transform || set_depth.filter(|(_, c)| *c).is_some();
         if changed {
             let (origin, flat) = if let Some((sd, _)) = set_depth {
                 match sd {
