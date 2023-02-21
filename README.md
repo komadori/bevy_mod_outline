@@ -28,6 +28,20 @@ a gap between the object and its outline.
 cargo run --example pieces
 ```
 
+An outlined torus viewed through four cameras with different combinations of render layers
+enabled.
+
+```shell
+cargo run --example render_layers
+```
+
+An animated jointed model with an outline.
+
+```shell
+cargo run --features="bevy/animation bevy/bevy_gltf bevy/png bevy/bevy_scene" \
+    --example animated_fox
+```
+
 ## Versions
 
 | This Version | Bevy version |
