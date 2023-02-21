@@ -1,5 +1,12 @@
 # Changelog
 
+## bevy_mod_outline 0.3.3 (2023-02-21)
+
+## Fixed
+- Fixed SetOutlineDepth being ignored in some cases (@mxgrey).
+- Fixed defaulting to SetOutlineDepth::Real in some cases.
+- Fixed missing examples from README.
+
 ## bevy_mod_outline 0.3.2 (2023-01-15)
 
 ### Added
