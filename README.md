@@ -3,8 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/bevy_mod_outline.svg)](https://crates.io/crates/bevy_mod_outline)
 [![docs](https://docs.rs/bevy_mod_outline/badge.svg)](https://docs.rs/bevy_mod_outline)
 
-This crate provides a Bevy plugin for drawing outlines around meshes using the
-vertex extrusion method.
+This crate provides a Bevy plugin for drawing outlines around meshes using the vertex extrusion method.
 
 ## Dependency
 
@@ -15,17 +14,19 @@ bevy_mod_outline = "0.3"
 
 ## Examples
 
-A rotating cube and torus with opaque and transparent outlines.
-
-```shell
-cargo run --example shapes
-```
-
 Multiple intersecting meshes sharing an outline plane. The outline stencil is offset to create
 a gap between the object and its outline.
 
 ```shell
 cargo run --example pieces
+```
+
+![Demo showing the pieces example](assets/demo.gif)
+
+A rotating cube and torus with opaque and transparent outlines.
+
+```shell
+cargo run --example shapes
 ```
 
 An outlined torus viewed through four cameras with different combinations of render layers
