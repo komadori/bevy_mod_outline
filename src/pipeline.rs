@@ -11,6 +11,7 @@ use bevy::render::render_resource::{
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::texture::BevyDefault;
+use bevy::render::view::ViewTarget;
 use bevy::{
     pbr::MeshPipeline,
     render::{
@@ -53,6 +54,7 @@ impl PipelineKey {
         pass_type_int, set_pass_type_int: 10, 9;
         depth_mode_int, set_depth_mode_int: 12, 11;
         pub offset_zero, set_offset_zero: 13;
+        pub hdr_format, set_hdr_format: 14;
     }
 
     pub(crate) fn new() -> Self {
@@ -98,11 +100,6 @@ impl PipelineKey {
         }
     }
 
-    pub(crate) fn with_offset_zero(mut self, offset_zero: bool) -> Self {
-        self.set_offset_zero(offset_zero);
-        self
-    }
-
     pub(crate) fn with_depth_mode(mut self, depth_mode: DepthMode) -> Self {
         self.set_depth_mode_int(depth_mode as u32);
         self
@@ -114,6 +111,16 @@ impl PipelineKey {
             x if x == DepthMode::Real as u32 => DepthMode::Real,
             x => panic!("Invalid value for DepthMode: {}", x),
         }
+    }
+
+    pub(crate) fn with_offset_zero(mut self, offset_zero: bool) -> Self {
+        self.set_offset_zero(offset_zero);
+        self
+    }
+
+    pub(crate) fn with_hdr_format(mut self, hdr_format: bool) -> Self {
+        self.set_hdr_format(hdr_format);
+        self
     }
 }
 
@@ -251,7 +258,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             PassType::Opaque | PassType::Transparent => {
                 fragment_defs.push("VOLUME".to_string());
                 targets.push(Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: if key.hdr_format() {
+                        ViewTarget::TEXTURE_FORMAT_HDR
+                    } else {
+                        TextureFormat::bevy_default()
+                    },
                     blend: Some(if key.pass_type() == PassType::Transparent {
                         BlendState::ALPHA_BLENDING
                     } else {
@@ -299,7 +310,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            label: Some(Cow::Borrowed("outline_stencil_pipeline")),
+            label: Some(Cow::Borrowed("outline_pipeline")),
         })
     }
 }

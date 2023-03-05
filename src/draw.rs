@@ -146,7 +146,8 @@ pub(crate) fn queue_outline_volume_mesh(
                         PassType::Opaque
                     })
                     .with_depth_mode(volume_flags.depth_mode)
-                    .with_offset_zero(volume_uniform.offset == 0.0);
+                    .with_offset_zero(volume_uniform.offset == 0.0)
+                    .with_hdr_format(view.hdr);
                 let pipeline = pipelines
                     .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
                     .unwrap();
