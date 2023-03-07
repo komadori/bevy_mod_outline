@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, window::close_on_esc};
+use bevy::{prelude::*, scene::SceneInstance, window::close_on_esc};
 use bevy_mod_outline::{
     AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
 };
@@ -66,15 +66,17 @@ fn setup(
 // Once the scene is loaded, start the animation and add an outline
 fn setup_scene_once_loaded(
     mut commands: Commands,
+    scene_query: Query<&SceneInstance>,
+    scene_manager: Res<SceneSpawner>,
+    mut player_query: Query<&mut AnimationPlayer>,
     animation: Res<Fox>,
-    mut player: Query<&mut AnimationPlayer>,
-    entities: Query<Entity, With<Handle<Mesh>>>,
     mut done: Local<bool>,
 ) {
     if !*done {
-        if let Ok(mut player) = player.get_single_mut() {
-            player.play(animation.0.clone_weak()).repeat();
-            for entity in entities.iter() {
+        if let (Ok(scene), Ok(mut player)) =
+            (scene_query.get_single(), player_query.get_single_mut())
+        {
+            for entity in scene_manager.iter_instance_entities(**scene) {
                 commands.entity(entity).insert(OutlineBundle {
                     outline: OutlineVolume {
                         visible: true,
@@ -84,6 +86,7 @@ fn setup_scene_once_loaded(
                     ..default()
                 });
             }
+            player.play(animation.0.clone_weak()).repeat();
             *done = true;
         }
     }
