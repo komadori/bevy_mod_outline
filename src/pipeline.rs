@@ -304,7 +304,9 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState {
-                    constant: if key.pass_type() == PassType::Stencil {
+                    constant: if key.depth_mode() == DepthMode::Flat
+                        && key.pass_type() == PassType::Stencil
+                    {
                         2 // 1 is empirically not enough to prevent Z-fighting.
                     } else {
                         0

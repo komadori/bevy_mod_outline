@@ -63,7 +63,7 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
 #ifdef FLAT_DEPTH
     let out_zw = vec2<f32>(model_origin_z(vstage.origin, view.view_proj) * clip_pos.w, clip_pos.w);
 #else
-    let out_zw = clip_pos.wz;
+    let out_zw = clip_pos.zw;
 #endif
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
