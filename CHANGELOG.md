@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.3.5 (2023-03-08)
+
+### Fixed
+- Fixed regression breaking SetOutlineDepth::Real.
+
 ## bevy_mod_outline 0.3.4 (2023-03-08)
 
 ### Fixed
