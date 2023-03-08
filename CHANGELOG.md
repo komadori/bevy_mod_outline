@@ -1,8 +1,14 @@
 # Changelog
 
+## bevy_mod_outline 0.3.4 (2023-03-08)
+
+### Fixed
+- Fixed texture format error when HDR is enabled.
+- Fixed bad clipping of outlines behind the camera.
+
 ## bevy_mod_outline 0.3.3 (2023-02-21)
 
-## Fixed
+### Fixed
 - Fixed SetOutlineDepth being ignored in some cases (@mxgrey).
 - Fixed defaulting to SetOutlineDepth::Real in some cases.
 - Fixed missing examples from README.
