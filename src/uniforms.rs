@@ -1,19 +1,22 @@
 use bevy::{
     ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
+        lifetimeless::{Read, SRes},
         SystemParamItem,
     },
     prelude::*,
     render::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
-        render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
+        render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
         Extract,
     },
 };
 
-use crate::{pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil, OutlineVolume};
+use crate::{
+    node::StencilOutline, pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil,
+    OutlineVolume,
+};
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineStencilUniform {
@@ -150,40 +153,46 @@ pub(crate) fn queue_outline_volume_bind_group(
 
 pub(crate) struct SetOutlineStencilBindGroup<const I: usize>();
 
-impl<const I: usize> EntityRenderCommand for SetOutlineStencilBindGroup<I> {
-    type Param = (
-        SRes<OutlineStencilBindGroup>,
-        SQuery<Read<DynamicUniformIndex<OutlineStencilUniform>>>,
-    );
+impl<const I: usize> RenderCommand<StencilOutline> for SetOutlineStencilBindGroup<I> {
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<DynamicUniformIndex<OutlineStencilUniform>>;
+    type Param = SRes<OutlineStencilBindGroup>;
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (bind_group, query): SystemParamItem<'w, '_, Self::Param>,
+        _item: &StencilOutline,
+        _view_data: (),
+        entity_data: &DynamicUniformIndex<OutlineStencilUniform>,
+        bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let vertex = query.get(item).unwrap();
-        pass.set_bind_group(I, &bind_group.into_inner().bind_group, &[vertex.index()]);
+        pass.set_bind_group(
+            I,
+            &bind_group.into_inner().bind_group,
+            &[entity_data.index()],
+        );
         RenderCommandResult::Success
     }
 }
 
 pub(crate) struct SetOutlineVolumeBindGroup<const I: usize>();
 
-impl<const I: usize> EntityRenderCommand for SetOutlineVolumeBindGroup<I> {
-    type Param = (
-        SRes<OutlineVolumeBindGroup>,
-        SQuery<(
-            Read<DynamicUniformIndex<OutlineVolumeUniform>>,
-            Read<DynamicUniformIndex<OutlineFragmentUniform>>,
-        )>,
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineVolumeBindGroup<I> {
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = (
+        Read<DynamicUniformIndex<OutlineVolumeUniform>>,
+        Read<DynamicUniformIndex<OutlineFragmentUniform>>,
     );
+    type Param = SRes<OutlineVolumeBindGroup>;
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (bind_group, query): SystemParamItem<'w, '_, Self::Param>,
+        _item: &P,
+        _view_data: (),
+        entity_data: (
+            &DynamicUniformIndex<OutlineVolumeUniform>,
+            &DynamicUniformIndex<OutlineFragmentUniform>,
+        ),
+        bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let (vertex, fragment) = query.get(item).unwrap();
+        let (vertex, fragment) = entity_data;
         pass.set_bind_group(
             I,
             &bind_group.into_inner().bind_group,

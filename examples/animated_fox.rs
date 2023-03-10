@@ -1,6 +1,10 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, scene::SceneInstance, window::close_on_esc};
+use bevy::{
+    prelude::{shape::Plane, *},
+    scene::SceneInstance,
+    window::close_on_esc,
+};
 use bevy_mod_outline::{
     AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
 };
@@ -41,7 +45,10 @@ fn setup(
 
     // Plane
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 500000.0 })),
+        mesh: meshes.add(Mesh::from(Plane {
+            size: 500000.0,
+            subdivisions: 0,
+        })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });

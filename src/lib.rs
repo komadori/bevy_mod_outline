@@ -31,7 +31,7 @@ use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::RenderLayers;
-use bevy::render::{RenderApp, RenderStage};
+use bevy::render::{RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use interpolation::Lerp;
 
@@ -82,9 +82,10 @@ pub struct OutlineStencil {
 impl ExtractComponent for OutlineStencil {
     type Query = &'static OutlineStencil;
     type Filter = ();
+    type Out = Self;
 
-    fn extract_component(item: QueryItem<Self::Query>) -> Self {
-        item.clone()
+    fn extract_component(item: QueryItem<Self::Query>) -> Option<Self> {
+        Some(item.clone())
     }
 }
 
@@ -143,14 +144,17 @@ impl ExtractComponent for OutlineRenderLayers {
         Option<&'static RenderLayers>,
     );
     type Filter = Or<(With<OutlineVolume>, With<OutlineStencil>)>;
+    type Out = Self;
 
     fn extract_component(
         (outline_mask, object_mask): (Option<&OutlineRenderLayers>, Option<&RenderLayers>),
-    ) -> Self {
-        outline_mask
-            .copied()
-            .or_else(|| object_mask.copied().map(OutlineRenderLayers))
-            .unwrap_or_default()
+    ) -> Option<Self> {
+        Some(
+            outline_mask
+                .copied()
+                .or_else(|| object_mask.copied().map(OutlineRenderLayers))
+                .unwrap_or_default(),
+        )
     }
 }
 
@@ -193,9 +197,10 @@ impl Plugin for OutlinePlugin {
             .add_plugin(UniformComponentPlugin::<OutlineVolumeUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                compute_outline_depth.after(TransformSystem::TransformPropagate),
+            .add_system(
+                compute_outline_depth
+                    .in_base_set(CoreSet::PostUpdate)
+                    .after(TransformSystem::TransformPropagate),
             )
             .sub_app_mut(RenderApp)
             .init_resource::<DrawFunctions<StencilOutline>>()
@@ -206,20 +211,17 @@ impl Plugin for OutlinePlugin {
             .add_render_command::<StencilOutline, DrawStencil>()
             .add_render_command::<OpaqueOutline, DrawOutline>()
             .add_render_command::<TransparentOutline, DrawOutline>()
-            .add_system_to_stage(RenderStage::Extract, extract_outline_view_uniforms)
-            .add_system_to_stage(RenderStage::Extract, extract_outline_stencil_uniforms)
-            .add_system_to_stage(RenderStage::Extract, extract_outline_volume_uniforms)
-            .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<StencilOutline>)
-            .add_system_to_stage(RenderStage::PhaseSort, sort_phase_system::<OpaqueOutline>)
-            .add_system_to_stage(
-                RenderStage::PhaseSort,
-                sort_phase_system::<TransparentOutline>,
-            )
-            .add_system_to_stage(RenderStage::Queue, queue_outline_view_bind_group)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_bind_group)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_volume_bind_group)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_stencil_mesh)
-            .add_system_to_stage(RenderStage::Queue, queue_outline_volume_mesh);
+            .add_system(extract_outline_view_uniforms.in_schedule(ExtractSchedule))
+            .add_system(extract_outline_stencil_uniforms.in_schedule(ExtractSchedule))
+            .add_system(extract_outline_volume_uniforms.in_schedule(ExtractSchedule))
+            .add_system(sort_phase_system::<StencilOutline>.in_set(RenderSet::PhaseSort))
+            .add_system(sort_phase_system::<OpaqueOutline>.in_set(RenderSet::PhaseSort))
+            .add_system(sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort))
+            .add_system(queue_outline_view_bind_group.in_set(RenderSet::Queue))
+            .add_system(queue_outline_stencil_bind_group.in_set(RenderSet::Queue))
+            .add_system(queue_outline_volume_bind_group.in_set(RenderSet::Queue))
+            .add_system(queue_outline_stencil_mesh.in_set(RenderSet::Queue))
+            .add_system(queue_outline_volume_mesh.in_set(RenderSet::Queue));
 
         let world = &mut app.sub_app_mut(RenderApp).world;
         let node = OutlineNode::new(world);
@@ -230,28 +232,22 @@ impl Plugin for OutlinePlugin {
             .get_sub_graph_mut(bevy::core_pipeline::core_3d::graph::NAME)
             .unwrap();
         draw_3d_graph.add_node(OUTLINE_PASS_NODE_NAME, node);
-        draw_3d_graph
-            .add_slot_edge(
-                draw_3d_graph.input_node().unwrap().id,
-                bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
-                OUTLINE_PASS_NODE_NAME,
-                OutlineNode::IN_VIEW,
-            )
-            .unwrap();
+        draw_3d_graph.add_slot_edge(
+            draw_3d_graph.input_node().id,
+            bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
+            OUTLINE_PASS_NODE_NAME,
+            OutlineNode::IN_VIEW,
+        );
 
         // Run after main 3D pass, but before UI psss
-        draw_3d_graph
-            .add_node_edge(
-                bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
-                OUTLINE_PASS_NODE_NAME,
-            )
-            .unwrap();
+        draw_3d_graph.add_node_edge(
+            bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
+            OUTLINE_PASS_NODE_NAME,
+        );
         #[cfg(feature = "bevy_ui")]
-        draw_3d_graph
-            .add_node_edge(
-                OUTLINE_PASS_NODE_NAME,
-                bevy::ui::draw_ui_graph::node::UI_PASS,
-            )
-            .unwrap();
+        draw_3d_graph.add_node_edge(
+            OUTLINE_PASS_NODE_NAME,
+            bevy::ui::draw_ui_graph::node::UI_PASS,
+        );
     }
 }

@@ -2,7 +2,7 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{
     prelude::{
-        shape::{Cube, Torus},
+        shape::{Cube, Plane, Torus},
         *,
     },
     window::close_on_esc,
@@ -13,7 +13,7 @@ use bevy_mod_outline::*;
 #[bevy_main]
 fn main() {
     App::new()
-        .insert_resource(Msaa { samples: 4 })
+        .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_plugin(OutlinePlugin)
@@ -81,7 +81,10 @@ fn setup(
 
     // Add plane, light source, and camera
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
+        mesh: meshes.add(Mesh::from(Plane {
+            size: 5.0,
+            subdivisions: 0,
+        })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });

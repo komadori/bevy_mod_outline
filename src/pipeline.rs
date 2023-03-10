@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 
+use bevy::pbr::{MAX_CASCADES_PER_LIGHT, MAX_DIRECTIONAL_LIGHTS};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PolygonMode,
-    PrimitiveState, PrimitiveTopology, ShaderSize, ShaderStages, StencilState, TextureFormat,
-    VertexState,
+    PrimitiveState, PrimitiveTopology, ShaderDefVal, ShaderSize, ShaderStages, StencilState,
+    TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::texture::BevyDefault;
@@ -61,13 +62,19 @@ impl PipelineKey {
         PipelineKey(0)
     }
 
-    pub(crate) fn with_msaa_samples(mut self, msaa_samples: u32) -> Self {
-        self.set_msaa_samples_minus_one(msaa_samples - 1);
+    pub(crate) fn with_msaa(mut self, msaa: Msaa) -> Self {
+        self.set_msaa_samples_minus_one(msaa as u32 - 1);
         self
     }
 
-    pub(crate) fn msaa_samples(&self) -> u32 {
-        self.msaa_samples_minus_one() + 1
+    pub(crate) fn msaa(&self) -> Msaa {
+        match self.msaa_samples_minus_one() + 1 {
+            x if x == Msaa::Off as u32 => Msaa::Off,
+            x if x == Msaa::Sample2 as u32 => Msaa::Sample2,
+            x if x == Msaa::Sample4 as u32 => Msaa::Sample4,
+            x if x == Msaa::Sample8 as u32 => Msaa::Sample8,
+            x => panic!("Invalid value for Msaa: {}", x),
+        }
     }
 
     pub(crate) fn with_primitive_topology(mut self, primitive_topology: PrimitiveTopology) -> Self {
@@ -213,15 +220,28 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         mesh_layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
-        let mut bind_layouts = vec![self.mesh_pipeline.view_layout.clone()];
+        let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
+            self.mesh_pipeline.view_layout.clone()
+        } else {
+            self.mesh_pipeline.view_layout_multisampled.clone()
+        }];
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut vertex_defs = vec![];
+        let mut vertex_defs = vec![
+            ShaderDefVal::Int(
+                "MAX_CASCADES_PER_LIGHT".to_string(),
+                MAX_CASCADES_PER_LIGHT as i32,
+            ),
+            ShaderDefVal::Int(
+                "MAX_DIRECTIONAL_LIGHTS".to_string(),
+                MAX_DIRECTIONAL_LIGHTS as i32,
+            ),
+        ];
         let mut fragment_defs = vec![];
         bind_layouts.push(
             if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
                 && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
             {
-                vertex_defs.push("SKINNED".to_string());
+                vertex_defs.push(ShaderDefVal::from("SKINNED"));
                 buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(2));
                 buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(3));
                 self.mesh_pipeline.skinned_mesh_layout.clone()
@@ -232,7 +252,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
-            vertex_defs.push("FLAT_DEPTH".to_string());
+            vertex_defs.push(ShaderDefVal::from("FLAT_DEPTH"));
             cull_mode = Some(Face::Back);
         } else if key.pass_type() == PassType::Stencil {
             cull_mode = Some(Face::Back);
@@ -240,7 +260,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             cull_mode = Some(Face::Front);
         }
         if key.offset_zero() {
-            vertex_defs.push("OFFSET_ZERO".to_string());
+            vertex_defs.push(ShaderDefVal::from("OFFSET_ZERO"));
         } else {
             buffer_attrs.push(
                 if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
@@ -256,7 +276,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 bind_layouts.push(self.outline_stencil_bind_group_layout.clone());
             }
             PassType::Opaque | PassType::Transparent => {
-                fragment_defs.push("VOLUME".to_string());
+                fragment_defs.push(ShaderDefVal::from("VOLUME"));
                 targets.push(Some(ColorTargetState {
                     format: if key.hdr_format() {
                         ViewTarget::TEXTURE_FORMAT_HDR
@@ -288,7 +308,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 entry_point: "fragment".into(),
                 targets,
             }),
-            layout: Some(bind_layouts),
+            layout: bind_layouts,
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
                 cull_mode,
@@ -315,10 +335,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 },
             }),
             multisample: MultisampleState {
-                count: key.msaa_samples(),
+                count: key.msaa().samples(),
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            push_constant_ranges: default(),
             label: Some(Cow::Borrowed("outline_pipeline")),
         })
     }

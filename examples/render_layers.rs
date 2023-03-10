@@ -2,16 +2,19 @@ use std::f32::consts::PI;
 
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
-    prelude::{shape::Torus, *},
+    prelude::{
+        shape::{Plane, Torus},
+        *,
+    },
     render::{camera::Viewport, view::RenderLayers},
-    window::close_on_esc,
+    window::{close_on_esc, PrimaryWindow},
 };
 use bevy_mod_outline::{OutlineBundle, OutlinePlugin, OutlineRenderLayers, OutlineVolume};
 
 #[bevy_main]
 fn main() {
     App::new()
-        .insert_resource(Msaa { samples: 4 })
+        .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_plugin(OutlinePlugin)
@@ -62,7 +65,10 @@ fn setup(
 
     // Add plane and light source
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(bevy::prelude::shape::Plane { size: 5.0 })),
+        mesh: meshes.add(Mesh::from(Plane {
+            size: 5.0,
+            subdivisions: 0,
+        })),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
@@ -90,7 +96,7 @@ fn setup(
         commands
             .spawn(Camera3dBundle {
                 camera: Camera {
-                    priority: i,
+                    order: i,
                     ..default()
                 },
                 camera_3d: Camera3d {
@@ -112,10 +118,13 @@ fn setup(
     }
 }
 
-fn set_camera_viewports(windows: Res<Windows>, mut query: Query<(&mut Camera, &CameraMode)>) {
-    if windows.is_changed() {
+fn set_camera_viewports(
+    win_query: Query<(&Window, Changed<Window>), With<PrimaryWindow>>,
+    mut query: Query<(&mut Camera, &CameraMode)>,
+) {
+    let (win, win_changed) = win_query.get_single().unwrap();
+    if win_changed {
         // Divide window into quadrants
-        let win = windows.primary();
         let size = UVec2::new(win.physical_width() / 2, win.physical_height() / 2);
         for (mut camera, mode) in query.iter_mut() {
             let offset = UVec2::new(

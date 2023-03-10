@@ -1,9 +1,9 @@
-use bevy::ecs::system::lifetimeless::{Read, SQuery, SRes};
+use bevy::ecs::system::lifetimeless::{Read, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::prelude::*;
 use bevy::render::extract_component::{ComponentUniforms, DynamicUniformIndex};
 use bevy::render::render_phase::{
-    EntityRenderCommand, RenderCommandResult, RenderPhase, TrackedRenderPass,
+    PhaseItem, RenderCommand, RenderCommandResult, RenderPhase, TrackedRenderPass,
 };
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry};
@@ -70,23 +70,18 @@ pub(crate) fn queue_outline_view_bind_group(
 
 pub(crate) struct SetOutlineViewBindGroup<const I: usize>();
 
-impl<const I: usize> EntityRenderCommand for SetOutlineViewBindGroup<I> {
-    type Param = (
-        SRes<OutlineViewBindGroup>,
-        SQuery<Read<DynamicUniformIndex<OutlineViewUniform>>>,
-    );
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<I> {
+    type ViewWorldQuery = Read<DynamicUniformIndex<OutlineViewUniform>>;
+    type ItemWorldQuery = ();
+    type Param = SRes<OutlineViewBindGroup>;
     fn render<'w>(
-        view: Entity,
-        _item: Entity,
-        (bind_group, query): SystemParamItem<'w, '_, Self::Param>,
+        _item: &P,
+        view_data: &DynamicUniformIndex<OutlineViewUniform>,
+        _entity_data: (),
+        bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let view_index = query.get(view).unwrap();
-        pass.set_bind_group(
-            I,
-            &bind_group.into_inner().bind_group,
-            &[view_index.index()],
-        );
+        pass.set_bind_group(I, &bind_group.into_inner().bind_group, &[view_data.index()]);
         RenderCommandResult::Success
     }
 }

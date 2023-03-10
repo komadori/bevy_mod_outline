@@ -5,8 +5,7 @@ use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::render_graph::{NodeRunError, SlotInfo, SlotType};
 use bevy::render::render_phase::{
-    CachedRenderPipelinePhaseItem, DrawFunctionId, DrawFunctions, EntityPhaseItem, PhaseItem,
-    RenderPhase, TrackedRenderPass,
+    CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, RenderPhase,
 };
 use bevy::render::render_resource::{
     CachedRenderPipelineId, LoadOp, Operations, RenderPassDepthStencilAttachment,
@@ -29,19 +28,17 @@ pub(crate) struct StencilOutline {
 impl PhaseItem for StencilOutline {
     type SortKey = Reverse<FloatOrd>;
 
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity
+    }
+
     fn sort_key(&self) -> Self::SortKey {
         Reverse(FloatOrd(self.distance))
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
-    }
-}
-
-impl EntityPhaseItem for StencilOutline {
-    #[inline]
-    fn entity(&self) -> Entity {
-        self.entity
     }
 }
 
@@ -62,19 +59,17 @@ pub(crate) struct OpaqueOutline {
 impl PhaseItem for OpaqueOutline {
     type SortKey = Reverse<FloatOrd>;
 
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity
+    }
+
     fn sort_key(&self) -> Self::SortKey {
         Reverse(FloatOrd(self.distance))
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
-    }
-}
-
-impl EntityPhaseItem for OpaqueOutline {
-    #[inline]
-    fn entity(&self) -> Entity {
-        self.entity
     }
 }
 
@@ -95,19 +90,17 @@ pub(crate) struct TransparentOutline {
 impl PhaseItem for TransparentOutline {
     type SortKey = FloatOrd;
 
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity
+    }
+
     fn sort_key(&self) -> Self::SortKey {
         FloatOrd(self.distance)
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
-    }
-}
-
-impl EntityPhaseItem for TransparentOutline {
-    #[inline]
-    fn entity(&self) -> Entity {
-        self.entity
     }
 }
 
@@ -182,19 +175,11 @@ impl Node for OutlineNode {
                     stencil_ops: None,
                 }),
             };
-            let draw_functions = world.resource::<DrawFunctions<StencilOutline>>();
-            let render_pass = render_context
-                .command_encoder
-                .begin_render_pass(&pass_descriptor);
-            let mut draw_functions = draw_functions.write();
-            let mut tracked_pass = TrackedRenderPass::new(render_pass);
+            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            for item in &stencil_phase.items {
-                let draw_function = draw_functions.get_mut(item.draw_function).unwrap();
-                draw_function.draw(world, &mut tracked_pass, view_entity, item);
-            }
+            stencil_phase.render(&mut tracked_pass, world, view_entity);
         }
 
         if !opaque_phase.items.is_empty() {
@@ -213,19 +198,11 @@ impl Node for OutlineNode {
                     stencil_ops: None,
                 }),
             };
-            let draw_functions = world.resource::<DrawFunctions<OpaqueOutline>>();
-            let render_pass = render_context
-                .command_encoder
-                .begin_render_pass(&pass_descriptor);
-            let mut draw_functions = draw_functions.write();
-            let mut tracked_pass = TrackedRenderPass::new(render_pass);
+            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            for item in &opaque_phase.items {
-                let draw_function = draw_functions.get_mut(item.draw_function).unwrap();
-                draw_function.draw(world, &mut tracked_pass, view_entity, item);
-            }
+            opaque_phase.render(&mut tracked_pass, world, view_entity);
         }
 
         if !transparent_phase.items.is_empty() {
@@ -244,19 +221,11 @@ impl Node for OutlineNode {
                     stencil_ops: None,
                 }),
             };
-            let draw_functions = world.resource::<DrawFunctions<TransparentOutline>>();
-            let render_pass = render_context
-                .command_encoder
-                .begin_render_pass(&pass_descriptor);
-            let mut draw_functions = draw_functions.write();
-            let mut tracked_pass = TrackedRenderPass::new(render_pass);
+            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            for item in &transparent_phase.items {
-                let draw_function = draw_functions.get_mut(item.draw_function).unwrap();
-                draw_function.draw(world, &mut tracked_pass, view_entity, item);
-            }
+            transparent_phase.render(&mut tracked_pass, world, view_entity);
         }
 
         Ok(())

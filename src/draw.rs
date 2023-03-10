@@ -29,7 +29,7 @@ pub(crate) fn queue_outline_stencil_mesh(
     stencil_pipeline: Res<OutlinePipeline>,
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<(
         Entity,
@@ -50,7 +50,7 @@ pub(crate) fn queue_outline_stencil_mesh(
         .unwrap();
 
     let base_key = PipelineKey::new()
-        .with_msaa_samples(msaa.samples)
+        .with_msaa(*msaa)
         .with_pass_type(PassType::Stencil);
 
     for (view, mut stencil_phase, view_mask) in views.iter_mut() {
@@ -68,7 +68,7 @@ pub(crate) fn queue_outline_stencil_mesh(
                     .with_depth_mode(stencil_flags.depth_mode)
                     .with_offset_zero(stencil_uniform.offset == 0.0);
                 let pipeline = pipelines
-                    .specialize(&mut pipeline_cache, &stencil_pipeline, key, &mesh.layout)
+                    .specialize(&pipeline_cache, &stencil_pipeline, key, &mesh.layout)
                     .unwrap();
                 let distance =
                     rangefinder.distance(&Mat4::from_translation(stencil_uniform.origin));
@@ -99,7 +99,7 @@ pub(crate) fn queue_outline_volume_mesh(
     outline_pipeline: Res<OutlinePipeline>,
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<(
         Entity,
@@ -125,7 +125,7 @@ pub(crate) fn queue_outline_volume_mesh(
         .get_id::<DrawOutline>()
         .unwrap();
 
-    let base_key = PipelineKey::new().with_msaa_samples(msaa.samples);
+    let base_key = PipelineKey::new().with_msaa(*msaa);
 
     for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
         let view_mask = view_mask.copied().unwrap_or_default();
@@ -149,7 +149,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     .with_offset_zero(volume_uniform.offset == 0.0)
                     .with_hdr_format(view.hdr);
                 let pipeline = pipelines
-                    .specialize(&mut pipeline_cache, &outline_pipeline, key, &mesh.layout)
+                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout)
                     .unwrap();
                 let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
                 if transparent {
