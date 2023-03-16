@@ -71,6 +71,9 @@ pub(crate) fn extract_outline_stencil_uniforms(
     query: Extract<Query<(Entity, &OutlineStencil, &ComputedOutlineDepth)>>,
 ) {
     for (entity, stencil, computed) in query.iter() {
+        if !stencil.enabled {
+            continue;
+        }
         commands
             .get_or_spawn(entity)
             .insert(OutlineStencilUniform {

@@ -37,7 +37,10 @@ fn setup(
             colour: Color::WHITE,
             width: 10.0,
         },
-        stencil: OutlineStencil { offset: 5.0 },
+        stencil: OutlineStencil {
+            offset: 5.0,
+            ..default()
+        },
         ..default()
     };
 

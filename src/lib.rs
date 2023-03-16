@@ -73,10 +73,21 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
 pub const OUTLINE_PASS_NODE_NAME: &str = "bevy_mod_outline_node";
 
 /// A component for stenciling meshes during outline rendering.
-#[derive(Clone, Component, Default)]
+#[derive(Clone, Component)]
 pub struct OutlineStencil {
+    /// Enable rendering of the stencil
+    pub enabled: bool,
     /// Offset of the stencil in logical pixels
     pub offset: f32,
+}
+
+impl Default for OutlineStencil {
+    fn default() -> Self {
+        OutlineStencil {
+            enabled: true,
+            offset: 0.0,
+        }
+    }
 }
 
 impl ExtractComponent for OutlineStencil {
@@ -89,11 +100,22 @@ impl ExtractComponent for OutlineStencil {
     }
 }
 
+fn lerp_bool(this: bool, other: bool, scalar: f32) -> bool {
+    if scalar <= 0.0 {
+        this
+    } else if scalar >= 1.0 {
+        other
+    } else {
+        this | other
+    }
+}
+
 impl Lerp for OutlineStencil {
     type Scalar = f32;
 
     fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
         OutlineStencil {
+            enabled: lerp_bool(self.enabled, other.enabled, *scalar),
             offset: self.offset.lerp(&other.offset, scalar),
         }
     }
@@ -115,13 +137,7 @@ impl Lerp for OutlineVolume {
 
     fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
         OutlineVolume {
-            visible: if *scalar <= 0.0 {
-                self.visible
-            } else if *scalar >= 1.0 {
-                other.visible
-            } else {
-                self.visible | other.visible
-            },
+            visible: lerp_bool(self.visible, other.visible, *scalar),
             width: self.width.lerp(&other.width, scalar),
             colour: {
                 let [r, g, b, a] = self
