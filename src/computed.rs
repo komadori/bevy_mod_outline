@@ -35,7 +35,10 @@ pub(crate) fn compute_outline_depth(
         ),
         Without<InheritOutlineDepth>,
     >,
-    mut computed_query: Query<(&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>)>,
+    mut computed_query: Query<
+        (&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>),
+        With<InheritOutlineDepth>,
+    >,
     child_query: Query<(&Children, Changed<Children>)>,
 ) {
     for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
@@ -75,7 +78,10 @@ fn propagate_outline_depth(
     root_computed: &ComputedOutlineDepth,
     mut changed: bool,
     entity: Entity,
-    computed_query: &mut Query<(&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>)>,
+    computed_query: &mut Query<
+        (&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>),
+        With<InheritOutlineDepth>,
+    >,
     child_query: &Query<(&Children, Changed<Children>)>,
 ) {
     if let Ok((mut computed, changed_inherit)) = computed_query.get_mut(entity) {
