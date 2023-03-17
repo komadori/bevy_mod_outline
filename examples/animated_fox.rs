@@ -83,18 +83,20 @@ fn setup_scene_once_loaded(
         if let (Ok(scene), Ok(mut player)) =
             (scene_query.get_single(), player_query.get_single_mut())
         {
-            for entity in scene_manager.iter_instance_entities(**scene) {
-                commands.entity(entity).insert(OutlineBundle {
-                    outline: OutlineVolume {
-                        visible: true,
-                        width: 3.0,
-                        colour: Color::RED,
-                    },
-                    ..default()
-                });
+            if scene_manager.instance_is_ready(**scene) {
+                for entity in scene_manager.iter_instance_entities(**scene) {
+                    commands.entity(entity).insert(OutlineBundle {
+                        outline: OutlineVolume {
+                            visible: true,
+                            width: 3.0,
+                            colour: Color::RED,
+                        },
+                        ..default()
+                    });
+                }
+                player.play(animation.0.clone_weak()).repeat();
+                *done = true;
             }
-            player.play(animation.0.clone_weak()).repeat();
-            *done = true;
         }
     }
 }
