@@ -23,7 +23,11 @@ thiserror = "1.0"
 
 [dev-dependencies]
 bevy = { version = "0.10", default-features = false, features = [
+    "animation",
+    "bevy_gltf",
+    "bevy_scene",
     "bevy_winit",
+    "png",
     "x11",
 ] }
 
@@ -46,6 +50,3 @@ path = "examples/render_layers.rs"
 [[example]]
 name = "animated_fox"
 path = "examples/animated_fox.rs"
-required-features = [
-    "bevy/animation", "bevy/bevy_gltf", "bevy/png", "bevy/bevy_scene"
-]

@@ -40,8 +40,7 @@ cargo run --example render_layers
 An animated jointed model with an outline.
 
 ```shell
-cargo run --features="bevy/animation bevy/bevy_gltf bevy/png bevy/bevy_scene" \
-    --example animated_fox
+cargo run --example animated_fox
 ```
 
 ## Versions
