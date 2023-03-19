@@ -1,6 +1,9 @@
 use bevy::{
     prelude::*,
-    render::{mesh::VertexAttributeValues, render_resource::VertexFormat},
+    render::{
+        mesh::VertexAttributeValues,
+        render_resource::{PrimitiveTopology, VertexFormat},
+    },
     utils::{FloatOrd, HashMap, HashSet},
 };
 
@@ -9,6 +12,8 @@ use crate::ATTRIBUTE_OUTLINE_NORMAL;
 /// Failed to generate outline normals for the mesh.
 #[derive(thiserror::Error, Debug)]
 pub enum GenerateOutlineNormalsError {
+    #[error("unsupported primitive topology '{0:?}'")]
+    UnsupportedPrimitiveTopology(PrimitiveTopology),
     #[error("missing vertex attributes '{0}'")]
     MissingVertexAttribute(&'static str),
     #[error("the '{0}' vertex attribute should have {1:?} format, but had {2:?} format")]
@@ -17,7 +22,7 @@ pub enum GenerateOutlineNormalsError {
 
 /// Extension methods for [`Mesh`].
 pub trait OutlineMeshExt {
-    /// Generates outline normals for the mesh from the regular normals.
+    /// Generates outline normals for the mesh from the face normals.
     ///
     /// Vertex extrusion only works for meshes with smooth surface normals. Hard edges cause
     /// visual artefacts. This function generates faux-smooth normals for outlining purposes
@@ -27,13 +32,17 @@ pub trait OutlineMeshExt {
     /// perpendicular to the surface of the mesh, this technique may result in non-uniform
     /// outline thickness.
     ///
-    /// This function will silently do nothing if the outline normals would be equal to the
-    /// regular normals.
+    /// This function only supports meshes with TriangleList topology.
     fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
 }
 
 impl OutlineMeshExt for Mesh {
     fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError> {
+        if self.primitive_topology() != PrimitiveTopology::TriangleList {
+            return Err(GenerateOutlineNormalsError::UnsupportedPrimitiveTopology(
+                self.primitive_topology(),
+            ));
+        }
         let positions = match self.attribute(Mesh::ATTRIBUTE_POSITION).ok_or(
             GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
         )? {
@@ -44,39 +53,45 @@ impl OutlineMeshExt for Mesh {
                 v.into(),
             )),
         }?;
-        let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL).ok_or(
-            GenerateOutlineNormalsError::MissingVertexAttribute(Mesh::ATTRIBUTE_POSITION.name),
-        )? {
-            VertexAttributeValues::Float32x3(n) => Ok(n),
-            v => Err(GenerateOutlineNormalsError::InvalidVertexAttributeFormat(
-                Mesh::ATTRIBUTE_NORMAL.name,
-                VertexFormat::Float32x3,
-                v.into(),
-            )),
-        }?;
-        let mut map = HashMap::with_capacity(positions.len());
-        let mut modified = false;
-        for (p, n) in positions.iter().zip(normals.iter()) {
-            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-            let value = Vec3::from_array(*n);
-            map.entry(key)
-                .and_modify(|e| {
-                    modified = true;
-                    *e += value
-                })
-                .or_insert(value);
-        }
-        if modified {
-            let mut outlines = Vec::with_capacity(positions.len());
-            for p in positions.iter() {
-                let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-                outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+        let mut map = HashMap::<[FloatOrd; 3], Vec3>::with_capacity(positions.len());
+        let mut proc = |p0: Vec3, p1: Vec3, p2: Vec3| {
+            let face_normal = (p1 - p0).cross(p2 - p0).normalize_or_zero();
+            for (cp0, cp1, cp2) in [(p0, p1, p2), (p1, p2, p0), (p2, p0, p1)] {
+                let angle = (cp1 - cp0).angle_between(cp2 - cp0);
+                let n = map
+                    .entry([FloatOrd(cp0.x), FloatOrd(cp0.y), FloatOrd(cp0.z)])
+                    .or_default();
+                *n += angle * face_normal;
             }
-            self.insert_attribute(
-                ATTRIBUTE_OUTLINE_NORMAL,
-                VertexAttributeValues::Float32x3(outlines),
-            );
+        };
+        if let Some(indices) = self.indices() {
+            let mut it = indices.iter();
+            while let (Some(i0), Some(i1), Some(i2)) = (it.next(), it.next(), it.next()) {
+                proc(
+                    Vec3::from_array(positions[i0]),
+                    Vec3::from_array(positions[i1]),
+                    Vec3::from_array(positions[i2]),
+                );
+            }
+        } else {
+            let mut it = positions.iter();
+            while let (Some(p0), Some(p1), Some(p2)) = (it.next(), it.next(), it.next()) {
+                proc(
+                    Vec3::from_array(*p0),
+                    Vec3::from_array(*p1),
+                    Vec3::from_array(*p2),
+                );
+            }
         }
+        let mut outlines = Vec::with_capacity(positions.len());
+        for p in positions.iter() {
+            let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
+            outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+        }
+        self.insert_attribute(
+            ATTRIBUTE_OUTLINE_NORMAL,
+            VertexAttributeValues::Float32x3(outlines),
+        );
         Ok(())
     }
 }
