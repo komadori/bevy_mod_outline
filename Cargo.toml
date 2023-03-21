@@ -30,6 +30,7 @@ bevy = { version = "0.10", default-features = false, features = [
     "png",
     "x11",
 ] }
+bevy_mod_gltf_patched = "0.2"
 
 [features]
 default = ["bevy_ui"]
@@ -50,3 +51,7 @@ path = "examples/render_layers.rs"
 [[example]]
 name = "animated_fox"
 path = "examples/animated_fox.rs"
+
+[[example]]
+name = "hollow"
+path = "examples/hollow.rs"

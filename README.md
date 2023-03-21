@@ -37,10 +37,16 @@ enabled.
 cargo run --example render_layers
 ```
 
-An animated jointed model with an outline.
+An animated jointed glTF model with an outline.
 
 ```shell
 cargo run --example animated_fox
+```
+
+A glTF model with pre-baked outline normals.
+
+```shell
+cargo run --example hollow
 ```
 
 ## Versions
