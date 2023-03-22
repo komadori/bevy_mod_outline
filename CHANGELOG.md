@@ -1,5 +1,18 @@
 # Changelog
 
+## bevy_mod_outline 0.4.0 (2023-03-22)
+
+### Added
+- Added enabled flag to OutlineStencil.
+- Added hollow example.
+
+###
+- Fixed outline depth propagating when inheritance not enabled.
+
+### Changed
+- Updated Bevy dependency to 0.10.
+- Changed outline normal generator to use face normals.
+
 ## bevy_mod_outline 0.3.5 (2023-03-08)
 
 ### Fixed
