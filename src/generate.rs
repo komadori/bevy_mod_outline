@@ -86,7 +86,13 @@ impl OutlineMeshExt for Mesh {
         let mut outlines = Vec::with_capacity(positions.len());
         for p in positions.iter() {
             let key = [FloatOrd(p[0]), FloatOrd(p[1]), FloatOrd(p[2])];
-            outlines.push(map.get(&key).unwrap().normalize_or_zero().to_array());
+            outlines.push(
+                map.get(&key)
+                    .copied()
+                    .unwrap_or(Vec3::ZERO)
+                    .normalize_or_zero()
+                    .to_array(),
+            );
         }
         self.insert_attribute(
             ATTRIBUTE_OUTLINE_NORMAL,
