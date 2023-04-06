@@ -1,13 +1,51 @@
 use bevy::{
     prelude::*,
     render::{
-        mesh::VertexAttributeValues,
+        mesh::{Indices, VertexAttributeValues},
         render_resource::{PrimitiveTopology, VertexFormat},
     },
     utils::{FloatOrd, HashMap, HashSet},
 };
 
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
+
+enum IndexIterator<'a> {
+    ExplicitU16(std::slice::Iter<'a, u16>),
+    ExplicitU32(std::slice::Iter<'a, u32>),
+    Implicit(std::ops::Range<usize>),
+}
+
+impl<'a> From<&'a Mesh> for IndexIterator<'a> {
+    fn from(value: &'a Mesh) -> Self {
+        match value.indices() {
+            Some(Indices::U16(vec)) => IndexIterator::ExplicitU16(vec.iter()),
+            Some(Indices::U32(vec)) => IndexIterator::ExplicitU32(vec.iter()),
+            None => IndexIterator::Implicit(0..value.count_vertices()),
+        }
+    }
+}
+
+impl Iterator for IndexIterator<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IndexIterator::ExplicitU16(iter) => iter.next().map(|val| *val as usize),
+            IndexIterator::ExplicitU32(iter) => iter.next().map(|val| *val as usize),
+            IndexIterator::Implicit(iter) => iter.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            IndexIterator::ExplicitU16(iter) => iter.size_hint(),
+            IndexIterator::ExplicitU32(iter) => iter.size_hint(),
+            IndexIterator::Implicit(iter) => iter.size_hint(),
+        }
+    }
+}
+
+impl ExactSizeIterator for IndexIterator<'_> {}
 
 /// Failed to generate outline normals for the mesh.
 #[derive(thiserror::Error, Debug)]
@@ -22,7 +60,7 @@ pub enum GenerateOutlineNormalsError {
 
 /// Extension methods for [`Mesh`].
 pub trait OutlineMeshExt {
-    /// Generates outline normals for the mesh from the face normals.
+    /// Generates outline normals for the mesh.
     ///
     /// Vertex extrusion only works for meshes with smooth surface normals. Hard edges cause
     /// visual artefacts. This function generates faux-smooth normals for outlining purposes
@@ -53,34 +91,29 @@ impl OutlineMeshExt for Mesh {
                 v.into(),
             )),
         }?;
-        let mut map = HashMap::<[FloatOrd; 3], Vec3>::with_capacity(positions.len());
-        let mut proc = |p0: Vec3, p1: Vec3, p2: Vec3| {
-            let face_normal = (p1 - p0).cross(p2 - p0).normalize_or_zero();
-            for (cp0, cp1, cp2) in [(p0, p1, p2), (p1, p2, p0), (p2, p0, p1)] {
-                let angle = (cp1 - cp0).angle_between(cp2 - cp0);
-                let n = map
-                    .entry([FloatOrd(cp0.x), FloatOrd(cp0.y), FloatOrd(cp0.z)])
-                    .or_default();
-                *n += angle * face_normal;
-            }
+        let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL) {
+            Some(VertexAttributeValues::Float32x3(p)) => Some(p),
+            _ => None,
         };
-        if let Some(indices) = self.indices() {
-            let mut it = indices.iter();
-            while let (Some(i0), Some(i1), Some(i2)) = (it.next(), it.next(), it.next()) {
-                proc(
-                    Vec3::from_array(positions[i0]),
-                    Vec3::from_array(positions[i1]),
-                    Vec3::from_array(positions[i2]),
-                );
-            }
-        } else {
-            let mut it = positions.iter();
-            while let (Some(p0), Some(p1), Some(p2)) = (it.next(), it.next(), it.next()) {
-                proc(
-                    Vec3::from_array(*p0),
-                    Vec3::from_array(*p1),
-                    Vec3::from_array(*p2),
-                );
+        let mut map = HashMap::<[FloatOrd; 3], Vec3>::with_capacity(positions.len());
+        let mut it = IndexIterator::from(&*self);
+        while let (Some(i0), Some(i1), Some(i2)) = (it.next(), it.next(), it.next()) {
+            for (j0, j1, j2) in [(i0, i1, i2), (i1, i2, i0), (i2, i0, i1)] {
+                let p0 = Vec3::from(positions[j0]);
+                let p1 = Vec3::from(positions[j1]);
+                let p2 = Vec3::from(positions[j2]);
+                let angle = (p1 - p0).angle_between(p2 - p0);
+                let n = map
+                    .entry([FloatOrd(p0.x), FloatOrd(p0.y), FloatOrd(p0.z)])
+                    .or_default();
+                *n += angle
+                    * if let Some(ns) = normals {
+                        // Use vertex normal
+                        Vec3::from(ns[j0])
+                    } else {
+                        // Calculate face normal
+                        (p1 - p0).cross(p2 - p0).normalize_or_zero()
+                    };
             }
         }
         let mut outlines = Vec::with_capacity(positions.len());
