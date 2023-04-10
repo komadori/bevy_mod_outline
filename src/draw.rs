@@ -8,8 +8,9 @@ use bevy::render::view::{ExtractedView, RenderLayers};
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::uniforms::{
-    OutlineFragmentUniform, OutlineStencilFlags, OutlineStencilUniform, OutlineVolumeFlags,
-    OutlineVolumeUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
+    DepthMode, OutlineFragmentUniform, OutlineStencilFlags, OutlineStencilUniform,
+    OutlineVolumeFlags, OutlineVolumeUniform, SetOutlineStencilBindGroup,
+    SetOutlineVolumeBindGroup,
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
 use crate::OutlineRenderLayers;
@@ -60,7 +61,10 @@ pub(crate) fn queue_outline_stencil_mesh(
             material_meshes.iter()
         {
             if !view_mask.intersects(outline_mask) {
-                continue;
+                continue; // Layer not enabled
+            }
+            if stencil_flags.depth_mode == DepthMode::Invalid {
+                continue; // DepthMode not propagated
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let key = base_key
@@ -134,7 +138,10 @@ pub(crate) fn queue_outline_volume_mesh(
             material_meshes.iter()
         {
             if !view_mask.intersects(outline_mask) {
-                continue;
+                continue; // Layer not enabled
+            }
+            if volume_flags.depth_mode == DepthMode::Invalid {
+                continue; // DepthMode not propagated
             }
             if let Some(mesh) = render_meshes.get(mesh_handle) {
                 let transparent = fragment_uniform.colour[3] < 1.0;
