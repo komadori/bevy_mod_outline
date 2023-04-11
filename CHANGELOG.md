@@ -1,12 +1,21 @@
 # Changelog
 
+## bevy_mod_outline 0.4.1 (2023-04-11)
+
+### Fixed
+- Fixed panic if mesh has unused vertex indices.
+- Fixed panic if the DepthMode hasn't propagated before rendering.
+
+### Changed
+- Changed normal weighting to use vertex rather than face normals if available.
+
 ## bevy_mod_outline 0.4.0 (2023-03-22)
 
 ### Added
 - Added enabled flag to OutlineStencil.
 - Added hollow example.
 
-###
+### Fixed
 - Fixed outline depth propagating when inheritance not enabled.
 
 ### Changed
