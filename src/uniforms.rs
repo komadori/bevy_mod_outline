@@ -46,6 +46,12 @@ pub(crate) enum DepthMode {
     Real = 2,
 }
 
+impl DepthMode {
+    pub fn is_valid(&self) -> bool {
+        *self != DepthMode::Invalid
+    }
+}
+
 #[derive(Component)]
 pub(crate) struct OutlineStencilFlags {
     pub depth_mode: DepthMode,

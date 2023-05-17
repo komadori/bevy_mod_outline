@@ -7,6 +7,7 @@ use crate::uniforms::DepthMode;
 pub struct ComputedOutlineDepth {
     pub(crate) world_origin: Vec3,
     pub(crate) depth_mode: DepthMode,
+    pub(crate) inherited: Option<Entity>,
 }
 
 /// A component which specifies how the outline depth should be computed.
@@ -27,23 +28,25 @@ pub struct InheritOutlineDepth;
 pub(crate) fn compute_outline_depth(
     mut root_query: Query<
         (
+            Entity,
             &mut ComputedOutlineDepth,
             &GlobalTransform,
             Changed<GlobalTransform>,
             Option<(&SetOutlineDepth, Changed<SetOutlineDepth>)>,
-            Option<(&Children, Changed<Children>)>,
+            Option<&Children>,
         ),
         Without<InheritOutlineDepth>,
     >,
-    mut computed_query: Query<
-        (&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>),
-        With<InheritOutlineDepth>,
-    >,
-    child_query: Query<(&Children, Changed<Children>)>,
+    mut computed_query: Query<&mut ComputedOutlineDepth, With<InheritOutlineDepth>>,
+    child_query: Query<&Children>,
 ) {
-    for (mut computed, transform, changed_transform, set_depth, children) in root_query.iter_mut() {
-        let mut changed =
-            computed.is_added() || changed_transform || set_depth.filter(|(_, c)| *c).is_some();
+    for (entity, mut computed, transform, changed_transform, set_depth, children) in
+        root_query.iter_mut()
+    {
+        let changed = !computed.depth_mode.is_valid()
+            || computed.inherited.is_some()
+            || changed_transform
+            || set_depth.filter(|(_, c)| *c).is_some();
         if changed {
             let (origin, depth_mode) = if let Some((sd, _)) = set_depth {
                 match sd {
@@ -58,13 +61,14 @@ pub(crate) fn compute_outline_depth(
             let matrix = transform.compute_matrix();
             computed.world_origin = matrix.project_point3(origin);
             computed.depth_mode = depth_mode;
+            computed.inherited = None;
         }
-        if let Some((cs, changed_children)) = children {
-            changed |= changed_children;
+        if let Some(cs) = children {
             for child in cs.iter() {
                 propagate_outline_depth(
                     &computed,
                     changed,
+                    entity,
                     *child,
                     &mut computed_query,
                     &child_query,
@@ -77,24 +81,23 @@ pub(crate) fn compute_outline_depth(
 fn propagate_outline_depth(
     root_computed: &ComputedOutlineDepth,
     mut changed: bool,
+    parent: Entity,
     entity: Entity,
-    computed_query: &mut Query<
-        (&mut ComputedOutlineDepth, Changed<InheritOutlineDepth>),
-        With<InheritOutlineDepth>,
-    >,
-    child_query: &Query<(&Children, Changed<Children>)>,
+    computed_query: &mut Query<&mut ComputedOutlineDepth, With<InheritOutlineDepth>>,
+    child_query: &Query<&Children>,
 ) {
-    if let Ok((mut computed, changed_inherit)) = computed_query.get_mut(entity) {
-        changed |= changed_inherit;
+    if let Ok(mut computed) = computed_query.get_mut(entity) {
+        changed |= !computed.depth_mode.is_valid() | (computed.inherited != Some(parent));
         if changed {
             *computed = root_computed.clone();
+            computed.inherited = Some(parent);
         }
-        if let Ok((cs, changed_children)) = child_query.get(entity) {
-            changed |= changed_children;
+        if let Ok(cs) = child_query.get(entity) {
             for child in cs.iter() {
                 propagate_outline_depth(
                     root_computed,
                     changed,
+                    entity,
                     *child,
                     computed_query,
                     child_query,
