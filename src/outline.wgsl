@@ -12,6 +12,13 @@ struct VertexInput {
 #endif
 };
 
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+#ifdef OPENGL_WORKAROUND
+    @location(0) normalised_depth: f32,
+#endif
+};
+
 struct OutlineViewUniform {
     @align(16)
     scale: vec2<f32>,
@@ -53,7 +60,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 }
 
 @vertex
-fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
+fn vertex(vertex: VertexInput) -> VertexOutput {
 #ifdef SKINNED
     let model = skin_model(vertex.joint_indexes, vertex.joint_weights);
 #else
@@ -72,5 +79,10 @@ fn vertex(vertex: VertexInput) -> @builtin(position) vec4<f32> {
     let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
-    return vec4<f32>(out_xy, out_z, clip_pos.w);
+    var out: VertexOutput;
+    out.position = vec4<f32>(out_xy, out_z, clip_pos.w);
+#ifdef OPENGL_WORKAROUND
+    out.normalised_depth = 0.5 + 0.5 * (out_z / clip_pos.w);
+#endif
+    return out;
 }

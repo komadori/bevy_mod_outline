@@ -20,6 +20,7 @@ bevy = { version = "0.10", default-features = false, features = [
 bitfield = "0.14"
 interpolation = "0.2"
 thiserror = "1.0"
+wgpu-types = "0.15"
 
 [dev-dependencies]
 bevy = { version = "0.10", default-features = false, features = [

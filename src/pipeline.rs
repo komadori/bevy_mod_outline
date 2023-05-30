@@ -56,6 +56,7 @@ impl PipelineKey {
         depth_mode_int, set_depth_mode_int: 12, 11;
         pub offset_zero, set_offset_zero: 13;
         pub hdr_format, set_hdr_format: 14;
+        pub opengl_workaround, set_opengl_workaround: 15;
     }
 
     pub(crate) fn new() -> Self {
@@ -127,6 +128,11 @@ impl PipelineKey {
 
     pub(crate) fn with_hdr_format(mut self, hdr_format: bool) -> Self {
         self.set_hdr_format(hdr_format);
+        self
+    }
+
+    pub(crate) fn with_opengl_workaround(mut self, opengl_workaround: bool) -> Self {
+        self.set_opengl_workaround(opengl_workaround);
         self
     }
 }
@@ -293,6 +299,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 
                 bind_layouts.push(self.outline_volume_bind_group_layout.clone());
             }
+        }
+        if key.opengl_workaround() {
+            let val = ShaderDefVal::from("OPENGL_WORKAROUND");
+            vertex_defs.push(val.clone());
+            fragment_defs.push(val);
         }
         let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
