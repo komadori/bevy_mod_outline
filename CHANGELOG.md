@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.4.2 (2023-05-30)
+
+### Fixed
+- Fixed failures to propagate ComputedOutlineDepth when needed.
+- Fixed Z-fighting between overlay and stencil with OpenGL wgpu back-end.
+
 ## bevy_mod_outline 0.4.1 (2023-04-11)
 
 ### Fixed
