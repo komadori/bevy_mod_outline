@@ -162,9 +162,10 @@ pub(crate) fn queue_outline_volume_mesh(
                     .with_depth_mode(volume_flags.depth_mode)
                     .with_offset_zero(volume_uniform.offset == 0.0)
                     .with_hdr_format(view.hdr);
-                let pipeline = pipelines
-                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout)
-                    .unwrap();
+                let Ok(pipeline) = pipelines
+                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout) else {
+                        continue;
+                    };
                 let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
                 if transparent {
                     transparent_phase.add(TransparentOutline {
