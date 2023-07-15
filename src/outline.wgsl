@@ -1,5 +1,6 @@
-#import bevy_pbr::mesh_view_bindings
-#import bevy_pbr::mesh_types
+#import bevy_render::view  View
+#import bevy_pbr::mesh_types Mesh
+#import bevy_pbr::mesh_types SkinnedMesh
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -29,6 +30,9 @@ struct OutlineVertexUniform {
     origin: vec3<f32>,
     offset: f32,
 };
+
+@group(0) @binding(0)
+var<uniform> view: View;
 
 @group(1) @binding(0)
 var<uniform> mesh: Mesh;
@@ -62,7 +66,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 @vertex
 fn vertex(vertex: VertexInput) -> VertexOutput {
 #ifdef SKINNED
-    let model = skin_model(vertex.joint_indexes, vertex.joint_weights);
+    let model = bevy_pbr::skinning::skin_model(vertex.joint_indexes, vertex.joint_weights);
 #else
     let model = mesh.model;
 #endif

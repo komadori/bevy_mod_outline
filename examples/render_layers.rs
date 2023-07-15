@@ -16,11 +16,9 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
-        .add_plugins(DefaultPlugins)
-        .add_plugin(OutlinePlugin)
-        .add_startup_system(setup)
-        .add_system(close_on_esc)
-        .add_system(set_camera_viewports)
+        .add_plugins((DefaultPlugins, OutlinePlugin))
+        .add_systems(Startup, setup)
+        .add_systems(Update, (close_on_esc, set_camera_viewports))
         .run();
 }
 

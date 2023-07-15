@@ -9,20 +9,17 @@ fn main() {
         // Disable built-in glTF plugin
         .add_plugins(DefaultPlugins.build().disable::<bevy::gltf::GltfPlugin>())
         // Register outline normal vertex attribute with bevy_mod_gltf_patched
-        .add_plugin(
+        .add_plugins(
             GltfPlugin::default()
                 .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
         )
-        .add_plugin(OutlinePlugin)
+        .add_plugins(OutlinePlugin)
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 1.0,
         })
-        .add_startup_system(setup)
-        .add_system(setup_scene_once_loaded)
-        .add_system(rotates)
-        .add_system(rotates_hue)
-        .add_system(close_on_esc)
+        .add_systems(Startup, setup)
+        .add_systems(Update, (setup_scene_once_loaded, rotates, rotates_hue, close_on_esc))
         .run();
 }
 

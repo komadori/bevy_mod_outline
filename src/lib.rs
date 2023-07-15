@@ -31,7 +31,7 @@ use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::RenderLayers;
-use bevy::render::{RenderApp, RenderSet};
+use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use interpolation::Lerp;
 
@@ -207,37 +207,55 @@ impl Plugin for OutlinePlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
-            .add_plugin(ExtractComponentPlugin::<OutlineRenderLayers>::default())
-            .add_plugin(UniformComponentPlugin::<OutlineStencilUniform>::default())
-            .add_plugin(UniformComponentPlugin::<OutlineVolumeUniform>::default())
-            .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
-            .add_plugin(UniformComponentPlugin::<OutlineViewUniform>::default())
-            .add_system(
-                compute_outline_depth
-                    .in_base_set(CoreSet::PostUpdate)
-                    .after(TransformSystem::TransformPropagate),
-            )
-            .sub_app_mut(RenderApp)
-            .init_resource::<DrawFunctions<StencilOutline>>()
-            .init_resource::<DrawFunctions<OpaqueOutline>>()
-            .init_resource::<DrawFunctions<TransparentOutline>>()
-            .init_resource::<OutlinePipeline>()
-            .init_resource::<SpecializedMeshPipelines<OutlinePipeline>>()
-            .add_render_command::<StencilOutline, DrawStencil>()
-            .add_render_command::<OpaqueOutline, DrawOutline>()
-            .add_render_command::<TransparentOutline, DrawOutline>()
-            .add_system(extract_outline_view_uniforms.in_schedule(ExtractSchedule))
-            .add_system(extract_outline_stencil_uniforms.in_schedule(ExtractSchedule))
-            .add_system(extract_outline_volume_uniforms.in_schedule(ExtractSchedule))
-            .add_system(sort_phase_system::<StencilOutline>.in_set(RenderSet::PhaseSort))
-            .add_system(sort_phase_system::<OpaqueOutline>.in_set(RenderSet::PhaseSort))
-            .add_system(sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort))
-            .add_system(queue_outline_view_bind_group.in_set(RenderSet::Queue))
-            .add_system(queue_outline_stencil_bind_group.in_set(RenderSet::Queue))
-            .add_system(queue_outline_volume_bind_group.in_set(RenderSet::Queue))
-            .add_system(queue_outline_stencil_mesh.in_set(RenderSet::Queue))
-            .add_system(queue_outline_volume_mesh.in_set(RenderSet::Queue));
+        app.add_plugins((
+            ExtractComponentPlugin::<OutlineStencil>::extract_visible(),
+            ExtractComponentPlugin::<OutlineRenderLayers>::default(),
+            UniformComponentPlugin::<OutlineStencilUniform>::default(),
+            UniformComponentPlugin::<OutlineVolumeUniform>::default(),
+            UniformComponentPlugin::<OutlineFragmentUniform>::default(),
+            UniformComponentPlugin::<OutlineViewUniform>::default(),
+        ))
+        .add_systems(
+            PostUpdate,
+            compute_outline_depth.after(TransformSystem::TransformPropagate),
+        )
+        .sub_app_mut(RenderApp)
+        .init_resource::<DrawFunctions<StencilOutline>>()
+        .init_resource::<DrawFunctions<OpaqueOutline>>()
+        .init_resource::<DrawFunctions<TransparentOutline>>()
+        .init_resource::<SpecializedMeshPipelines<OutlinePipeline>>()
+        .add_render_command::<StencilOutline, DrawStencil>()
+        .add_render_command::<OpaqueOutline, DrawOutline>()
+        .add_render_command::<TransparentOutline, DrawOutline>()
+        .add_systems(ExtractSchedule, extract_outline_view_uniforms)
+        .add_systems(ExtractSchedule, extract_outline_stencil_uniforms)
+        .add_systems(ExtractSchedule, extract_outline_volume_uniforms)
+        .add_systems(
+            Render,
+            sort_phase_system::<StencilOutline>.in_set(RenderSet::PhaseSort),
+        )
+        .add_systems(
+            Render,
+            sort_phase_system::<OpaqueOutline>.in_set(RenderSet::PhaseSort),
+        )
+        .add_systems(
+            Render,
+            sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort),
+        )
+        .add_systems(
+            Render,
+            queue_outline_view_bind_group.in_set(RenderSet::Queue),
+        )
+        .add_systems(
+            Render,
+            queue_outline_stencil_bind_group.in_set(RenderSet::Queue),
+        )
+        .add_systems(
+            Render,
+            queue_outline_volume_bind_group.in_set(RenderSet::Queue),
+        )
+        .add_systems(Render, queue_outline_stencil_mesh.in_set(RenderSet::Queue))
+        .add_systems(Render, queue_outline_volume_mesh.in_set(RenderSet::Queue));
 
         let world = &mut app.sub_app_mut(RenderApp).world;
         let node = OutlineNode::new(world);
@@ -248,16 +266,10 @@ impl Plugin for OutlinePlugin {
             .get_sub_graph_mut(bevy::core_pipeline::core_3d::graph::NAME)
             .unwrap();
         draw_3d_graph.add_node(OUTLINE_PASS_NODE_NAME, node);
-        draw_3d_graph.add_slot_edge(
-            draw_3d_graph.input_node().id,
-            bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
-            OUTLINE_PASS_NODE_NAME,
-            OutlineNode::IN_VIEW,
-        );
 
         // Run after main 3D pass, but before UI psss
         draw_3d_graph.add_node_edge(
-            bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
+            bevy::core_pipeline::core_3d::graph::node::END_MAIN_PASS,
             OUTLINE_PASS_NODE_NAME,
         );
         #[cfg(feature = "bevy_ui")]
@@ -265,5 +277,10 @@ impl Plugin for OutlinePlugin {
             OUTLINE_PASS_NODE_NAME,
             bevy::ui::draw_ui_graph::node::UI_PASS,
         );
+    }
+
+    fn finish(&self, app: &mut App) {
+        app.sub_app_mut(RenderApp)
+            .init_resource::<OutlinePipeline>();
     }
 }

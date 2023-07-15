@@ -11,27 +11,31 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.10", default-features = false, features = [
+bevy = { version = "0.11", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "bevy_pbr",
+    "ktx2", 
+    "tonemapping_luts", 
+    "zstd",
     "bevy_core_pipeline",
 ] }
 bitfield = "0.14"
 interpolation = "0.2"
 thiserror = "1.0"
-wgpu-types = "0.15"
+wgpu-types = "0.16.1"
 
 [dev-dependencies]
-bevy = { version = "0.10", default-features = false, features = [
+bevy = { version = "0.11", default-features = false, features = [
     "animation",
     "bevy_gltf",
+    "bevy_pbr",
     "bevy_scene",
     "bevy_winit",
     "png",
     "x11",
 ] }
-bevy_mod_gltf_patched = "0.2"
+bevy_mod_gltf_patched = { git = "https://github.com/luggage66/bevy_mod_gltf_patched/", branch = "bevy-0.11" }
 
 [features]
 default = ["bevy_ui"]

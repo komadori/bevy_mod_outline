@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use bevy::pbr::{MAX_CASCADES_PER_LIGHT, MAX_DIRECTIONAL_LIGHTS};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{
@@ -232,27 +231,19 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             self.mesh_pipeline.view_layout_multisampled.clone()
         }];
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut vertex_defs = vec![
-            ShaderDefVal::Int(
-                "MAX_CASCADES_PER_LIGHT".to_string(),
-                MAX_CASCADES_PER_LIGHT as i32,
-            ),
-            ShaderDefVal::Int(
-                "MAX_DIRECTIONAL_LIGHTS".to_string(),
-                MAX_DIRECTIONAL_LIGHTS as i32,
-            ),
-        ];
+        let mut vertex_defs = vec![];
         let mut fragment_defs = vec![];
         bind_layouts.push(
             if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
                 && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
             {
                 vertex_defs.push(ShaderDefVal::from("SKINNED"));
+                vertex_defs.push("MESH_BINDGROUP_1".into());
                 buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(2));
                 buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(3));
-                self.mesh_pipeline.skinned_mesh_layout.clone()
+                self.mesh_pipeline.mesh_layouts.skinned.clone()
             } else {
-                self.mesh_pipeline.mesh_layout.clone()
+                self.mesh_pipeline.mesh_layouts.model_only.clone()
             },
         );
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
