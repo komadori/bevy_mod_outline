@@ -8,8 +8,8 @@ struct VertexInput {
     @location(1) normal: vec3<f32>,
 #endif
 #ifdef SKINNED
-    @location(2) joint_indexes: vec4<u32>,
-    @location(3) joint_weights: vec4<f32>,
+    @location(5) joint_indices: vec4<u32>,
+    @location(6) joint_weights: vec4<f32>,
 #endif
 };
 
@@ -37,11 +37,8 @@ var<uniform> view: View;
 @group(1) @binding(0)
 var<uniform> mesh: Mesh;
 
-#ifdef SKINNED
-@group(1) @binding(1)
-var<uniform> joint_matrices: SkinnedMesh;
 #import bevy_pbr::skinning
-#endif
+#import bevy_pbr::morph
 
 @group(2) @binding(0)
 var<uniform> view_uniform: OutlineViewUniform;
@@ -66,7 +63,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 @vertex
 fn vertex(vertex: VertexInput) -> VertexOutput {
 #ifdef SKINNED
-    let model = bevy_pbr::skinning::skin_model(vertex.joint_indexes, vertex.joint_weights);
+    let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
 #else
     let model = mesh.model;
 #endif
