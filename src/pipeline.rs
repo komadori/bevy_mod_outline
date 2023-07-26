@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{
@@ -56,6 +57,7 @@ impl PipelineKey {
         pub offset_zero, set_offset_zero: 13;
         pub hdr_format, set_hdr_format: 14;
         pub opengl_workaround, set_opengl_workaround: 15;
+        pub morph_targets, set_morph_targets: 16;
     }
 
     pub(crate) fn new() -> Self {
@@ -133,6 +135,21 @@ impl PipelineKey {
     pub(crate) fn with_opengl_workaround(mut self, opengl_workaround: bool) -> Self {
         self.set_opengl_workaround(opengl_workaround);
         self
+    }
+
+    pub(crate) fn with_morph_targets(mut self, morph_targets: bool) -> Self {
+        self.set_morph_targets(morph_targets);
+        self
+    }
+}
+
+impl From<PipelineKey> for MeshPipelineKey {
+    fn from(key: PipelineKey) -> Self {
+        if key.morph_targets() {
+            MeshPipelineKey::empty() | MeshPipelineKey::MORPH_TARGETS
+        } else {
+            MeshPipelineKey::empty()
+        }
     }
 }
 
@@ -230,22 +247,20 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         } else {
             self.mesh_pipeline.view_layout_multisampled.clone()
         }];
+
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut vertex_defs = vec![];
+        let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
         let mut fragment_defs = vec![];
-        bind_layouts.push(
-            if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
-                && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
-            {
-                vertex_defs.push(ShaderDefVal::from("SKINNED"));
-                vertex_defs.push("MESH_BINDGROUP_1".into());
-                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(2));
-                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(3));
-                self.mesh_pipeline.mesh_layouts.skinned.clone()
-            } else {
-                self.mesh_pipeline.mesh_layouts.model_only.clone()
-            },
-        );
+
+        bind_layouts.push(setup_morph_and_skinning_defs(
+            &self.mesh_pipeline.mesh_layouts,
+            mesh_layout,
+            5,
+            &key.into(),
+            &mut vertex_defs,
+            &mut buffer_attrs,
+        ));
+
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
