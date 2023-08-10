@@ -19,7 +19,10 @@ fn main() {
             brightness: 1.0,
         })
         .add_systems(Startup, setup)
-        .add_systems(Update, (setup_scene_once_loaded, rotates, rotates_hue, close_on_esc))
+        .add_systems(
+            Update,
+            (setup_scene_once_loaded, rotates, rotates_hue, close_on_esc),
+        )
         .run();
 }
 
