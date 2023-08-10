@@ -35,7 +35,6 @@ bevy = { version = "0.11", default-features = false, features = [
     "png",
     "x11",
 ] }
-bevy_mod_gltf_patched = { git = "https://github.com/zainthemaynnn/bevy_mod_gltf_patched/", branch = "bevy-0.11" }
 
 [features]
 default = ["bevy_ui"]

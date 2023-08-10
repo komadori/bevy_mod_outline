@@ -1,17 +1,16 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::{prelude::*, scene::SceneInstance, window::close_on_esc};
-use bevy_mod_gltf_patched::GltfPlugin;
+use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance, window::close_on_esc};
 use bevy_mod_outline::*;
 
 fn main() {
     App::new()
-        // Disable built-in glTF plugin
-        .add_plugins(DefaultPlugins.build().disable::<bevy::gltf::GltfPlugin>())
-        // Register outline normal vertex attribute with bevy_mod_gltf_patched
+        // Register outline normal vertex attribute with glTF plugin
         .add_plugins(
-            GltfPlugin::default()
-                .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
+            DefaultPlugins.build().set(
+                GltfPlugin::default()
+                    .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
+            ),
         )
         .add_plugins(OutlinePlugin)
         .insert_resource(AmbientLight {
