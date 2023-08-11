@@ -239,22 +239,37 @@ impl SpecializedMeshPipeline for OutlinePipeline {
     fn specialize(
         &self,
         key: Self::Key,
-        mesh_layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
+        let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
+        let mut fragment_defs = vec![];
+        let mut buffer_attrs = Vec::new();
+
+        if layout.contains(Mesh::ATTRIBUTE_POSITION) {
+            vertex_defs.push("VERTEX_POSITIONS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_NORMAL) {
+            vertex_defs.push("VERTEX_NORMALS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(2));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_TANGENT) {
+            vertex_defs.push("VERTEX_TANGENTS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_TANGENT.at_shader_location(3));
+        }
+
         let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
             self.mesh_pipeline.view_layout.clone()
         } else {
             self.mesh_pipeline.view_layout_multisampled.clone()
         }];
 
-        let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
-        let mut fragment_defs = vec![];
-
         bind_layouts.push(setup_morph_and_skinning_defs(
             &self.mesh_pipeline.mesh_layouts,
-            mesh_layout,
+            layout,
             5,
             &key.into(),
             &mut vertex_defs,
@@ -275,7 +290,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(ShaderDefVal::from("OFFSET_ZERO"));
         } else {
             buffer_attrs.push(
-                if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
+                if layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
                     ATTRIBUTE_OUTLINE_NORMAL
                 } else {
                     Mesh::ATTRIBUTE_NORMAL
@@ -311,7 +326,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
         }
-        let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
+        let buffers = vec![layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE.typed::<Shader>(),

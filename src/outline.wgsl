@@ -2,14 +2,46 @@
 #import bevy_pbr::mesh_types Mesh
 #import bevy_pbr::mesh_types SkinnedMesh
 
-struct VertexInput {
+#ifdef MORPH_TARGETS
+fn morph_vertex(vertex_in: Vertex) -> Vertex {
+    var vertex = vertex_in;
+    let weight_count = bevy_pbr::morph::layer_count();
+    for (var i: u32 = 0u; i < weight_count; i ++) {
+        let weight = bevy_pbr::morph::weight_at(i);
+        if weight == 0.0 {
+            continue;
+        }
+        vertex.position += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::position_offset, i);
+#ifdef VERTEX_NORMALS
+        vertex.normal += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::normal_offset, i);
+#endif
+#ifdef VERTEX_TANGENTS
+        vertex.tangent += vec4(weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::tangent_offset, i), 0.0);
+#endif
+    }
+    return vertex;
+}
+#endif
+
+struct Vertex {
+#ifdef VERTEX_POSITIONS
     @location(0) position: vec3<f32>,
+#endif
 #ifndef OFFSET_ZERO
-    @location(1) normal: vec3<f32>,
+    @location(1) outline_normal: vec3<f32>,
+#endif
+#ifdef VERTEX_NORMALS
+    @location(2) normal: vec3<f32>,
+#endif
+#ifdef VERTEX_TANGENTS
+    @location(3) tangent: vec4<f32>,
 #endif
 #ifdef SKINNED
     @location(5) joint_indices: vec4<u32>,
     @location(6) joint_weights: vec4<f32>,
+#endif
+#ifdef MORPH_TARGETS
+    @builtin(vertex_index) index: u32,
 #endif
 };
 
@@ -61,7 +93,12 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 }
 
 @vertex
-fn vertex(vertex: VertexInput) -> VertexOutput {
+fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
+#ifdef MORPH_TARGETS
+    var vertex = morph_vertex(vertex_no_morph);
+#else
+    var vertex = vertex_no_morph;
+#endif
 #ifdef SKINNED
     let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
 #else
@@ -76,7 +113,7 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
 #else
-    let clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.normal);
+    let clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.outline_normal);
     let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
