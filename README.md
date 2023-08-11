@@ -49,6 +49,12 @@ A glTF model with pre-baked outline normals.
 cargo run --example hollow
 ```
 
+An animated morphing glTF model with an outline.
+
+```shell
+cargo run --example morph_targets
+```
+
 ## Versions
 
 | This Version | Bevy version |
