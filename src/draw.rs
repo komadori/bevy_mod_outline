@@ -70,24 +70,26 @@ pub(crate) fn queue_outline_stencil_mesh(
             if stencil_flags.depth_mode == DepthMode::Invalid {
                 continue; // DepthMode not propagated
             }
-            if let Some(mesh) = render_meshes.get(mesh_handle) {
-                let key = base_key
-                    .with_primitive_topology(mesh.primitive_topology)
-                    .with_depth_mode(stencil_flags.depth_mode)
-                    .with_offset_zero(stencil_uniform.offset == 0.0)
-                    .with_morph_targets(mesh.morph_targets.is_some());
-                let pipeline = pipelines
+            let Some(mesh) = render_meshes.get(mesh_handle) else {
+                continue; // No mesh
+            };
+            let key = base_key
+                .with_primitive_topology(mesh.primitive_topology)
+                .with_depth_mode(stencil_flags.depth_mode)
+                .with_offset_zero(stencil_uniform.offset == 0.0)
+                .with_morph_targets(mesh.morph_targets.is_some());
+            let Ok(pipeline) = pipelines
                     .specialize(&pipeline_cache, &stencil_pipeline, key, &mesh.layout)
-                    .unwrap();
-                let distance =
-                    rangefinder.distance(&Mat4::from_translation(stencil_uniform.origin));
-                stencil_phase.add(StencilOutline {
-                    entity,
-                    pipeline,
-                    draw_function: draw_stencil,
-                    distance,
-                });
-            }
+                    else {
+                        continue; // No pipeline
+                    };
+            let distance = rangefinder.distance(&Mat4::from_translation(stencil_uniform.origin));
+            stencil_phase.add(StencilOutline {
+                entity,
+                pipeline,
+                draw_function: draw_stencil,
+                distance,
+            });
         }
     }
 }
@@ -151,38 +153,40 @@ pub(crate) fn queue_outline_volume_mesh(
             if volume_flags.depth_mode == DepthMode::Invalid {
                 continue; // DepthMode not propagated
             }
-            if let Some(mesh) = render_meshes.get(mesh_handle) {
-                let transparent = fragment_uniform.colour[3] < 1.0;
-                let key = base_key
-                    .with_primitive_topology(mesh.primitive_topology)
-                    .with_pass_type(if transparent {
-                        PassType::Transparent
-                    } else {
-                        PassType::Opaque
-                    })
-                    .with_depth_mode(volume_flags.depth_mode)
-                    .with_offset_zero(volume_uniform.offset == 0.0)
-                    .with_hdr_format(view.hdr)
-                    .with_morph_targets(mesh.morph_targets.is_some());
-                let pipeline = pipelines
-                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout)
-                    .unwrap();
-                let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
-                if transparent {
-                    transparent_phase.add(TransparentOutline {
-                        entity,
-                        pipeline,
-                        draw_function: draw_transparent_outline,
-                        distance,
-                    });
+            let Some(mesh) = render_meshes.get(mesh_handle) else {
+                continue; // No mesh
+            };
+            let transparent = fragment_uniform.colour[3] < 1.0;
+            let key = base_key
+                .with_primitive_topology(mesh.primitive_topology)
+                .with_pass_type(if transparent {
+                    PassType::Transparent
                 } else {
-                    opaque_phase.add(OpaqueOutline {
-                        entity,
-                        pipeline,
-                        draw_function: draw_opaque_outline,
-                        distance,
-                    });
-                }
+                    PassType::Opaque
+                })
+                .with_depth_mode(volume_flags.depth_mode)
+                .with_offset_zero(volume_uniform.offset == 0.0)
+                .with_hdr_format(view.hdr)
+                .with_morph_targets(mesh.morph_targets.is_some());
+            let Ok(pipeline) = pipelines
+                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout) else {
+                        continue; // No pipeline
+                    };
+            let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
+            if transparent {
+                transparent_phase.add(TransparentOutline {
+                    entity,
+                    pipeline,
+                    draw_function: draw_transparent_outline,
+                    distance,
+                });
+            } else {
+                opaque_phase.add(OpaqueOutline {
+                    entity,
+                    pipeline,
+                    draw_function: draw_opaque_outline,
+                    distance,
+                });
             }
         }
     }
