@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.5.0 (2023-08-14)
+
+### Changed
+- Updated Bevy dependency to 0.11. (@ramirezmike and @zainthemaynnn)
+- Removed panic if specialising mesh pipeline fails. (@arjo129)
+
 ## bevy_mod_outline 0.4.2 (2023-05-30)
 
 ### Fixed
