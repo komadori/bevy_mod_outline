@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use bevy::pbr::{MAX_CASCADES_PER_LIGHT, MAX_DIRECTIONAL_LIGHTS};
+use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{
@@ -57,6 +57,7 @@ impl PipelineKey {
         pub offset_zero, set_offset_zero: 13;
         pub hdr_format, set_hdr_format: 14;
         pub opengl_workaround, set_opengl_workaround: 15;
+        pub morph_targets, set_morph_targets: 16;
     }
 
     pub(crate) fn new() -> Self {
@@ -134,6 +135,21 @@ impl PipelineKey {
     pub(crate) fn with_opengl_workaround(mut self, opengl_workaround: bool) -> Self {
         self.set_opengl_workaround(opengl_workaround);
         self
+    }
+
+    pub(crate) fn with_morph_targets(mut self, morph_targets: bool) -> Self {
+        self.set_morph_targets(morph_targets);
+        self
+    }
+}
+
+impl From<PipelineKey> for MeshPipelineKey {
+    fn from(key: PipelineKey) -> Self {
+        if key.morph_targets() {
+            MeshPipelineKey::empty() | MeshPipelineKey::MORPH_TARGETS
+        } else {
+            MeshPipelineKey::empty()
+        }
     }
 }
 
@@ -223,38 +239,43 @@ impl SpecializedMeshPipeline for OutlinePipeline {
     fn specialize(
         &self,
         key: Self::Key,
-        mesh_layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
+        let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
+        let mut fragment_defs = vec![];
+        let mut buffer_attrs = Vec::new();
+
+        if layout.contains(Mesh::ATTRIBUTE_POSITION) {
+            vertex_defs.push("VERTEX_POSITIONS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_NORMAL) {
+            vertex_defs.push("VERTEX_NORMALS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(2));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_TANGENT) {
+            vertex_defs.push("VERTEX_TANGENTS".into());
+            buffer_attrs.push(Mesh::ATTRIBUTE_TANGENT.at_shader_location(3));
+        }
+
         let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
             self.mesh_pipeline.view_layout.clone()
         } else {
             self.mesh_pipeline.view_layout_multisampled.clone()
         }];
-        let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
-        let mut vertex_defs = vec![
-            ShaderDefVal::Int(
-                "MAX_CASCADES_PER_LIGHT".to_string(),
-                MAX_CASCADES_PER_LIGHT as i32,
-            ),
-            ShaderDefVal::Int(
-                "MAX_DIRECTIONAL_LIGHTS".to_string(),
-                MAX_DIRECTIONAL_LIGHTS as i32,
-            ),
-        ];
-        let mut fragment_defs = vec![];
-        bind_layouts.push(
-            if mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
-                && mesh_layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
-            {
-                vertex_defs.push(ShaderDefVal::from("SKINNED"));
-                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(2));
-                buffer_attrs.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(3));
-                self.mesh_pipeline.skinned_mesh_layout.clone()
-            } else {
-                self.mesh_pipeline.mesh_layout.clone()
-            },
-        );
+
+        bind_layouts.push(setup_morph_and_skinning_defs(
+            &self.mesh_pipeline.mesh_layouts,
+            layout,
+            5,
+            &key.into(),
+            &mut vertex_defs,
+            &mut buffer_attrs,
+        ));
+
         bind_layouts.push(self.outline_view_bind_group_layout.clone());
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
@@ -269,7 +290,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(ShaderDefVal::from("OFFSET_ZERO"));
         } else {
             buffer_attrs.push(
-                if mesh_layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
+                if layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
                     ATTRIBUTE_OUTLINE_NORMAL
                 } else {
                     Mesh::ATTRIBUTE_NORMAL
@@ -305,7 +326,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
         }
-        let buffers = vec![mesh_layout.get_layout(&buffer_attrs)?];
+        let buffers = vec![layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE.typed::<Shader>(),

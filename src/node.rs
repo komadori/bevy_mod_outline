@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
-use bevy::render::render_graph::{NodeRunError, SlotInfo, SlotType};
+use bevy::render::render_graph::NodeRunError;
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, RenderPhase,
 };
@@ -128,8 +128,6 @@ pub(crate) struct OutlineNode {
 }
 
 impl OutlineNode {
-    pub(crate) const IN_VIEW: &'static str = "view";
-
     pub(crate) fn new(world: &mut World) -> Self {
         Self {
             query: world.query_filtered(),
@@ -138,10 +136,6 @@ impl OutlineNode {
 }
 
 impl Node for OutlineNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![SlotInfo::new(Self::IN_VIEW, SlotType::Entity)]
-    }
-
     fn update(&mut self, world: &mut World) {
         self.query.update_archetypes(world);
     }
@@ -152,7 +146,7 @@ impl Node for OutlineNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
+        let view_entity = graph.view_entity();
         let (camera, stencil_phase, opaque_phase, transparent_phase, camera_3d, target, depth) =
             match self.query.get_manual(world, view_entity) {
                 Ok(query) => query,

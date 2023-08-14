@@ -168,6 +168,6 @@ pub struct AutoGenerateOutlineNormalsPlugin;
 
 impl Plugin for AutoGenerateOutlineNormalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(auto_generate_outline_normals);
+        app.add_systems(Update, auto_generate_outline_normals);
     }
 }

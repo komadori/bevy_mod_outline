@@ -14,16 +14,17 @@ struct Fox(Handle<AnimationClip>);
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(OutlinePlugin)
-        .add_plugin(AutoGenerateOutlineNormalsPlugin)
+        .add_plugins((
+            DefaultPlugins,
+            OutlinePlugin,
+            AutoGenerateOutlineNormalsPlugin,
+        ))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 1.0,
         })
-        .add_startup_system(setup)
-        .add_system(setup_scene_once_loaded)
-        .add_system(close_on_esc)
+        .add_systems(Startup, setup)
+        .add_systems(Update, (setup_scene_once_loaded, close_on_esc))
         .run();
 }
 
