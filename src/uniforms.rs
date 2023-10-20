@@ -94,9 +94,17 @@ pub(crate) fn extract_outline_stencil_uniforms(
 
 pub(crate) fn extract_outline_volume_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth, &Handle<Mesh>)>>,
+    query: Extract<
+        Query<(
+            Entity,
+            &OutlineVolume,
+            &ComputedOutlineDepth,
+            &GlobalTransform,
+            &Handle<Mesh>,
+        )>,
+    >,
 ) {
-    for (entity, outline, computed, mesh) in query.iter() {
+    for (entity, outline, computed, transform, mesh) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {
             continue;
         }
@@ -112,6 +120,8 @@ pub(crate) fn extract_outline_volume_uniforms(
             .insert(OutlineVolumeFlags {
                 depth_mode: computed.depth_mode,
             })
+            // FIXME: This is a hack!
+            .insert(*transform)
             .insert(mesh.clone_weak());
     }
 }

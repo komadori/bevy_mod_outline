@@ -182,7 +182,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     pipeline,
                     draw_function: draw_transparent_outline,
                     distance,
-                    batch_range: 0..1,
+                    batch_range: 0..0,
                     dynamic_offset: None,
                 });
             } else {
@@ -191,7 +191,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     pipeline,
                     draw_function: draw_opaque_outline,
                     distance,
-                    batch_range: 0..1,
+                    batch_range: 0..0,
                     dynamic_offset: None,
                 });
             }

@@ -23,6 +23,7 @@
 use bevy::asset::load_internal_asset;
 use bevy::ecs::query::QueryItem;
 use bevy::prelude::*;
+use bevy::render::batching::{batch_and_prepare_render_phase, write_batched_instance_buffer};
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
@@ -256,6 +257,20 @@ impl Plugin for OutlinePlugin {
                 sort_phase_system::<TransparentOutline>,
             )
                 .in_set(RenderSet::PhaseSort),
+        )
+        .add_systems(
+            Render,
+            (
+                batch_and_prepare_render_phase::<StencilOutline, OutlinePipeline>,
+                batch_and_prepare_render_phase::<OpaqueOutline, OutlinePipeline>,
+                batch_and_prepare_render_phase::<TransparentOutline, OutlinePipeline>,
+            )
+                .in_set(RenderSet::PrepareResources),
+        )
+        .add_systems(
+            Render,
+            write_batched_instance_buffer::<OutlinePipeline>
+                .in_set(RenderSet::PrepareResourcesFlush),
         );
 
         let world = &mut app.sub_app_mut(RenderApp).world;

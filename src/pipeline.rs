@@ -1,7 +1,13 @@
 use std::borrow::Cow;
 
-use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
+use bevy::ecs::query::QueryItem;
+use bevy::ecs::system::lifetimeless::Read;
+use bevy::ecs::system::SystemParamItem;
+use bevy::pbr::{
+    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshTransforms, MeshUniform,
+};
 use bevy::prelude::*;
+use bevy::render::batching::GetBatchData;
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -373,5 +379,25 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             push_constant_ranges: default(),
             label: Some(Cow::Borrowed("outline_pipeline")),
         })
+    }
+}
+
+impl GetBatchData for OutlinePipeline {
+    type Param = ();
+    type Query = (Read<GlobalTransform>, Read<Handle<Mesh>>);
+    type QueryFilter = ();
+    type CompareData = AssetId<Mesh>;
+    type BufferData = MeshUniform;
+
+    fn get_batch_data(
+        _: &SystemParamItem<Self::Param>,
+        (transform, mesh_handle): &QueryItem<Self::Query>,
+    ) -> (Self::BufferData, Option<Self::CompareData>) {
+        let ts = MeshTransforms {
+            transform: (&transform.affine()).into(),
+            previous_transform: (&transform.affine()).into(),
+            flags: MeshFlags::NONE.bits(),
+        };
+        ((&ts).into(), Some(mesh_handle.id()))
     }
 }
