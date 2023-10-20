@@ -60,7 +60,7 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
         ..default()
     });
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3.0, 2.1, 10.2).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(3.0, 2.1, 5.2).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 }
@@ -117,8 +117,12 @@ fn name_morphs(
         return;
     }
 
-    let Some(mesh) = meshes.get(&morph_data.mesh) else { return };
-    let Some(names) = mesh.morph_target_names() else { return };
+    let Some(mesh) = meshes.get(&morph_data.mesh) else {
+        return;
+    };
+    let Some(names) = mesh.morph_target_names() else {
+        return;
+    };
     for name in names {
         println!("  {name}");
     }
