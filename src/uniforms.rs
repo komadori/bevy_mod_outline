@@ -94,9 +94,9 @@ pub(crate) fn extract_outline_stencil_uniforms(
 
 pub(crate) fn extract_outline_volume_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth)>>,
+    query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth, &Handle<Mesh>)>>,
 ) {
-    for (entity, outline, computed) in query.iter() {
+    for (entity, outline, computed, mesh) in query.iter() {
         if !outline.visible || outline.colour.a() == 0.0 {
             continue;
         }
@@ -111,11 +111,12 @@ pub(crate) fn extract_outline_volume_uniforms(
             })
             .insert(OutlineVolumeFlags {
                 depth_mode: computed.depth_mode,
-            });
+            })
+            .insert(mesh.clone_weak());
     }
 }
 
-pub(crate) fn queue_outline_stencil_bind_group(
+pub(crate) fn prepare_outline_stencil_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
@@ -134,7 +135,7 @@ pub(crate) fn queue_outline_stencil_bind_group(
     }
 }
 
-pub(crate) fn queue_outline_volume_bind_group(
+pub(crate) fn prepare_outline_volume_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,

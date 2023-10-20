@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -30,11 +29,11 @@ use crate::uniforms::{
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
-pub(crate) const OUTLINE_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
+pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(2101625026478770097);
 
-pub(crate) const FRAGMENT_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12033806834125368121);
+pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(12033806834125368121);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PassType {
@@ -329,13 +328,13 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         let buffers = vec![layout.get_layout(&buffer_attrs)?];
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
-                shader: OUTLINE_SHADER_HANDLE.typed::<Shader>(),
+                shader: OUTLINE_SHADER_HANDLE,
                 entry_point: "vertex".into(),
                 shader_defs: vertex_defs,
                 buffers,
             },
             fragment: Some(FragmentState {
-                shader: FRAGMENT_SHADER_HANDLE.typed::<Shader>(),
+                shader: FRAGMENT_SHADER_HANDLE,
                 shader_defs: fragment_defs,
                 entry_point: "fragment".into(),
                 targets,

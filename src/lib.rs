@@ -42,11 +42,11 @@ use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline
 use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
 use crate::uniforms::{
     extract_outline_stencil_uniforms, extract_outline_volume_uniforms,
-    queue_outline_stencil_bind_group, queue_outline_volume_bind_group, OutlineFragmentUniform,
+    prepare_outline_stencil_bind_group, prepare_outline_volume_bind_group, OutlineFragmentUniform,
     OutlineStencilUniform, OutlineVolumeUniform,
 };
 use crate::view_uniforms::{
-    extract_outline_view_uniforms, queue_outline_view_bind_group, OutlineViewUniform,
+    extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
 
 mod computed;
@@ -227,35 +227,36 @@ impl Plugin for OutlinePlugin {
         .add_render_command::<StencilOutline, DrawStencil>()
         .add_render_command::<OpaqueOutline, DrawOutline>()
         .add_render_command::<TransparentOutline, DrawOutline>()
-        .add_systems(ExtractSchedule, extract_outline_view_uniforms)
-        .add_systems(ExtractSchedule, extract_outline_stencil_uniforms)
-        .add_systems(ExtractSchedule, extract_outline_volume_uniforms)
         .add_systems(
-            Render,
-            sort_phase_system::<StencilOutline>.in_set(RenderSet::PhaseSort),
+            ExtractSchedule,
+            (
+                extract_outline_view_uniforms,
+                extract_outline_stencil_uniforms,
+                extract_outline_volume_uniforms,
+            ),
         )
         .add_systems(
             Render,
-            sort_phase_system::<OpaqueOutline>.in_set(RenderSet::PhaseSort),
+            (
+                prepare_outline_view_bind_group,
+                prepare_outline_stencil_bind_group,
+                prepare_outline_volume_bind_group,
+            )
+                .in_set(RenderSet::PrepareBindGroups),
         )
         .add_systems(
             Render,
-            sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort),
+            (queue_outline_stencil_mesh, queue_outline_volume_mesh).in_set(RenderSet::QueueMeshes),
         )
         .add_systems(
             Render,
-            queue_outline_view_bind_group.in_set(RenderSet::Queue),
-        )
-        .add_systems(
-            Render,
-            queue_outline_stencil_bind_group.in_set(RenderSet::Queue),
-        )
-        .add_systems(
-            Render,
-            queue_outline_volume_bind_group.in_set(RenderSet::Queue),
-        )
-        .add_systems(Render, queue_outline_stencil_mesh.in_set(RenderSet::Queue))
-        .add_systems(Render, queue_outline_volume_mesh.in_set(RenderSet::Queue));
+            (
+                sort_phase_system::<StencilOutline>,
+                sort_phase_system::<OpaqueOutline>,
+                sort_phase_system::<TransparentOutline>,
+            )
+                .in_set(RenderSet::PhaseSort),
+        );
 
         let world = &mut app.sub_app_mut(RenderApp).world;
         let node = OutlineNode::new(world);

@@ -138,22 +138,23 @@ impl OutlineMeshExt for Mesh {
 fn auto_generate_outline_normals(
     mut meshes: ResMut<Assets<Mesh>>,
     mut events: EventReader<'_, '_, AssetEvent<Mesh>>,
-    mut squelch: Local<HashSet<Handle<Mesh>>>,
+    mut squelch: Local<HashSet<AssetId<Mesh>>>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event {
-            AssetEvent::Created { handle } | AssetEvent::Modified { handle } => {
-                if squelch.contains(handle) {
+            AssetEvent::Added { id } | AssetEvent::Modified { id } => {
+                if squelch.contains(id) {
                     // Suppress modification events created by this system
-                    squelch.remove(handle);
-                } else if let Some(mesh) = meshes.get_mut(handle) {
+                    squelch.remove(id);
+                } else if let Some(mesh) = meshes.get_mut(*id) {
                     let _ = mesh.generate_outline_normals();
-                    squelch.insert(handle.clone_weak());
+                    squelch.insert(*id);
                 }
             }
-            AssetEvent::Removed { handle } => {
-                squelch.remove(handle);
+            AssetEvent::Removed { id } => {
+                squelch.remove(id);
             }
+            _ => {}
         }
     }
 }

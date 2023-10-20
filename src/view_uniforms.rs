@@ -49,7 +49,7 @@ pub(crate) fn extract_outline_view_uniforms(
     }
 }
 
-pub(crate) fn queue_outline_view_bind_group(
+pub(crate) fn prepare_outline_view_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
