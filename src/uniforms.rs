@@ -92,6 +92,7 @@ pub(crate) fn extract_outline_stencil_uniforms(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_volume_uniforms(
     mut commands: Commands,
     query: Extract<
