@@ -78,11 +78,11 @@ pub(crate) fn queue_outline_stencil_mesh(
                 .with_depth_mode(stencil_flags.depth_mode)
                 .with_offset_zero(stencil_uniform.offset == 0.0)
                 .with_morph_targets(mesh.morph_targets.is_some());
-            let Ok(pipeline) = pipelines
-                    .specialize(&pipeline_cache, &stencil_pipeline, key, &mesh.layout)
-                    else {
-                        continue; // No pipeline
-                    };
+            let Ok(pipeline) =
+                pipelines.specialize(&pipeline_cache, &stencil_pipeline, key, &mesh.layout)
+            else {
+                continue; // No pipeline
+            };
             let distance = rangefinder.distance(&Mat4::from_translation(stencil_uniform.origin));
             stencil_phase.add(StencilOutline {
                 entity,
@@ -168,10 +168,11 @@ pub(crate) fn queue_outline_volume_mesh(
                 .with_offset_zero(volume_uniform.offset == 0.0)
                 .with_hdr_format(view.hdr)
                 .with_morph_targets(mesh.morph_targets.is_some());
-            let Ok(pipeline) = pipelines
-                    .specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout) else {
-                        continue; // No pipeline
-                    };
+            let Ok(pipeline) =
+                pipelines.specialize(&pipeline_cache, &outline_pipeline, key, &mesh.layout)
+            else {
+                continue; // No pipeline
+            };
             let distance = rangefinder.distance(&Mat4::from_translation(volume_uniform.origin));
             if transparent {
                 transparent_phase.add(TransparentOutline {
