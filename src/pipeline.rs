@@ -251,16 +251,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
 
-        if layout.contains(Mesh::ATTRIBUTE_NORMAL) {
-            vertex_defs.push("VERTEX_NORMALS".into());
-            buffer_attrs.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(2));
-        }
-
-        if layout.contains(Mesh::ATTRIBUTE_TANGENT) {
-            vertex_defs.push("VERTEX_TANGENTS".into());
-            buffer_attrs.push(Mesh::ATTRIBUTE_TANGENT.at_shader_location(3));
-        }
-
         let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
             self.mesh_pipeline.view_layout.clone()
         } else {

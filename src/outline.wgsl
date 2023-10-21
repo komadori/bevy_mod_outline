@@ -2,39 +2,12 @@
 #import bevy_pbr::mesh_types Mesh
 #import bevy_pbr::mesh_types SkinnedMesh
 
-#ifdef MORPH_TARGETS
-fn morph_vertex(vertex_in: Vertex) -> Vertex {
-    var vertex = vertex_in;
-    let weight_count = bevy_pbr::morph::layer_count();
-    for (var i: u32 = 0u; i < weight_count; i ++) {
-        let weight = bevy_pbr::morph::weight_at(i);
-        if weight == 0.0 {
-            continue;
-        }
-        vertex.position += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::position_offset, i);
-#ifdef VERTEX_NORMALS
-        vertex.normal += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::normal_offset, i);
-#endif
-#ifdef VERTEX_TANGENTS
-        vertex.tangent += vec4(weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::tangent_offset, i), 0.0);
-#endif
-    }
-    return vertex;
-}
-#endif
-
 struct Vertex {
 #ifdef VERTEX_POSITIONS
     @location(0) position: vec3<f32>,
 #endif
 #ifndef OFFSET_ZERO
     @location(1) outline_normal: vec3<f32>,
-#endif
-#ifdef VERTEX_NORMALS
-    @location(2) normal: vec3<f32>,
-#endif
-#ifdef VERTEX_TANGENTS
-    @location(3) tangent: vec4<f32>,
 #endif
 #ifdef SKINNED
     @location(5) joint_indices: vec4<u32>,
@@ -77,6 +50,21 @@ var<uniform> view_uniform: OutlineViewUniform;
 
 @group(3) @binding(0)
 var<uniform> vstage: OutlineVertexUniform;
+
+#ifdef MORPH_TARGETS
+fn morph_vertex(vertex_in: Vertex) -> Vertex {
+    var vertex = vertex_in;
+    let weight_count = bevy_pbr::morph::layer_count();
+    for (var i: u32 = 0u; i < weight_count; i ++) {
+        let weight = bevy_pbr::morph::weight_at(i);
+        if weight == 0.0 {
+            continue;
+        }
+        vertex.position += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::position_offset, i);
+    }
+    return vertex;
+}
+#endif
 
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
     return mat3x3<f32>(
