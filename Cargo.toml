@@ -28,6 +28,7 @@ wgpu-types = "0.17"
 [dev-dependencies]
 bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "5d110eb96e64eda03d3f3716d2e94555a68ec846", default-features = false, features = [
     "animation",
+    "multi-threaded",
     "bevy_gltf",
     "bevy_pbr",
     "bevy_scene",
