@@ -12,12 +12,6 @@ struct Vertex {
 #ifndef OFFSET_ZERO
     @location(1) outline_normal: vec3<f32>,
 #endif
-#ifdef VERTEX_NORMALS
-    @location(2) normal: vec3<f32>,
-#endif
-#ifdef VERTEX_TANGENTS
-    @location(3) tangent: vec4<f32>,
-#endif
 #ifdef SKINNED
     @location(5) joint_indices: vec4<u32>,
     @location(6) joint_weights: vec4<f32>,
@@ -68,12 +62,6 @@ fn morph_vertex(vertex_in: Vertex) -> Vertex {
             continue;
         }
         vertex.position += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::position_offset, i);
-#ifdef VERTEX_NORMALS
-        vertex.normal += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::normal_offset, i);
-#endif
-#ifdef VERTEX_TANGENTS
-        vertex.tangent += vec4(weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::tangent_offset, i), 0.0);
-#endif
     }
     return vertex;
 }
