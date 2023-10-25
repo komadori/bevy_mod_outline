@@ -30,6 +30,13 @@ a gap between the object and its outline.
 cargo run --example pieces
 ```
 
+Many instances of the same mesh, with two different outline configurations, flying towards the
+camera.
+
+```shell
+cargo run --example flying_objects
+```
+
 An outlined torus viewed through four cameras with different combinations of render layers
 enabled.
 
