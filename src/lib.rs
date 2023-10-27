@@ -21,7 +21,6 @@
 //! [`AutoGenerateOutlineNormalsPlugin`].
 
 use bevy::asset::load_internal_asset;
-use bevy::ecs::query::QueryItem;
 use bevy::prelude::*;
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
@@ -87,16 +86,6 @@ impl Default for OutlineStencil {
             enabled: true,
             offset: 0.0,
         }
-    }
-}
-
-impl ExtractComponent for OutlineStencil {
-    type Query = &'static OutlineStencil;
-    type Filter = ();
-    type Out = Self;
-
-    fn extract_component(item: QueryItem<Self::Query>) -> Option<Self> {
-        Some(item.clone())
     }
 }
 
@@ -208,7 +197,6 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugins((
-            ExtractComponentPlugin::<OutlineStencil>::extract_visible(),
             ExtractComponentPlugin::<OutlineRenderLayers>::default(),
             UniformComponentPlugin::<OutlineStencilUniform>::default(),
             UniformComponentPlugin::<OutlineVolumeUniform>::default(),
