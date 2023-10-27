@@ -355,15 +355,16 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 depth_write_enabled: true,
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
-                bias: DepthBiasState {
-                    constant: if key.depth_mode() == DepthMode::Flat
-                        && key.pass_type() == PassType::Stencil
-                    {
-                        2 // 1 is empirically not enough to prevent Z-fighting.
-                    } else {
-                        0
-                    },
-                    ..default()
+                bias: if key.depth_mode() == DepthMode::Flat && key.pass_type() == PassType::Stencil
+                {
+                    DepthBiasState {
+                        // Values determined empirically
+                        constant: 3,
+                        slope_scale: 1.0,
+                        ..default()
+                    }
+                } else {
+                    default()
                 },
             }),
             multisample: MultisampleState {
