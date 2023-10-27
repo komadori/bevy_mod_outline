@@ -30,7 +30,8 @@ use bevy::{
 use bitfield::{bitfield_bitrange, bitfield_fields};
 
 use crate::uniforms::{
-    DepthMode, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+    DepthMode, ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform,
+    OutlineVolumeUniform,
 };
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
@@ -374,20 +375,20 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 
 impl GetBatchData for OutlinePipeline {
     type Param = ();
-    type Query = (Read<GlobalTransform>, Read<Handle<Mesh>>);
+    type Query = Read<ExtractedOutline>;
     type QueryFilter = ();
     type CompareData = AssetId<Mesh>;
     type BufferData = MeshUniform;
 
     fn get_batch_data(
         _: &SystemParamItem<Self::Param>,
-        (transform, mesh_handle): &QueryItem<Self::Query>,
+        outline: &QueryItem<Self::Query>,
     ) -> (Self::BufferData, Option<Self::CompareData>) {
         let ts = MeshTransforms {
-            transform: (&transform.affine()).into(),
-            previous_transform: (&transform.affine()).into(),
+            transform: (&outline.transform).into(),
+            previous_transform: (&outline.transform).into(),
             flags: MeshFlags::NONE.bits(),
         };
-        ((&ts).into(), Some(mesh_handle.id()))
+        ((&ts).into(), None /*Some(outline.mesh_id)*/)
     }
 }

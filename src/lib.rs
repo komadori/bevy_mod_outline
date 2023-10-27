@@ -31,7 +31,7 @@ use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
-use bevy::render::view::RenderLayers;
+use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use interpolation::Lerp;
@@ -42,9 +42,9 @@ use crate::draw::{
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
 use crate::uniforms::{
-    extract_outline_stencil_uniforms, extract_outline_volume_uniforms,
-    prepare_outline_stencil_bind_group, prepare_outline_volume_bind_group, OutlineFragmentUniform,
-    OutlineStencilUniform, OutlineVolumeUniform,
+    extract_outline, extract_outline_stencil_uniforms, extract_outline_volume_uniforms,
+    prepare_outline_stencil_bind_group, prepare_outline_volume_bind_group, set_outline_visibility,
+    OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
 };
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
@@ -218,7 +218,10 @@ impl Plugin for OutlinePlugin {
         ))
         .add_systems(
             PostUpdate,
-            compute_outline_depth.after(TransformSystem::TransformPropagate),
+            (
+                compute_outline_depth.after(TransformSystem::TransformPropagate),
+                set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
+            ),
         )
         .sub_app_mut(RenderApp)
         .init_resource::<DrawFunctions<StencilOutline>>()
@@ -231,6 +234,7 @@ impl Plugin for OutlinePlugin {
         .add_systems(
             ExtractSchedule,
             (
+                extract_outline,
                 extract_outline_view_uniforms,
                 extract_outline_stencil_uniforms,
                 extract_outline_volume_uniforms,
