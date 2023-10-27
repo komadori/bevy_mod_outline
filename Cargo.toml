@@ -49,6 +49,10 @@ name = "pieces"
 path = "examples/pieces.rs"
 
 [[example]]
+name = "flying_objects"
+path = "examples/flying_objects.rs"
+
+[[example]]
 name = "render_layers"
 path = "examples/render_layers.rs"
 
