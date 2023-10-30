@@ -9,7 +9,8 @@
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
+    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlineBundle, OutlinePlugin,
+    OutlineVolume,
 };
 use std::f32::consts::PI;
 
@@ -46,10 +47,19 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
         the_wave: asset_server.load("MorphStressTest.gltf#Animation2"),
         mesh: asset_server.load("MorphStressTest.gltf#Mesh0/Primitive0"),
     });
-    commands.spawn(SceneBundle {
-        scene: asset_server.load("MorphStressTest.gltf#Scene0"),
-        ..default()
-    });
+    commands
+        .spawn(SceneBundle {
+            scene: asset_server.load("MorphStressTest.gltf#Scene0"),
+            ..default()
+        })
+        .insert(OutlineBundle {
+            outline: OutlineVolume {
+                visible: true,
+                width: 3.0,
+                colour: Color::RED,
+            },
+            ..default()
+        });
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             color: Color::WHITE,
@@ -78,14 +88,9 @@ fn setup_outlines(
     if let Ok(scene) = scene_query.get_single() {
         if scene_manager.instance_is_ready(**scene) {
             for entity in scene_manager.iter_instance_entities(**scene) {
-                commands.entity(entity).insert(OutlineBundle {
-                    outline: OutlineVolume {
-                        visible: true,
-                        width: 3.0,
-                        colour: Color::RED,
-                    },
-                    ..default()
-                });
+                commands
+                    .entity(entity)
+                    .insert(InheritOutlineBundle::default());
                 *has_setup = true;
             }
         }

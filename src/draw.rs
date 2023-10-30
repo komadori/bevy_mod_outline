@@ -10,8 +10,8 @@ use wgpu_types::Backend;
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::uniforms::{
-    DepthMode, ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform,
-    OutlineVolumeUniform, SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
+    ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+    SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
 use crate::OutlineRenderLayers;
@@ -62,9 +62,6 @@ pub(crate) fn queue_outline_stencil_mesh(
         for (entity, stencil_uniform, outline, outline_mask) in material_meshes.iter() {
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
-            }
-            if outline.depth_mode == DepthMode::Invalid {
-                continue; // DepthMode not propagated
             }
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
                 continue; // No mesh
@@ -146,9 +143,6 @@ pub(crate) fn queue_outline_volume_mesh(
         {
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
-            }
-            if outline.depth_mode == DepthMode::Invalid {
-                continue; // DepthMode not propagated
             }
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
                 continue; // No mesh

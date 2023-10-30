@@ -6,7 +6,8 @@ use bevy::{
     window::close_on_esc,
 };
 use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
+    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlineBundle, OutlinePlugin,
+    OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -65,10 +66,19 @@ fn setup(
     });
 
     // Fox
-    commands.spawn(SceneBundle {
-        scene: asset_server.load("Fox.glb#Scene0"),
-        ..default()
-    });
+    commands
+        .spawn(SceneBundle {
+            scene: asset_server.load("Fox.glb#Scene0"),
+            ..default()
+        })
+        .insert(OutlineBundle {
+            outline: OutlineVolume {
+                visible: true,
+                width: 3.0,
+                colour: Color::RED,
+            },
+            ..default()
+        });
 }
 
 // Once the scene is loaded, start the animation and add an outline
@@ -86,14 +96,9 @@ fn setup_scene_once_loaded(
         {
             if scene_manager.instance_is_ready(**scene) {
                 for entity in scene_manager.iter_instance_entities(**scene) {
-                    commands.entity(entity).insert(OutlineBundle {
-                        outline: OutlineVolume {
-                            visible: true,
-                            width: 3.0,
-                            colour: Color::RED,
-                        },
-                        ..default()
-                    });
+                    commands
+                        .entity(entity)
+                        .insert(InheritOutlineBundle::default());
                 }
                 player.play(animation.0.clone_weak()).repeat();
                 *done = true;

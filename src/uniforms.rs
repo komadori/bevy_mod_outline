@@ -14,10 +14,7 @@ use bevy::{
     },
 };
 
-use crate::{
-    node::StencilOutline, pipeline::OutlinePipeline, ComputedOutlineDepth, OutlineStencil,
-    OutlineVolume,
-};
+use crate::{node::StencilOutline, pipeline::OutlinePipeline, ComputedOutline};
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineStencilUniform {
@@ -47,12 +44,6 @@ pub(crate) enum DepthMode {
     Real = 2,
 }
 
-impl DepthMode {
-    pub fn is_valid(&self) -> bool {
-        *self != DepthMode::Invalid
-    }
-}
-
 #[derive(Component)]
 pub(crate) struct ExtractedOutline {
     pub depth_mode: DepthMode,
@@ -70,68 +61,42 @@ pub(crate) struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(
-    mut query: Query<&mut ViewVisibility, With<ComputedOutlineDepth>>,
-) {
+pub(crate) fn set_outline_visibility(mut query: Query<&mut ViewVisibility, With<ComputedOutline>>) {
     for mut visibility in query.iter_mut() {
         visibility.set();
     }
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn extract_outline(
+pub(crate) fn extract_outline_uniforms(
     mut commands: Commands,
-    query: Extract<
-        Query<(
-            Entity,
-            &ComputedOutlineDepth,
-            &GlobalTransform,
-            &Handle<Mesh>,
-        )>,
-    >,
+    query: Extract<Query<(Entity, &ComputedOutline, &GlobalTransform, &Handle<Mesh>)>>,
 ) {
     for (entity, computed, transform, mesh) in query.iter() {
-        commands.get_or_spawn(entity).insert(ExtractedOutline {
+        let cmds = &mut commands.get_or_spawn(entity);
+        if !computed.is_valid {
+            continue; // Not propagated
+        }
+        cmds.insert(ExtractedOutline {
             depth_mode: computed.depth_mode,
             transform: transform.affine(),
             mesh_id: mesh.id(),
         });
-    }
-}
-
-pub(crate) fn extract_outline_stencil_uniforms(
-    mut commands: Commands,
-    query: Extract<Query<(Entity, &OutlineStencil, &ComputedOutlineDepth)>>,
-) {
-    for (entity, stencil, computed) in query.iter() {
-        if !stencil.enabled {
-            continue;
-        }
-        commands.get_or_spawn(entity).insert(OutlineStencilUniform {
-            origin: computed.world_origin,
-            offset: stencil.offset,
-        });
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub(crate) fn extract_outline_volume_uniforms(
-    mut commands: Commands,
-    query: Extract<Query<(Entity, &OutlineVolume, &ComputedOutlineDepth)>>,
-) {
-    for (entity, outline, computed) in query.iter() {
-        if !outline.visible || outline.colour.a() == 0.0 {
-            continue;
-        }
-        commands
-            .get_or_spawn(entity)
-            .insert(OutlineVolumeUniform {
+        if computed.volume_enabled {
+            cmds.insert(OutlineVolumeUniform {
                 origin: computed.world_origin,
-                offset: outline.width,
+                offset: computed.volume_offset,
             })
             .insert(OutlineFragmentUniform {
-                colour: outline.colour.as_linear_rgba_f32().into(),
+                colour: computed.volume_colour,
             });
+        }
+        if computed.stencil_enabled {
+            cmds.insert(OutlineStencilUniform {
+                origin: computed.world_origin,
+                offset: computed.stencil_offset,
+            });
+        }
     }
 }
 

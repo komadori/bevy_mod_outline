@@ -29,19 +29,6 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let outline = OutlineBundle {
-        outline: OutlineVolume {
-            visible: true,
-            colour: Color::WHITE,
-            width: 10.0,
-        },
-        stencil: OutlineStencil {
-            offset: 5.0,
-            ..default()
-        },
-        ..default()
-    };
-
     // Add sphere with child meshes sticking out of it
     commands
         .spawn(PbrBundle {
@@ -57,7 +44,18 @@ fn setup(
             transform: Transform::from_translation(Vec3::new(0.0, 1.0, 0.0)),
             ..default()
         })
-        .insert(outline.clone())
+        .insert(OutlineBundle {
+            outline: OutlineVolume {
+                visible: true,
+                colour: Color::WHITE,
+                width: 10.0,
+            },
+            stencil: OutlineStencil {
+                offset: 5.0,
+                ..default()
+            },
+            ..default()
+        })
         .insert(Rotates)
         .with_children(|parent| {
             parent
@@ -78,8 +76,7 @@ fn setup(
                         .with_translation(Vec3::new(0.0, 0.0, 0.75)),
                     ..default()
                 })
-                .insert(outline.clone())
-                .insert(InheritOutlineDepth);
+                .insert(InheritOutlineBundle::default());
             parent
                 .spawn(PbrBundle {
                     mesh: meshes.add(
@@ -96,8 +93,7 @@ fn setup(
                         .with_translation(Vec3::new(0.0, 0.0, -0.75)),
                     ..default()
                 })
-                .insert(outline.clone())
-                .insert(InheritOutlineDepth);
+                .insert(InheritOutlineBundle::default());
         });
 
     // Add plane, light source, and camera

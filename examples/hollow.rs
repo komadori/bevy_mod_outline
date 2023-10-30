@@ -56,7 +56,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         })
         .insert(Rotates)
-        .insert(ComputedOutlineDepth::default());
+        .insert(ComputedOutline::default());
 }
 
 // Once the scene is loaded, start the animation and add an outline
@@ -85,7 +85,7 @@ fn setup_scene_once_loaded(
                             },
                             ..default()
                         })
-                        .insert(InheritOutlineDepth);
+                        .insert(InheritOutline);
                     if let Ok(name) = name_query.get(entity) {
                         if name.as_str() == "inside" {
                             commands.entity(entity).insert(RotatesHue);
