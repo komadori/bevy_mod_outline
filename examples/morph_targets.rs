@@ -7,7 +7,7 @@
 //! - How to read morph target names in [`name_morphs`].
 //! - How to play morph target animations in [`setup_animations`].
 
-use bevy::prelude::*;
+use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
     AutoGenerateOutlineNormalsPlugin, OutlineBundle, OutlinePlugin, OutlineVolume,
 };
@@ -69,21 +69,26 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
 fn setup_outlines(
     mut commands: Commands,
     mut has_setup: Local<bool>,
-    meshes: Query<Entity, With<Handle<Mesh>>>,
+    scene_query: Query<&SceneInstance>,
+    scene_manager: Res<SceneSpawner>,
 ) {
     if *has_setup {
         return;
     }
-    for entity in &meshes {
-        commands.entity(entity).insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                width: 3.0,
-                colour: Color::RED,
-            },
-            ..default()
-        });
-        *has_setup = true;
+    if let Ok(scene) = scene_query.get_single() {
+        if scene_manager.instance_is_ready(**scene) {
+            for entity in scene_manager.iter_instance_entities(**scene) {
+                commands.entity(entity).insert(OutlineBundle {
+                    outline: OutlineVolume {
+                        visible: true,
+                        width: 3.0,
+                        colour: Color::RED,
+                    },
+                    ..default()
+                });
+                *has_setup = true;
+            }
+        }
     }
 }
 
