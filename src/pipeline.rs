@@ -16,6 +16,7 @@ use bevy::render::render_resource::{
     TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
+use bevy::render::settings::WgpuSettings;
 use bevy::render::texture::BevyDefault;
 use bevy::render::view::ViewTarget;
 use bevy::{
@@ -28,6 +29,7 @@ use bevy::{
     },
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
+use wgpu_types::{Backends, PushConstantRange};
 
 use crate::uniforms::{
     DepthMode, ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform,
@@ -314,6 +316,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             }
         }
         let buffers = vec![layout.get_layout(&buffer_attrs)?];
+        let mut push_constant_ranges = Vec::with_capacity(1);
+        // Proxy for webgl feature flag in bevy
+        if WgpuSettings::default().backends == Some(Backends::GL) {
+            push_constant_ranges.push(PushConstantRange {
+                stages: ShaderStages::VERTEX,
+                range: 0..4,
+            });
+        }
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE,
@@ -349,7 +359,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            push_constant_ranges: default(),
+            push_constant_ranges,
             label: Some(Cow::Borrowed("outline_pipeline")),
         })
     }
