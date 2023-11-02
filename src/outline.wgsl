@@ -14,8 +14,8 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-#ifdef OPENGL_WORKAROUND
-    @location(0) normalised_depth: f32,
+#ifdef FLAT_DEPTH
+    @location(0) @interpolate(flat) flat_depth: f32,
 #endif
 };
 
@@ -67,11 +67,6 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
     let model = mesh.model;
 #endif
     let clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
-#ifdef FLAT_DEPTH
-    let out_z = model_origin_z(vstage.origin, view.view_proj) * clip_pos.w;
-#else
-    let out_z = clip_pos.z;
-#endif
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
 #else
@@ -80,9 +75,9 @@ fn vertex(vertex: VertexInput) -> VertexOutput {
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
     var out: VertexOutput;
-    out.position = vec4<f32>(out_xy, out_z, clip_pos.w);
-#ifdef OPENGL_WORKAROUND
-    out.normalised_depth = 0.5 + 0.5 * (out_z / clip_pos.w);
+    out.position = vec4<f32>(out_xy, clip_pos.zw);
+#ifdef FLAT_DEPTH
+    out.flat_depth = model_origin_z(vstage.origin, view.view_proj);
 #endif
     return out;
 }

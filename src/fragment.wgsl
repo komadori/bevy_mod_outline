@@ -1,6 +1,6 @@
 struct FragmentOutput {
     @location(0) colour: vec4<f32>,
-#ifdef OPENGL_WORKAROUND
+#ifdef FLAT_DEPTH
     @builtin(frag_depth) frag_depth: f32,
 #endif
 };
@@ -16,8 +16,8 @@ var<uniform> fstage: OutlineFragmentUniform;
 #endif
 
 @fragment
-#ifdef OPENGL_WORKAROUND
-fn fragment(@location(0) normalised_depth: f32) -> FragmentOutput {
+#ifdef FLAT_DEPTH
+fn fragment(@location(0) @interpolate(flat) flat_depth: f32) -> FragmentOutput {
 #else
 fn fragment() -> FragmentOutput {
 #endif
@@ -25,8 +25,8 @@ fn fragment() -> FragmentOutput {
 #ifdef VOLUME
     out.colour = fstage.colour;
 #endif
-#ifdef OPENGL_WORKAROUND
-    out.frag_depth = normalised_depth; 
+#ifdef FLAT_DEPTH
+    out.frag_depth = flat_depth; 
 #endif
     return out;
 }
