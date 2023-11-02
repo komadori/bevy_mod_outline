@@ -3,9 +3,7 @@ use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
-use bevy::render::renderer::RenderAdapterInfo;
 use bevy::render::view::{ExtractedView, RenderLayers};
-use wgpu_types::Backend;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
@@ -33,7 +31,6 @@ pub(crate) fn queue_outline_stencil_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    adapter_info: Res<RenderAdapterInfo>,
     material_meshes: Query<(
         Entity,
         &OutlineStencilUniform,
@@ -53,8 +50,7 @@ pub(crate) fn queue_outline_stencil_mesh(
 
     let base_key = PipelineKey::new()
         .with_msaa(*msaa)
-        .with_pass_type(PassType::Stencil)
-        .with_opengl_workaround(adapter_info.0.backend == Backend::Gl);
+        .with_pass_type(PassType::Stencil);
 
     for (view, mut stencil_phase, view_mask) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
@@ -107,7 +103,6 @@ pub(crate) fn queue_outline_volume_mesh(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<Mesh>>,
-    adapter_info: Res<RenderAdapterInfo>,
     material_meshes: Query<(
         Entity,
         &OutlineVolumeUniform,
@@ -131,9 +126,7 @@ pub(crate) fn queue_outline_volume_mesh(
         .get_id::<DrawOutline>()
         .unwrap();
 
-    let base_key = PipelineKey::new()
-        .with_msaa(*msaa)
-        .with_opengl_workaround(adapter_info.0.backend == Backend::Gl);
+    let base_key = PipelineKey::new().with_msaa(*msaa);
 
     for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
         let view_mask = view_mask.copied().unwrap_or_default();
