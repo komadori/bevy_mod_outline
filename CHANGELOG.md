@@ -1,5 +1,17 @@
 # Changelog
 
+## bevy_mod_outline 0.5.1 (2023-11-03)
+
+### Added
+- Added flying_objects example.
+
+### Fixed
+- Fixed Z-fighting between overlay and stencil more reliably.
+
+### Changed
+- Removed unnecessary extraction step.
+- Removed unused vertex attributes bindings.
+
 ## bevy_mod_outline 0.5.0 (2023-08-14)
 
 ### Changed
