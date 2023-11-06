@@ -1,7 +1,7 @@
-#import bevy_render::view View
+#import bevy_render::view::View
 #import bevy_render::maths
-#import bevy_pbr::mesh_types Mesh
-#import bevy_pbr::mesh_types SkinnedMesh
+#import bevy_pbr::mesh_types::Mesh
+#import bevy_pbr::mesh_types::SkinnedMesh
 #import bevy_pbr::mesh_functions
 
 struct Vertex {
