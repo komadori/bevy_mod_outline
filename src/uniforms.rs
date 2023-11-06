@@ -8,7 +8,7 @@ use bevy::{
     render::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
-        render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry, ShaderType},
+        render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
         Extract,
     },
@@ -107,14 +107,14 @@ pub(crate) fn prepare_outline_stencil_bind_group(
     vertex: Res<ComponentUniforms<OutlineStencilUniform>>,
 ) {
     if let Some(vertex_binding) = vertex.binding() {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[BindGroupEntry {
+        let bind_group = render_device.create_bind_group(
+            Some("outline_stencil_bind_group"),
+            &outline_pipeline.outline_stencil_bind_group_layout,
+            &[BindGroupEntry {
                 binding: 0,
                 resource: vertex_binding.clone(),
             }],
-            label: Some("outline_stencil_bind_group"),
-            layout: &outline_pipeline.outline_stencil_bind_group_layout,
-        });
+        );
         commands.insert_resource(OutlineStencilBindGroup { bind_group });
     }
 }
@@ -127,8 +127,10 @@ pub(crate) fn prepare_outline_volume_bind_group(
     fragment: Res<ComponentUniforms<OutlineFragmentUniform>>,
 ) {
     if let (Some(vertex_binding), Some(fragment_binding)) = (vertex.binding(), fragment.binding()) {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[
+        let bind_group = render_device.create_bind_group(
+            "outline_volume_bind_group",
+            &outline_pipeline.outline_volume_bind_group_layout,
+            &[
                 BindGroupEntry {
                     binding: 0,
                     resource: vertex_binding.clone(),
@@ -138,9 +140,7 @@ pub(crate) fn prepare_outline_volume_bind_group(
                     resource: fragment_binding.clone(),
                 },
             ],
-            label: Some("outline_volume_bind_group"),
-            layout: &outline_pipeline.outline_volume_bind_group_layout,
-        });
+        );
         commands.insert_resource(OutlineVolumeBindGroup { bind_group });
     }
 }

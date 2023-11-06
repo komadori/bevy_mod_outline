@@ -4,7 +4,8 @@ use bevy::ecs::query::QueryItem;
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
-    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshTransforms, MeshUniform,
+    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshPipelineViewLayoutKey,
+    MeshTransforms, MeshUniform,
 };
 use bevy::prelude::*;
 use bevy::render::batching::GetBatchData;
@@ -253,11 +254,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
 
-        let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
-            self.mesh_pipeline.view_layout.clone()
-        } else {
-            self.mesh_pipeline.view_layout_multisampled.clone()
-        }];
+        let mut bind_layouts = vec![self
+            .mesh_pipeline
+            .get_view_layout(if key.msaa() == Msaa::Off {
+                MeshPipelineViewLayoutKey::empty()
+            } else {
+                MeshPipelineViewLayoutKey::MULTISAMPLED
+            })
+            .clone()];
 
         bind_layouts.push(setup_morph_and_skinning_defs(
             &self.mesh_pipeline.mesh_layouts,
