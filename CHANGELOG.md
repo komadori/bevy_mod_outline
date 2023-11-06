@@ -1,5 +1,13 @@
 # Changelog
 
+## bevy_mod_outline 0.4.3 (2023-11-06)
+
+## Fixed
+- Fixed Z-fighting between overlay and stencil more reliably (back-port from 0.5.1).
+
+### Changed
+- Removed unnecessary extraction step (back-port from 0.5.1).
+
 ## bevy_mod_outline 0.4.2 (2023-05-30)
 
 ### Fixed
