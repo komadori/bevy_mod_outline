@@ -207,8 +207,7 @@ impl Plugin for OutlinePlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(ExtractComponentPlugin::<OutlineStencil>::extract_visible())
-            .add_plugin(ExtractComponentPlugin::<OutlineRenderLayers>::default())
+        app.add_plugin(ExtractComponentPlugin::<OutlineRenderLayers>::default())
             .add_plugin(UniformComponentPlugin::<OutlineStencilUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineVolumeUniform>::default())
             .add_plugin(UniformComponentPlugin::<OutlineFragmentUniform>::default())
