@@ -373,7 +373,7 @@ impl GetBatchData for OutlinePipeline {
     type Param = ();
     type Query = Read<ExtractedOutline>;
     type QueryFilter = ();
-    type CompareData = AssetId<Mesh>;
+    type CompareData = ();
     type BufferData = MeshUniform;
 
     fn get_batch_data(
@@ -385,6 +385,6 @@ impl GetBatchData for OutlinePipeline {
             previous_transform: (&outline.transform).into(),
             flags: MeshFlags::NONE.bits(),
         };
-        ((&ts).into(), None /*Some(outline.mesh_id)*/)
+        ((&ts).into(), None)
     }
 }
