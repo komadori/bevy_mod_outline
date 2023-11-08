@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.6.0 (2023-11-08)
+
+### Changed
+- Updated Bevy dependency to 0.12.
+- Changed outline and stencil properties to be inheritable.
+
 ## bevy_mod_outline 0.5.1 (2023-11-03)
 
 ### Added
