@@ -56,7 +56,18 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         })
         .insert(Rotates)
-        .insert(ComputedOutlineDepth::default());
+        .insert(OutlineBundle {
+            outline: OutlineVolume {
+                visible: true,
+                width: 7.5,
+                colour: Color::BLUE,
+            },
+            stencil: OutlineStencil {
+                enabled: true,
+                offset: 0.0,
+            },
+            ..default()
+        });
 }
 
 // Once the scene is loaded, start the animation and add an outline
@@ -73,19 +84,7 @@ fn setup_scene_once_loaded(
                 for entity in scene_manager.iter_instance_entities(**scene) {
                     commands
                         .entity(entity)
-                        .insert(OutlineBundle {
-                            outline: OutlineVolume {
-                                visible: true,
-                                width: 7.5,
-                                colour: Color::BLUE,
-                            },
-                            stencil: OutlineStencil {
-                                enabled: true,
-                                offset: 0.0,
-                            },
-                            ..default()
-                        })
-                        .insert(InheritOutlineDepth);
+                        .insert(InheritOutlineBundle::default());
                     if let Ok(name) = name_query.get(entity) {
                         if name.as_str() == "inside" {
                             commands.entity(entity).insert(RotatesHue);

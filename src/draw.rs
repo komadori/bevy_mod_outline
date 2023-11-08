@@ -8,9 +8,8 @@ use bevy::render::view::{ExtractedView, RenderLayers};
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::uniforms::{
-    DepthMode, OutlineFragmentUniform, OutlineStencilFlags, OutlineStencilUniform,
-    OutlineVolumeFlags, OutlineVolumeUniform, SetOutlineStencilBindGroup,
-    SetOutlineVolumeBindGroup,
+    ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+    SetOutlineStencilBindGroup, SetOutlineVolumeBindGroup,
 };
 use crate::view_uniforms::SetOutlineViewBindGroup;
 use crate::OutlineRenderLayers;
@@ -34,9 +33,8 @@ pub(crate) fn queue_outline_stencil_mesh(
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<(
         Entity,
-        &Handle<Mesh>,
         &OutlineStencilUniform,
-        &OutlineStencilFlags,
+        &ExtractedOutline,
         &OutlineRenderLayers,
     )>,
     mut views: Query<(
@@ -57,21 +55,16 @@ pub(crate) fn queue_outline_stencil_mesh(
     for (view, mut stencil_phase, view_mask) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
         let view_mask = view_mask.copied().unwrap_or_default();
-        for (entity, mesh_handle, stencil_uniform, stencil_flags, outline_mask) in
-            material_meshes.iter()
-        {
+        for (entity, stencil_uniform, outline, outline_mask) in material_meshes.iter() {
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
             }
-            if stencil_flags.depth_mode == DepthMode::Invalid {
-                continue; // DepthMode not propagated
-            }
-            let Some(mesh) = render_meshes.get(mesh_handle) else {
+            let Some(mesh) = render_meshes.get(&outline.mesh) else {
                 continue; // No mesh
             };
             let key = base_key
                 .with_primitive_topology(mesh.primitive_topology)
-                .with_depth_mode(stencil_flags.depth_mode)
+                .with_depth_mode(outline.depth_mode)
                 .with_offset_zero(stencil_uniform.offset == 0.0)
                 .with_morph_targets(mesh.morph_targets.is_some());
             let Ok(pipeline) =
@@ -110,9 +103,8 @@ pub(crate) fn queue_outline_volume_mesh(
     render_meshes: Res<RenderAssets<Mesh>>,
     material_meshes: Query<(
         Entity,
-        &Handle<Mesh>,
         &OutlineVolumeUniform,
-        &OutlineVolumeFlags,
+        &ExtractedOutline,
         &OutlineFragmentUniform,
         &OutlineRenderLayers,
     )>,
@@ -137,16 +129,13 @@ pub(crate) fn queue_outline_volume_mesh(
     for (view, mut opaque_phase, mut transparent_phase, view_mask) in views.iter_mut() {
         let view_mask = view_mask.copied().unwrap_or_default();
         let rangefinder = view.rangefinder3d();
-        for (entity, mesh_handle, volume_uniform, volume_flags, fragment_uniform, outline_mask) in
+        for (entity, volume_uniform, outline, fragment_uniform, outline_mask) in
             material_meshes.iter()
         {
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
             }
-            if volume_flags.depth_mode == DepthMode::Invalid {
-                continue; // DepthMode not propagated
-            }
-            let Some(mesh) = render_meshes.get(mesh_handle) else {
+            let Some(mesh) = render_meshes.get(&outline.mesh) else {
                 continue; // No mesh
             };
             let transparent = fragment_uniform.colour[3] < 1.0;
@@ -157,7 +146,7 @@ pub(crate) fn queue_outline_volume_mesh(
                 } else {
                     PassType::Opaque
                 })
-                .with_depth_mode(volume_flags.depth_mode)
+                .with_depth_mode(outline.depth_mode)
                 .with_offset_zero(volume_uniform.offset == 0.0)
                 .with_hdr_format(view.hdr)
                 .with_morph_targets(mesh.morph_targets.is_some());
