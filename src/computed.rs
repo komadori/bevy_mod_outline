@@ -2,22 +2,79 @@ use bevy::{ecs::query::QueryItem, prelude::*};
 
 use crate::{uniforms::DepthMode, InheritOutline, OutlineMode, OutlineStencil, OutlineVolume};
 
-/// A component for storing the computed depth at which the outline lies.
-#[derive(Clone, Component, Default)]
-pub struct ComputedOutline {
-    pub(crate) is_valid: bool,
-    pub(crate) inherited_from: Option<Entity>,
-    pub(crate) volume_enabled: bool,
-    pub(crate) volume_offset: f32,
-    pub(crate) volume_colour: Vec4,
-    pub(crate) set_volume: bool,
-    pub(crate) stencil_enabled: bool,
-    pub(crate) stencil_offset: f32,
-    pub(crate) set_stencil: bool,
+#[derive(Clone, Default)]
+pub(crate) struct ComputedVolume {
+    pub(crate) enabled: bool,
+    pub(crate) offset: f32,
+    pub(crate) colour: Vec4,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct ComputedStencil {
+    pub(crate) enabled: bool,
+    pub(crate) offset: f32,
+}
+
+#[derive(Clone)]
+pub(crate) struct ComputedMode {
     pub(crate) world_origin: Vec3,
     pub(crate) depth_mode: DepthMode,
-    pub(crate) set_mode: bool,
 }
+
+impl Default for ComputedMode {
+    fn default() -> Self {
+        Self {
+            world_origin: Vec3::NAN,
+            depth_mode: DepthMode::Real,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Default)]
+pub(crate) enum Source {
+    #[default]
+    Set,
+    Inherited,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct Sourced<T: Clone + Default> {
+    pub(crate) value: T,
+    pub(crate) source: Source,
+}
+
+impl<T: Clone + Default> Sourced<T> {
+    pub fn inherit(value: &T) -> Self {
+        Sourced {
+            value: value.clone(),
+            source: Source::Inherited,
+        }
+    }
+
+    pub fn set(value: T) -> Self {
+        Sourced {
+            value,
+            source: Source::Set,
+        }
+    }
+
+    pub fn is_changed<U: Component>(&self, tuple: Option<(&U, bool)>) -> bool {
+        tuple.is_some() != matches!(self.source, Source::Set)
+            || if let Some((_, c)) = tuple { c } else { false }
+    }
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct ComputedInternal {
+    pub(crate) inherited_from: Option<Entity>,
+    pub(crate) volume: Sourced<ComputedVolume>,
+    pub(crate) stencil: Sourced<ComputedStencil>,
+    pub(crate) mode: Sourced<ComputedMode>,
+}
+
+/// A component for storing the computed depth at which the outline lies.
+#[derive(Clone, Component, Default)]
+pub struct ComputedOutline(pub(crate) Option<ComputedInternal>);
 
 type OutlineComponents<'a> = (
     (&'a GlobalTransform, Changed<GlobalTransform>),
@@ -41,11 +98,12 @@ pub(crate) fn compute_outline(
     child_query: Query<&Children>,
 ) {
     for (entity, mut computed, components, children) in root_query.iter_mut() {
-        let changed = update_computed_outline(&mut computed, components, None, None, false);
+        let changed = update_computed_outline(&mut computed, components, &default(), None, false);
         if let Some(cs) = children {
+            let parent_computed = computed.0.as_ref().unwrap();
             for child in cs.iter() {
                 propagate_computed_outline(
-                    &computed,
+                    parent_computed,
                     changed,
                     entity,
                     *child,
@@ -58,7 +116,7 @@ pub(crate) fn compute_outline(
 }
 
 fn propagate_computed_outline(
-    parent_computed: &ComputedOutline,
+    parent_computed: &ComputedInternal,
     parent_changed: bool,
     parent_entity: Entity,
     entity: Entity,
@@ -69,15 +127,15 @@ fn propagate_computed_outline(
         let changed = update_computed_outline(
             &mut computed,
             components,
-            Some(parent_computed),
+            parent_computed,
             Some(parent_entity),
             parent_changed,
         );
         if let Ok(cs) = child_query.get(entity) {
-            let parent_computed = computed.clone();
+            let parent_computed = &computed.0.as_ref().unwrap().clone();
             for child in cs.iter() {
                 propagate_computed_outline(
-                    &parent_computed,
+                    parent_computed,
                     changed,
                     entity,
                     *child,
@@ -92,59 +150,57 @@ fn propagate_computed_outline(
 fn update_computed_outline(
     computed: &mut ComputedOutline,
     ((transform, changed_transform), volume, stencil, mode): QueryItem<'_, OutlineComponents>,
-    parent_computed: Option<&ComputedOutline>,
+    parent_computed: &ComputedInternal,
     parent_entity: Option<Entity>,
     force_update: bool,
 ) -> bool {
     let changed = force_update
-        || !computed.is_valid
-        || computed.inherited_from != parent_entity
-        || (changed_transform && matches!(mode, Some((OutlineMode::FlatVertex { .. }, _))))
-        || is_changed(volume, computed.set_volume)
-        || is_changed(stencil, computed.set_stencil)
-        || is_changed(mode, computed.set_mode);
+        || if let ComputedOutline(Some(computed)) = computed {
+            computed.inherited_from != parent_entity
+                || (changed_transform && matches!(mode, Some((OutlineMode::FlatVertex { .. }, _))))
+                || computed.volume.is_changed(volume)
+                || computed.stencil.is_changed(stencil)
+                || computed.mode.is_changed(mode)
+        } else {
+            true
+        };
     if changed {
-        if let Some(base) = parent_computed {
-            *computed = base.clone();
-        }
-        computed.is_valid = true;
-        computed.inherited_from = parent_entity;
-        if let Some((vol, _)) = volume {
-            computed.volume_enabled = vol.visible && vol.colour.a() != 0.0;
-            computed.volume_offset = vol.width;
-            computed.volume_colour = vol.colour.into();
-            computed.set_volume = true;
-        } else {
-            computed.set_volume = false;
-        }
-        if let Some((sten, _)) = stencil {
-            computed.stencil_enabled = sten.enabled;
-            computed.stencil_offset = sten.offset;
-            computed.set_stencil = true;
-        } else {
-            computed.set_stencil = false;
-        }
-        if let Some((m, _)) = mode {
-            match m {
-                OutlineMode::FlatVertex {
-                    model_origin: origin,
-                } => {
-                    computed.world_origin = transform.compute_matrix().project_point3(*origin);
-                    computed.depth_mode = DepthMode::Flat;
-                }
-                OutlineMode::RealVertex => {
-                    computed.world_origin = Vec3::NAN;
-                    computed.depth_mode = DepthMode::Real;
-                }
-            }
-            computed.set_mode = true;
-        } else {
-            computed.set_mode = false;
-        }
+        *computed = ComputedOutline(Some(ComputedInternal {
+            inherited_from: parent_entity,
+            volume: if let Some((vol, _)) = volume {
+                Sourced::set(ComputedVolume {
+                    enabled: vol.visible && vol.colour.a() != 0.0,
+                    offset: vol.width,
+                    colour: vol.colour.into(),
+                })
+            } else {
+                Sourced::inherit(&parent_computed.volume.value)
+            },
+            stencil: if let Some((sten, _)) = stencil {
+                Sourced::set(ComputedStencil {
+                    enabled: sten.enabled,
+                    offset: sten.offset,
+                })
+            } else {
+                Sourced::inherit(&parent_computed.stencil.value)
+            },
+            mode: if let Some((m, _)) = mode {
+                Sourced::set(match m {
+                    OutlineMode::FlatVertex {
+                        model_origin: origin,
+                    } => ComputedMode {
+                        world_origin: transform.compute_matrix().project_point3(*origin),
+                        depth_mode: DepthMode::Flat,
+                    },
+                    OutlineMode::RealVertex => ComputedMode {
+                        world_origin: Vec3::NAN,
+                        depth_mode: DepthMode::Real,
+                    },
+                })
+            } else {
+                Sourced::inherit(&parent_computed.mode.value)
+            },
+        }));
     }
     changed
-}
-
-fn is_changed<T: Component>(tuple: Option<(&T, bool)>, previously_set: bool) -> bool {
-    tuple.is_some() != previously_set || if let Some((_, c)) = tuple { c } else { false }
 }

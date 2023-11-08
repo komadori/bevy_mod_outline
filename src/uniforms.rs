@@ -16,6 +16,13 @@ use bevy::{
 
 use crate::{node::StencilOutline, pipeline::OutlinePipeline, ComputedOutline};
 
+#[derive(Component)]
+pub(crate) struct ExtractedOutline {
+    pub depth_mode: DepthMode,
+    pub transform: Affine3A,
+    pub mesh_id: AssetId<Mesh>,
+}
+
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineStencilUniform {
     #[align(16)]
@@ -36,19 +43,10 @@ pub(crate) struct OutlineFragmentUniform {
     pub colour: Vec4,
 }
 
-#[derive(Clone, Copy, Default, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) enum DepthMode {
-    #[default]
-    Invalid = 0,
     Flat = 1,
     Real = 2,
-}
-
-#[derive(Component)]
-pub(crate) struct ExtractedOutline {
-    pub depth_mode: DepthMode,
-    pub transform: Affine3A,
-    pub mesh_id: AssetId<Mesh>,
 }
 
 #[derive(Resource)]
@@ -61,9 +59,13 @@ pub(crate) struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(mut query: Query<&mut ViewVisibility, With<ComputedOutline>>) {
-    for mut visibility in query.iter_mut() {
-        visibility.set();
+pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
+    for (mut visibility, computed) in query.iter_mut() {
+        if let ComputedOutline(Some(computed)) = computed {
+            if computed.volume.value.enabled || computed.stencil.value.enabled {
+                visibility.set();
+            }
+        }
     }
 }
 
@@ -74,28 +76,27 @@ pub(crate) fn extract_outline_uniforms(
 ) {
     for (entity, computed, transform, mesh) in query.iter() {
         let cmds = &mut commands.get_or_spawn(entity);
-        if !computed.is_valid {
-            continue; // Not propagated
-        }
-        cmds.insert(ExtractedOutline {
-            depth_mode: computed.depth_mode,
-            transform: transform.affine(),
-            mesh_id: mesh.id(),
-        });
-        if computed.volume_enabled {
-            cmds.insert(OutlineVolumeUniform {
-                origin: computed.world_origin,
-                offset: computed.volume_offset,
-            })
-            .insert(OutlineFragmentUniform {
-                colour: computed.volume_colour,
+        if let ComputedOutline(Some(computed)) = computed {
+            cmds.insert(ExtractedOutline {
+                depth_mode: computed.mode.value.depth_mode,
+                transform: transform.affine(),
+                mesh_id: mesh.id(),
             });
-        }
-        if computed.stencil_enabled {
-            cmds.insert(OutlineStencilUniform {
-                origin: computed.world_origin,
-                offset: computed.stencil_offset,
-            });
+            if computed.volume.value.enabled {
+                cmds.insert(OutlineVolumeUniform {
+                    origin: computed.mode.value.world_origin,
+                    offset: computed.volume.value.offset,
+                })
+                .insert(OutlineFragmentUniform {
+                    colour: computed.volume.value.colour,
+                });
+            }
+            if computed.stencil.value.enabled {
+                cmds.insert(OutlineStencilUniform {
+                    origin: computed.mode.value.world_origin,
+                    offset: computed.stencil.value.offset,
+                });
+            }
         }
     }
 }
