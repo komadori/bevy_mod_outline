@@ -12,7 +12,7 @@ vertex extrusion method.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.5"
+bevy_mod_outline = "0.6"
 ```
 
 ## Examples
