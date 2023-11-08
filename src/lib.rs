@@ -24,6 +24,7 @@
 
 use bevy::asset::load_internal_asset;
 use bevy::prelude::*;
+use bevy::render::batching::{batch_and_prepare_render_phase, write_batched_instance_buffer};
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
@@ -42,11 +43,12 @@ use crate::draw::{
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
 use crate::uniforms::{
-    extract_outline_uniforms, queue_outline_stencil_bind_group, queue_outline_volume_bind_group,
-    set_outline_visibility, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+    extract_outline_uniforms, prepare_outline_stencil_bind_group,
+    prepare_outline_volume_bind_group, set_outline_visibility, OutlineFragmentUniform,
+    OutlineStencilUniform, OutlineVolumeUniform,
 };
 use crate::view_uniforms::{
-    extract_outline_view_uniforms, queue_outline_view_bind_group, OutlineViewUniform,
+    extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
 
 mod computed;
@@ -258,6 +260,20 @@ impl Plugin for OutlinePlugin {
         .add_systems(
             Render,
             (
+                prepare_outline_view_bind_group,
+                prepare_outline_stencil_bind_group,
+                prepare_outline_volume_bind_group,
+            )
+                .in_set(RenderSet::PrepareBindGroups),
+        )
+        .add_systems(
+            Render,
+            (queue_outline_stencil_mesh, queue_outline_volume_mesh).in_set(RenderSet::QueueMeshes),
+        )
+        .add_systems(
+            Render,
+            (
+                sort_phase_system::<StencilOutline>,
                 sort_phase_system::<OpaqueOutline>,
                 sort_phase_system::<TransparentOutline>,
             )
@@ -266,15 +282,16 @@ impl Plugin for OutlinePlugin {
         .add_systems(
             Render,
             (
-                queue_outline_view_bind_group,
-                queue_outline_stencil_bind_group,
-                queue_outline_volume_bind_group,
+                batch_and_prepare_render_phase::<StencilOutline, OutlinePipeline>,
+                batch_and_prepare_render_phase::<OpaqueOutline, OutlinePipeline>,
+                batch_and_prepare_render_phase::<TransparentOutline, OutlinePipeline>,
             )
-                .in_set(RenderSet::Queue),
+                .in_set(RenderSet::PrepareResources),
         )
         .add_systems(
             Render,
-            (queue_outline_stencil_mesh, queue_outline_volume_mesh).in_set(RenderSet::Queue),
+            write_batched_instance_buffer::<OutlinePipeline>
+                .in_set(RenderSet::PrepareResourcesFlush),
         );
 
         let world = &mut app.sub_app_mut(RenderApp).world;

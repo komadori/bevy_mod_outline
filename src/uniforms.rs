@@ -3,11 +3,12 @@ use bevy::{
         lifetimeless::{Read, SRes},
         SystemParamItem,
     },
+    math::Affine3A,
     prelude::*,
     render::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
-        render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry, ShaderType},
+        render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
         Extract,
     },
@@ -18,7 +19,8 @@ use crate::{node::StencilOutline, pipeline::OutlinePipeline, ComputedOutline};
 #[derive(Component)]
 pub(crate) struct ExtractedOutline {
     pub depth_mode: DepthMode,
-    pub mesh: Handle<Mesh>,
+    pub transform: Affine3A,
+    pub mesh_id: AssetId<Mesh>,
 }
 
 #[derive(Clone, Component, ShaderType)]
@@ -57,13 +59,11 @@ pub(crate) struct OutlineVolumeBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(
-    mut query: Query<(&mut ComputedVisibility, &ComputedOutline)>,
-) {
+pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
     for (mut visibility, computed) in query.iter_mut() {
         if let ComputedOutline(Some(computed)) = computed {
             if computed.volume.value.enabled || computed.stencil.value.enabled {
-                visibility.set_visible_in_view();
+                visibility.set();
             }
         }
     }
@@ -72,14 +72,15 @@ pub(crate) fn set_outline_visibility(
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &ComputedOutline, &Handle<Mesh>)>>,
+    query: Extract<Query<(Entity, &ComputedOutline, &GlobalTransform, &Handle<Mesh>)>>,
 ) {
-    for (entity, computed, mesh) in query.iter() {
+    for (entity, computed, transform, mesh) in query.iter() {
         let cmds = &mut commands.get_or_spawn(entity);
         if let ComputedOutline(Some(computed)) = computed {
             cmds.insert(ExtractedOutline {
                 depth_mode: computed.mode.value.depth_mode,
-                mesh: mesh.clone_weak(),
+                transform: transform.affine(),
+                mesh_id: mesh.id(),
             });
             if computed.volume.value.enabled {
                 cmds.insert(OutlineVolumeUniform {
@@ -100,26 +101,26 @@ pub(crate) fn extract_outline_uniforms(
     }
 }
 
-pub(crate) fn queue_outline_stencil_bind_group(
+pub(crate) fn prepare_outline_stencil_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
     vertex: Res<ComponentUniforms<OutlineStencilUniform>>,
 ) {
     if let Some(vertex_binding) = vertex.binding() {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[BindGroupEntry {
+        let bind_group = render_device.create_bind_group(
+            Some("outline_stencil_bind_group"),
+            &outline_pipeline.outline_stencil_bind_group_layout,
+            &[BindGroupEntry {
                 binding: 0,
                 resource: vertex_binding.clone(),
             }],
-            label: Some("outline_stencil_bind_group"),
-            layout: &outline_pipeline.outline_stencil_bind_group_layout,
-        });
+        );
         commands.insert_resource(OutlineStencilBindGroup { bind_group });
     }
 }
 
-pub(crate) fn queue_outline_volume_bind_group(
+pub(crate) fn prepare_outline_volume_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
@@ -127,8 +128,10 @@ pub(crate) fn queue_outline_volume_bind_group(
     fragment: Res<ComponentUniforms<OutlineFragmentUniform>>,
 ) {
     if let (Some(vertex_binding), Some(fragment_binding)) = (vertex.binding(), fragment.binding()) {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[
+        let bind_group = render_device.create_bind_group(
+            "outline_volume_bind_group",
+            &outline_pipeline.outline_volume_bind_group_layout,
+            &[
                 BindGroupEntry {
                     binding: 0,
                     resource: vertex_binding.clone(),
@@ -138,9 +141,7 @@ pub(crate) fn queue_outline_volume_bind_group(
                     resource: fragment_binding.clone(),
                 },
             ],
-            label: Some("outline_volume_bind_group"),
-            layout: &outline_pipeline.outline_volume_bind_group_layout,
-        });
+        );
         commands.insert_resource(OutlineVolumeBindGroup { bind_group });
     }
 }

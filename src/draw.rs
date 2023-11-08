@@ -59,7 +59,7 @@ pub(crate) fn queue_outline_stencil_mesh(
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
             }
-            let Some(mesh) = render_meshes.get(&outline.mesh) else {
+            let Some(mesh) = render_meshes.get(outline.mesh_id) else {
                 continue; // No mesh
             };
             let key = base_key
@@ -78,6 +78,8 @@ pub(crate) fn queue_outline_stencil_mesh(
                 pipeline,
                 draw_function: draw_stencil,
                 distance,
+                batch_range: 0..0,
+                dynamic_offset: None,
             });
         }
     }
@@ -135,7 +137,7 @@ pub(crate) fn queue_outline_volume_mesh(
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
             }
-            let Some(mesh) = render_meshes.get(&outline.mesh) else {
+            let Some(mesh) = render_meshes.get(outline.mesh_id) else {
                 continue; // No mesh
             };
             let transparent = fragment_uniform.colour[3] < 1.0;
@@ -162,6 +164,8 @@ pub(crate) fn queue_outline_volume_mesh(
                     pipeline,
                     draw_function: draw_transparent_outline,
                     distance,
+                    batch_range: 0..0,
+                    dynamic_offset: None,
                 });
             } else {
                 opaque_phase.add(OpaqueOutline {
@@ -169,6 +173,8 @@ pub(crate) fn queue_outline_volume_mesh(
                     pipeline,
                     draw_function: draw_opaque_outline,
                     distance,
+                    batch_range: 0..0,
+                    dynamic_offset: None,
                 });
             }
         }

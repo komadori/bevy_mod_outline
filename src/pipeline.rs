@@ -1,8 +1,14 @@
 use std::borrow::Cow;
 
-use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
+use bevy::ecs::query::QueryItem;
+use bevy::ecs::system::lifetimeless::Read;
+use bevy::ecs::system::SystemParamItem;
+use bevy::pbr::{
+    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshPipelineViewLayoutKey,
+    MeshTransforms, MeshUniform,
+};
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
+use bevy::render::batching::GetBatchData;
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -11,6 +17,7 @@ use bevy::render::render_resource::{
     TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
+use bevy::render::settings::WgpuSettings;
 use bevy::render::texture::BevyDefault;
 use bevy::render::view::ViewTarget;
 use bevy::{
@@ -23,18 +30,20 @@ use bevy::{
     },
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
+use wgpu_types::{Backends, PushConstantRange};
 
 use crate::uniforms::{
-    DepthMode, OutlineFragmentUniform, OutlineStencilUniform, OutlineVolumeUniform,
+    DepthMode, ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform,
+    OutlineVolumeUniform,
 };
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
-pub(crate) const OUTLINE_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2101625026478770097);
+pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(2101625026478770097);
 
-pub(crate) const FRAGMENT_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12033806834125368121);
+pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(12033806834125368121);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PassType {
@@ -245,11 +254,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
 
-        let mut bind_layouts = vec![if key.msaa() == Msaa::Off {
-            self.mesh_pipeline.view_layout.clone()
-        } else {
-            self.mesh_pipeline.view_layout_multisampled.clone()
-        }];
+        let mut bind_layouts = vec![self
+            .mesh_pipeline
+            .get_view_layout(if key.msaa() == Msaa::Off {
+                MeshPipelineViewLayoutKey::empty()
+            } else {
+                MeshPipelineViewLayoutKey::MULTISAMPLED
+            })
+            .clone()];
 
         bind_layouts.push(setup_morph_and_skinning_defs(
             &self.mesh_pipeline.mesh_layouts,
@@ -308,15 +320,23 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             }
         }
         let buffers = vec![layout.get_layout(&buffer_attrs)?];
+        let mut push_constant_ranges = Vec::with_capacity(1);
+        // Proxy for webgl feature flag in bevy
+        if WgpuSettings::default().backends == Some(Backends::GL) {
+            push_constant_ranges.push(PushConstantRange {
+                stages: ShaderStages::VERTEX,
+                range: 0..4,
+            });
+        }
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
-                shader: OUTLINE_SHADER_HANDLE.typed::<Shader>(),
+                shader: OUTLINE_SHADER_HANDLE,
                 entry_point: "vertex".into(),
                 shader_defs: vertex_defs,
                 buffers,
             },
             fragment: Some(FragmentState {
-                shader: FRAGMENT_SHADER_HANDLE.typed::<Shader>(),
+                shader: FRAGMENT_SHADER_HANDLE,
                 shader_defs: fragment_defs,
                 entry_point: "fragment".into(),
                 targets,
@@ -343,8 +363,28 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            push_constant_ranges: default(),
+            push_constant_ranges,
             label: Some(Cow::Borrowed("outline_pipeline")),
         })
+    }
+}
+
+impl GetBatchData for OutlinePipeline {
+    type Param = ();
+    type Query = Read<ExtractedOutline>;
+    type QueryFilter = ();
+    type CompareData = ();
+    type BufferData = MeshUniform;
+
+    fn get_batch_data(
+        _: &SystemParamItem<Self::Param>,
+        outline: &QueryItem<Self::Query>,
+    ) -> (Self::BufferData, Option<Self::CompareData>) {
+        let ts = MeshTransforms {
+            transform: (&outline.transform).into(),
+            previous_transform: (&outline.transform).into(),
+            flags: MeshFlags::NONE.bits(),
+        };
+        ((&ts).into(), None)
     }
 }

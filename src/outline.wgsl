@@ -1,10 +1,13 @@
-#import bevy_render::view  View
-#import bevy_pbr::mesh_types Mesh
-#import bevy_pbr::mesh_types SkinnedMesh
+#import bevy_render::view::View
+#import bevy_render::maths
+#import bevy_pbr::mesh_types::Mesh
+#import bevy_pbr::mesh_types::SkinnedMesh
+#import bevy_pbr::mesh_functions
 
 struct Vertex {
 #ifdef VERTEX_POSITIONS
     @location(0) position: vec3<f32>,
+    @builtin(instance_index) instance_index: u32,
 #endif
 #ifndef OFFSET_ZERO
     @location(1) outline_normal: vec3<f32>,
@@ -39,9 +42,7 @@ struct OutlineVertexUniform {
 @group(0) @binding(0)
 var<uniform> view: View;
 
-@group(1) @binding(0)
-var<uniform> mesh: Mesh;
-
+#import bevy_pbr::mesh_bindings
 #import bevy_pbr::skinning
 #import bevy_pbr::morph
 
@@ -90,7 +91,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #ifdef SKINNED
     let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
 #else
-    let model = mesh.model;
+    let model = bevy_pbr::mesh_functions::get_model_matrix(vertex_no_morph.instance_index);
 #endif
     let clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
 #ifdef OFFSET_ZERO

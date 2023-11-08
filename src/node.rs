@@ -1,4 +1,5 @@
 use std::cmp::Reverse;
+use std::ops::Range;
 
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::prelude::*;
@@ -16,6 +17,7 @@ use bevy::render::{
     render_graph::{Node, RenderGraphContext},
     renderer::RenderContext,
 };
+use bevy::utils::nonmax::NonMaxU32;
 use bevy::utils::FloatOrd;
 
 pub(crate) struct StencilOutline {
@@ -23,6 +25,8 @@ pub(crate) struct StencilOutline {
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
     pub draw_function: DrawFunctionId,
+    pub batch_range: Range<u32>,
+    pub dynamic_offset: Option<NonMaxU32>,
 }
 
 impl PhaseItem for StencilOutline {
@@ -40,6 +44,22 @@ impl PhaseItem for StencilOutline {
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
     }
+
+    fn batch_range(&self) -> &std::ops::Range<u32> {
+        &self.batch_range
+    }
+
+    fn batch_range_mut(&mut self) -> &mut std::ops::Range<u32> {
+        &mut self.batch_range
+    }
+
+    fn dynamic_offset(&self) -> Option<bevy::utils::nonmax::NonMaxU32> {
+        self.dynamic_offset
+    }
+
+    fn dynamic_offset_mut(&mut self) -> &mut Option<bevy::utils::nonmax::NonMaxU32> {
+        &mut self.dynamic_offset
+    }
 }
 
 impl CachedRenderPipelinePhaseItem for StencilOutline {
@@ -54,6 +74,8 @@ pub(crate) struct OpaqueOutline {
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
     pub draw_function: DrawFunctionId,
+    pub batch_range: Range<u32>,
+    pub dynamic_offset: Option<NonMaxU32>,
 }
 
 impl PhaseItem for OpaqueOutline {
@@ -71,6 +93,22 @@ impl PhaseItem for OpaqueOutline {
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
     }
+
+    fn batch_range(&self) -> &Range<u32> {
+        &self.batch_range
+    }
+
+    fn batch_range_mut(&mut self) -> &mut Range<u32> {
+        &mut self.batch_range
+    }
+
+    fn dynamic_offset(&self) -> Option<NonMaxU32> {
+        self.dynamic_offset
+    }
+
+    fn dynamic_offset_mut(&mut self) -> &mut Option<NonMaxU32> {
+        &mut self.dynamic_offset
+    }
 }
 
 impl CachedRenderPipelinePhaseItem for OpaqueOutline {
@@ -85,6 +123,8 @@ pub(crate) struct TransparentOutline {
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
     pub draw_function: DrawFunctionId,
+    pub batch_range: Range<u32>,
+    pub dynamic_offset: Option<NonMaxU32>,
 }
 
 impl PhaseItem for TransparentOutline {
@@ -101,6 +141,22 @@ impl PhaseItem for TransparentOutline {
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
         self.draw_function
+    }
+
+    fn batch_range(&self) -> &Range<u32> {
+        &self.batch_range
+    }
+
+    fn batch_range_mut(&mut self) -> &mut Range<u32> {
+        &mut self.batch_range
+    }
+
+    fn dynamic_offset(&self) -> Option<NonMaxU32> {
+        self.dynamic_offset
+    }
+
+    fn dynamic_offset_mut(&mut self) -> &mut Option<NonMaxU32> {
+        &mut self.dynamic_offset
     }
 }
 

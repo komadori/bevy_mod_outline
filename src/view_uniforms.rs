@@ -6,7 +6,7 @@ use bevy::render::render_phase::{
     PhaseItem, RenderCommand, RenderCommandResult, RenderPhase, TrackedRenderPass,
 };
 use bevy::render::render_resource::ShaderType;
-use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry};
+use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::view::RenderLayers;
 use bevy::render::Extract;
@@ -49,21 +49,21 @@ pub(crate) fn extract_outline_view_uniforms(
     }
 }
 
-pub(crate) fn queue_outline_view_bind_group(
+pub(crate) fn prepare_outline_view_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
     view_uniforms: Res<ComponentUniforms<OutlineViewUniform>>,
 ) {
     if let Some(view_binding) = view_uniforms.binding() {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[BindGroupEntry {
+        let bind_group = render_device.create_bind_group(
+            "outline_view_bind_group",
+            &outline_pipeline.outline_view_bind_group_layout,
+            &[BindGroupEntry {
                 binding: 0,
                 resource: view_binding.clone(),
             }],
-            label: Some("outline_view_bind_group"),
-            layout: &outline_pipeline.outline_view_bind_group_layout,
-        });
+        );
         commands.insert_resource(OutlineViewBindGroup { bind_group });
     }
 }
