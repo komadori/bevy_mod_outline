@@ -100,7 +100,7 @@ pub(crate) fn compute_outline(
     for (entity, mut computed, components, children) in root_query.iter_mut() {
         let changed = update_computed_outline(&mut computed, components, &default(), None, false);
         if let Some(cs) = children {
-            let parent_computed = &computed.0.as_ref().unwrap().clone();
+            let parent_computed = computed.0.as_ref().unwrap();
             for child in cs.iter() {
                 propagate_computed_outline(
                     parent_computed,
