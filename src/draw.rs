@@ -1,4 +1,4 @@
-use bevy::pbr::{DrawMesh, SetMeshBindGroup, SetMeshViewBindGroup};
+use bevy::pbr::{DrawMesh, SetMeshBindGroup};
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
@@ -16,10 +16,9 @@ use crate::OutlineRenderLayers;
 
 pub(crate) type DrawStencil = (
     SetItemPipeline,
-    SetMeshViewBindGroup<0>,
+    SetOutlineViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    SetOutlineViewBindGroup<2>,
-    SetOutlineStencilBindGroup<3>,
+    SetOutlineStencilBindGroup<2>,
     DrawMesh,
 );
 
@@ -87,10 +86,9 @@ pub(crate) fn queue_outline_stencil_mesh(
 
 pub(crate) type DrawOutline = (
     SetItemPipeline,
-    SetMeshViewBindGroup<0>,
+    SetOutlineViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    SetOutlineViewBindGroup<2>,
-    SetOutlineVolumeBindGroup<3>,
+    SetOutlineVolumeBindGroup<2>,
     DrawMesh,
 );
 

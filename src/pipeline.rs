@@ -4,8 +4,7 @@ use bevy::ecs::query::QueryItem;
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
-    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshPipelineViewLayoutKey,
-    MeshTransforms, MeshUniform,
+    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshTransforms, MeshUniform,
 };
 use bevy::prelude::*;
 use bevy::render::batching::GetBatchData;
@@ -13,13 +12,13 @@ use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
     BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PolygonMode,
-    PrimitiveState, PrimitiveTopology, ShaderDefVal, ShaderSize, ShaderStages, StencilState,
-    TextureFormat, VertexState,
+    PrimitiveState, PrimitiveTopology, ShaderDefVal, ShaderSize, ShaderStages, ShaderType,
+    StencilState, TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
 use bevy::render::texture::BevyDefault;
-use bevy::render::view::ViewTarget;
+use bevy::render::view::{ViewTarget, ViewUniform};
 use bevy::{
     pbr::MeshPipeline,
     render::{
@@ -172,16 +171,28 @@ impl FromWorld for OutlinePipeline {
         let outline_view_bind_group_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("outline_view_bind_group_layout"),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: BufferSize::new(OutlineViewUniform::SHADER_SIZE.get()),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::VERTEX,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: true,
+                            min_binding_size: Some(ViewUniform::min_size()),
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::VERTEX,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: true,
+                            min_binding_size: Some(OutlineViewUniform::min_size()),
+                        },
+                        count: None,
+                    },
+                ],
             });
         let outline_volume_bind_group_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -254,14 +265,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
 
-        let mut bind_layouts = vec![self
-            .mesh_pipeline
-            .get_view_layout(if key.msaa() == Msaa::Off {
-                MeshPipelineViewLayoutKey::empty()
-            } else {
-                MeshPipelineViewLayoutKey::MULTISAMPLED
-            })
-            .clone()];
+        let mut bind_layouts = vec![self.outline_view_bind_group_layout.clone()];
 
         bind_layouts.push(setup_morph_and_skinning_defs(
             &self.mesh_pipeline.mesh_layouts,
@@ -272,7 +276,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             &mut buffer_attrs,
         ));
 
-        bind_layouts.push(self.outline_view_bind_group_layout.clone());
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
             let val = ShaderDefVal::from("FLAT_DEPTH");

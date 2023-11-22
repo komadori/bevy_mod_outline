@@ -1,3 +1,4 @@
+use bevy::ecs::query::ROQueryItem;
 use bevy::ecs::system::lifetimeless::{Read, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::prelude::*;
@@ -8,7 +9,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
-use bevy::render::view::RenderLayers;
+use bevy::render::view::{RenderLayers, ViewUniformOffset, ViewUniforms};
 use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
@@ -53,16 +54,26 @@ pub(crate) fn prepare_outline_view_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
-    view_uniforms: Res<ComponentUniforms<OutlineViewUniform>>,
+    core_view_uniforms: Res<ViewUniforms>,
+    outline_view_uniforms: Res<ComponentUniforms<OutlineViewUniform>>,
 ) {
-    if let Some(view_binding) = view_uniforms.binding() {
+    if let (Some(core_view_binding), Some(outline_view_binding)) = (
+        core_view_uniforms.uniforms.binding(),
+        outline_view_uniforms.binding(),
+    ) {
         let bind_group = render_device.create_bind_group(
             "outline_view_bind_group",
             &outline_pipeline.outline_view_bind_group_layout,
-            &[BindGroupEntry {
-                binding: 0,
-                resource: view_binding.clone(),
-            }],
+            &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: core_view_binding.clone(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: outline_view_binding.clone(),
+                },
+            ],
         );
         commands.insert_resource(OutlineViewBindGroup { bind_group });
     }
@@ -71,17 +82,24 @@ pub(crate) fn prepare_outline_view_bind_group(
 pub(crate) struct SetOutlineViewBindGroup<const I: usize>();
 
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<I> {
-    type ViewWorldQuery = Read<DynamicUniformIndex<OutlineViewUniform>>;
+    type ViewWorldQuery = (
+        Read<ViewUniformOffset>,
+        Read<DynamicUniformIndex<OutlineViewUniform>>,
+    );
     type ItemWorldQuery = ();
     type Param = SRes<OutlineViewBindGroup>;
     fn render<'w>(
         _item: &P,
-        view_data: &DynamicUniformIndex<OutlineViewUniform>,
+        (core_view_data, outline_view_data): ROQueryItem<'w, Self::ViewWorldQuery>,
         _entity_data: (),
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        pass.set_bind_group(I, &bind_group.into_inner().bind_group, &[view_data.index()]);
+        pass.set_bind_group(
+            I,
+            &bind_group.into_inner().bind_group,
+            &[core_view_data.offset, outline_view_data.index()],
+        );
         RenderCommandResult::Success
     }
 }

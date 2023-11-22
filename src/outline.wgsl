@@ -42,14 +42,14 @@ struct OutlineVertexUniform {
 @group(0) @binding(0)
 var<uniform> view: View;
 
+@group(0) @binding(1)
+var<uniform> view_uniform: OutlineViewUniform;
+
 #import bevy_pbr::mesh_bindings
 #import bevy_pbr::skinning
 #import bevy_pbr::morph
 
 @group(2) @binding(0)
-var<uniform> view_uniform: OutlineViewUniform;
-
-@group(3) @binding(0)
 var<uniform> vstage: OutlineVertexUniform;
 
 #ifdef MORPH_TARGETS
