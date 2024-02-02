@@ -241,7 +241,9 @@ impl Plugin for OutlinePlugin {
         .add_systems(
             PostUpdate,
             (
-                compute_outline.after(TransformSystem::TransformPropagate),
+                compute_outline
+                    .after(TransformSystem::TransformPropagate)
+                    .after(VisibilitySystems::VisibilityPropagate),
                 set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
             ),
         )

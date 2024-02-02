@@ -77,6 +77,7 @@ pub(crate) struct ComputedInternal {
 pub struct ComputedOutline(pub(crate) Option<ComputedInternal>);
 
 type OutlineComponents<'a> = (
+    (&'a InheritedVisibility, Changed<InheritedVisibility>),
     (&'a GlobalTransform, Changed<GlobalTransform>),
     Option<(&'a OutlineVolume, Changed<OutlineVolume>)>,
     Option<(&'a OutlineStencil, Changed<OutlineStencil>)>,
@@ -149,7 +150,7 @@ fn propagate_computed_outline(
 
 fn update_computed_outline(
     computed: &mut ComputedOutline,
-    ((transform, changed_transform), volume, stencil, mode): QueryItem<'_, OutlineComponents>,
+    ((visibility, changed_visibility), (transform, changed_transform), volume, stencil, mode): QueryItem<'_, OutlineComponents>,
     parent_computed: &ComputedInternal,
     parent_entity: Option<Entity>,
     force_update: bool,
@@ -157,6 +158,7 @@ fn update_computed_outline(
     let changed = force_update
         || if let ComputedOutline(Some(computed)) = computed {
             computed.inherited_from != parent_entity
+                || changed_visibility
                 || (changed_transform && matches!(mode, Some((OutlineMode::FlatVertex { .. }, _))))
                 || computed.volume.is_changed(volume)
                 || computed.stencil.is_changed(stencil)
@@ -169,7 +171,7 @@ fn update_computed_outline(
             inherited_from: parent_entity,
             volume: if let Some((vol, _)) = volume {
                 Sourced::set(ComputedVolume {
-                    enabled: vol.visible && vol.colour.a() != 0.0,
+                    enabled: visibility.get() && vol.visible && vol.colour.a() != 0.0,
                     offset: vol.width,
                     colour: vol.colour.into(),
                 })
@@ -178,7 +180,7 @@ fn update_computed_outline(
             },
             stencil: if let Some((sten, _)) = stencil {
                 Sourced::set(ComputedStencil {
-                    enabled: sten.enabled,
+                    enabled: visibility.get() && sten.enabled,
                     offset: sten.offset,
                 })
             } else {
