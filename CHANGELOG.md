@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.6.1 (2024-02-04)
+
+### Fixed
+- Fixed panic if prepasses are enabled.
+- Fixed Visibility::Hidden did not affect outlines.
+
 ## bevy_mod_outline 0.6.0 (2023-11-08)
 
 ### Changed
