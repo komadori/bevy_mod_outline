@@ -22,6 +22,7 @@ bevy = { version = "0.12", default-features = false, features = [
 ] }
 bitfield = "0.14"
 interpolation = "0.2"
+interpolation_03 = { package = "interpolation", version = "0.3", optional = true }
 thiserror = "1.0"
 wgpu-types = "0.17"
 
