@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.6.2 (2024-02-10)
+
+### Added
+- Added interpolation_03 feature.
+
 ## bevy_mod_outline 0.6.1 (2024-02-04)
 
 ### Fixed
