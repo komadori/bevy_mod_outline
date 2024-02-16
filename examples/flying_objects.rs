@@ -1,9 +1,6 @@
 use std::{f32::consts::TAU, num::Wrapping, time::Duration};
 
-use bevy::{
-    prelude::{shape::Capsule, *},
-    window::close_on_esc,
-};
+use bevy::{prelude::*, window::close_on_esc};
 
 use bevy_mod_outline::*;
 
@@ -36,14 +33,14 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.insert_resource(MyAssets {
-        mesh: meshes.add(Mesh::from(Capsule {
-            radius: 1.0,
-            rings: 10,
-            depth: 2.0,
-            latitudes: 15,
-            longitudes: 15,
-            ..default()
-        })),
+        mesh: meshes.add(
+            Capsule3d::new(1.0, 2.0)
+                .mesh()
+                .rings(10)
+                .latitudes(15)
+                .longitudes(15)
+                .build(),
+        ),
         material: materials.add(StandardMaterial::from(Color::BEIGE)),
     });
 

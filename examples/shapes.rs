@@ -1,12 +1,6 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::{
-    prelude::{
-        shape::{Cube, Plane, Torus},
-        *,
-    },
-    window::close_on_esc,
-};
+use bevy::{prelude::*, window::close_on_esc};
 
 use bevy_mod_outline::*;
 
@@ -33,7 +27,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Add cube with generated outline normals
-    let mut cube_mesh = Mesh::from(Cube { size: 1.0 });
+    let mut cube_mesh = Cuboid::new(1.0, 1.0, 1.0).mesh();
     cube_mesh.generate_outline_normals().unwrap();
     commands
         .spawn(PbrBundle {
@@ -55,12 +49,16 @@ fn setup(
     // Add torus using the regular surface normals for outlining
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Torus {
-                radius: 0.3,
-                ring_radius: 0.1,
-                subdivisions_segments: 20,
-                subdivisions_sides: 10,
-            })),
+            mesh: meshes.add(
+                Torus {
+                    minor_radius: 0.1,
+                    major_radius: 0.3,
+                }
+                .mesh()
+                .minor_resolution(10)
+                .major_resolution(20)
+                .build(),
+            ),
             material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
             transform: Transform::from_xyz(0.0, 1.2, 2.0)
                 .with_rotation(Quat::from_rotation_x(0.5 * PI)),
@@ -78,16 +76,12 @@ fn setup(
 
     // Add plane, light source, and camera
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(Plane {
-            size: 5.0,
-            subdivisions: 0,
-        })),
+        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
         material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.0,
             shadows_enabled: true,
             ..default()
         },

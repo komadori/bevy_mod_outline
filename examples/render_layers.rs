@@ -1,10 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    prelude::{
-        shape::{Plane, Torus},
-        *,
-    },
+    prelude::*,
     render::{camera::Viewport, view::RenderLayers},
     window::{close_on_esc, PrimaryWindow},
 };
@@ -38,12 +35,16 @@ fn setup(
     // Add torus using the regular surface normals for outlining
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Torus {
-                radius: 0.6,
-                ring_radius: 0.2,
-                subdivisions_segments: 40,
-                subdivisions_sides: 20,
-            })),
+            mesh: meshes.add(
+                Torus {
+                    minor_radius: 0.2,
+                    major_radius: 0.6,
+                }
+                .mesh()
+                .minor_resolution(20)
+                .major_resolution(40)
+                .build(),
+            ),
             material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
             transform: Transform::from_rotation(Quat::from_rotation_x(0.5 * PI))
                 .with_translation(0.8 * Vec3::Y),
@@ -62,16 +63,12 @@ fn setup(
 
     // Add plane and light source
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(Plane {
-            size: 5.0,
-            subdivisions: 0,
-        })),
+        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
         material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.0,
             shadows_enabled: true,
             ..default()
         },
