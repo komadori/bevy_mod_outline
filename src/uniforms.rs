@@ -149,20 +149,23 @@ pub(crate) fn prepare_outline_volume_bind_group(
 pub(crate) struct SetOutlineStencilBindGroup<const I: usize>();
 
 impl<const I: usize> RenderCommand<StencilOutline> for SetOutlineStencilBindGroup<I> {
-    type ViewWorldQuery = ();
-    type ItemWorldQuery = Read<DynamicUniformIndex<OutlineStencilUniform>>;
+    type ViewQuery = ();
+    type ItemQuery = Read<DynamicUniformIndex<OutlineStencilUniform>>;
     type Param = SRes<OutlineStencilBindGroup>;
     fn render<'w>(
         _item: &StencilOutline,
         _view_data: (),
-        entity_data: &DynamicUniformIndex<OutlineStencilUniform>,
+        entity_data: Option<&DynamicUniformIndex<OutlineStencilUniform>>,
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
+        let Some(dyn_uniform) = entity_data else {
+            return RenderCommandResult::Failure;
+        };
         pass.set_bind_group(
             I,
             &bind_group.into_inner().bind_group,
-            &[entity_data.index()],
+            &[dyn_uniform.index()],
         );
         RenderCommandResult::Success
     }
@@ -171,8 +174,8 @@ impl<const I: usize> RenderCommand<StencilOutline> for SetOutlineStencilBindGrou
 pub(crate) struct SetOutlineVolumeBindGroup<const I: usize>();
 
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineVolumeBindGroup<I> {
-    type ViewWorldQuery = ();
-    type ItemWorldQuery = (
+    type ViewQuery = ();
+    type ItemQuery = (
         Read<DynamicUniformIndex<OutlineVolumeUniform>>,
         Read<DynamicUniformIndex<OutlineFragmentUniform>>,
     );
@@ -180,14 +183,16 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineVolumeBindGrou
     fn render<'w>(
         _item: &P,
         _view_data: (),
-        entity_data: (
+        entity_data: Option<(
             &DynamicUniformIndex<OutlineVolumeUniform>,
             &DynamicUniformIndex<OutlineFragmentUniform>,
-        ),
+        )>,
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let (vertex, fragment) = entity_data;
+        let Some((vertex, fragment)) = entity_data else {
+            return RenderCommandResult::Failure;
+        };
         pass.set_bind_group(
             I,
             &bind_group.into_inner().bind_group,

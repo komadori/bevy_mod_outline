@@ -38,7 +38,7 @@ fn setup(
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(cube_mesh),
-            material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+            material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
         })
@@ -61,7 +61,7 @@ fn setup(
                 subdivisions_segments: 20,
                 subdivisions_sides: 10,
             })),
-            material: materials.add(Color::rgb(0.9, 0.1, 0.1).into()),
+            material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
             transform: Transform::from_xyz(0.0, 1.2, 2.0)
                 .with_rotation(Quat::from_rotation_x(0.5 * PI)),
             ..default()
@@ -82,7 +82,7 @@ fn setup(
             size: 5.0,
             subdivisions: 0,
         })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {

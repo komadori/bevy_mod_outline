@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use bevy::ecs::query::QueryItem;
-use bevy::ecs::system::lifetimeless::Read;
+use bevy::ecs::system::lifetimeless::SQuery;
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
     setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshTransforms, MeshUniform,
@@ -9,11 +8,10 @@ use bevy::pbr::{
 use bevy::prelude::*;
 use bevy::render::batching::GetBatchData;
 use bevy::render::render_resource::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
-    BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PolygonMode,
-    PrimitiveState, PrimitiveTopology, ShaderDefVal, ShaderSize, ShaderStages, ShaderType,
-    StencilState, TextureFormat, VertexState,
+    BindGroupLayout, BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType, BufferSize,
+    ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
+    FragmentState, FrontFace, MultisampleState, PolygonMode, PrimitiveState, PrimitiveTopology,
+    ShaderDefVal, ShaderSize, ShaderStages, ShaderType, StencilState, TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
@@ -168,76 +166,71 @@ impl FromWorld for OutlinePipeline {
         let world = world.cell();
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let outline_view_bind_group_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("outline_view_bind_group_layout"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::VERTEX,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: true,
-                            min_binding_size: Some(ViewUniform::min_size()),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::VERTEX,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: true,
-                            min_binding_size: Some(OutlineViewUniform::min_size()),
-                        },
-                        count: None,
-                    },
-                ],
-            });
-        let outline_volume_bind_group_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("outline_volume_bind_group_layout"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::VERTEX,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: true,
-                            min_binding_size: BufferSize::new(
-                                OutlineVolumeUniform::SHADER_SIZE.get(),
-                            ),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: true,
-                            min_binding_size: BufferSize::new(
-                                OutlineFragmentUniform::SHADER_SIZE.get(),
-                            ),
-                        },
-                        count: None,
-                    },
-                ],
-            });
-        let outline_stencil_bind_group_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("outline_stencil_bind_group_layout"),
-                entries: &[BindGroupLayoutEntry {
+        let outline_view_bind_group_layout = render_device.create_bind_group_layout(
+            "outline_view_bind_group_layout",
+            &[
+                BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::VERTEX,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: true,
-                        min_binding_size: BufferSize::new(OutlineStencilUniform::SHADER_SIZE.get()),
+                        min_binding_size: Some(ViewUniform::min_size()),
                     },
                     count: None,
-                }],
-            });
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: Some(OutlineViewUniform::min_size()),
+                    },
+                    count: None,
+                },
+            ],
+        );
+        let outline_volume_bind_group_layout = render_device.create_bind_group_layout(
+            "outline_volume_bind_group_layout",
+            &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: BufferSize::new(OutlineVolumeUniform::SHADER_SIZE.get()),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: BufferSize::new(
+                            OutlineFragmentUniform::SHADER_SIZE.get(),
+                        ),
+                    },
+                    count: None,
+                },
+            ],
+        );
+        let outline_stencil_bind_group_layout = render_device.create_bind_group_layout(
+            "outline_stencil_bind_group_layout",
+            &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: BufferSize::new(OutlineStencilUniform::SHADER_SIZE.get()),
+                },
+                count: None,
+            }],
+        );
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,
@@ -373,21 +366,20 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = ();
-    type Query = Read<ExtractedOutline>;
-    type QueryFilter = ();
+    type Param = SQuery<&'static ExtractedOutline>;
     type CompareData = ();
     type BufferData = MeshUniform;
 
     fn get_batch_data(
-        _: &SystemParamItem<Self::Param>,
-        outline: &QueryItem<Self::Query>,
-    ) -> (Self::BufferData, Option<Self::CompareData>) {
+        param: &SystemParamItem<Self::Param>,
+        entity: Entity,
+    ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
+        let outline = param.get(entity).unwrap();
         let ts = MeshTransforms {
             transform: (&outline.transform).into(),
             previous_transform: (&outline.transform).into(),
             flags: MeshFlags::NONE.bits(),
         };
-        ((&ts).into(), None)
+        Some((MeshUniform::new(&ts, None), None))
     }
 }

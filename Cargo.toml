@@ -11,7 +11,7 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.12", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "4ebc560dfb0fee5d3728d1d8f7362f484b784e4c", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "bevy_pbr",
@@ -24,10 +24,10 @@ bitfield = "0.14"
 interpolation = "0.2"
 interpolation_03 = { package = "interpolation", version = "0.3", optional = true }
 thiserror = "1.0"
-wgpu-types = "0.17"
+wgpu-types = "0.19"
 
 [dev-dependencies]
-bevy = { version = "0.12", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "4ebc560dfb0fee5d3728d1d8f7362f484b784e4c", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",

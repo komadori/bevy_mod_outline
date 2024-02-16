@@ -1,7 +1,6 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
     prelude::{
         shape::{Plane, Torus},
         *,
@@ -45,7 +44,7 @@ fn setup(
                 subdivisions_segments: 40,
                 subdivisions_sides: 20,
             })),
-            material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+            material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
             transform: Transform::from_rotation(Quat::from_rotation_x(0.5 * PI))
                 .with_translation(0.8 * Vec3::Y),
             ..default()
@@ -67,7 +66,7 @@ fn setup(
             size: 5.0,
             subdivisions: 0,
         })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {
@@ -95,9 +94,6 @@ fn setup(
             .spawn(Camera3dBundle {
                 camera: Camera {
                     order: i,
-                    ..default()
-                },
-                camera_3d: Camera3d {
                     clear_color: if i > 0 {
                         ClearColorConfig::None
                     } else {
@@ -105,6 +101,7 @@ fn setup(
                     },
                     ..default()
                 },
+                camera_3d: Camera3d { ..default() },
                 transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
                 ..default()
             })
@@ -117,11 +114,11 @@ fn setup(
 }
 
 fn set_camera_viewports(
-    win_query: Query<(&Window, Changed<Window>), With<PrimaryWindow>>,
+    win_query: Query<Ref<Window>, With<PrimaryWindow>>,
     mut query: Query<(&mut Camera, &CameraMode)>,
 ) {
-    let (win, win_changed) = win_query.get_single().unwrap();
-    if win_changed {
+    let win = win_query.get_single().unwrap();
+    if win.is_changed() {
         // Divide window into quadrants
         let size = UVec2::new(win.physical_width() / 2, win.physical_height() / 2);
         for (mut camera, mode) in query.iter_mut() {

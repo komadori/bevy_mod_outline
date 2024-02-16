@@ -51,7 +51,7 @@ fn setup(
             size: 500000.0,
             subdivisions: 0,
         })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
 

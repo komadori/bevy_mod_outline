@@ -36,18 +36,15 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.insert_resource(MyAssets {
-        mesh: meshes.add(
-            Capsule {
-                radius: 1.0,
-                rings: 10,
-                depth: 2.0,
-                latitudes: 15,
-                longitudes: 15,
-                ..default()
-            }
-            .into(),
-        ),
-        material: materials.add(Color::BEIGE.into()),
+        mesh: meshes.add(Mesh::from(Capsule {
+            radius: 1.0,
+            rings: 10,
+            depth: 2.0,
+            latitudes: 15,
+            longitudes: 15,
+            ..default()
+        })),
+        material: materials.add(StandardMaterial::from(Color::BEIGE)),
     });
 
     // Add light source and camera

@@ -10,7 +10,7 @@ use bevy::render::render_phase::{
 };
 use bevy::render::render_resource::{
     CachedRenderPipelineId, LoadOp, Operations, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor,
+    RenderPassDescriptor, StoreOp,
 };
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
 use bevy::render::{
@@ -217,13 +217,15 @@ impl Node for OutlineNode {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view,
+                    view: &depth.view(),
                     depth_ops: Some(Operations {
                         load: camera_3d.depth_load_op.clone().into(),
-                        store: true,
+                        store: StoreOp::Store,
                     }),
                     stencil_ops: None,
                 }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
             };
             let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {
@@ -235,18 +237,17 @@ impl Node for OutlineNode {
         if !opaque_phase.items.is_empty() {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_opaque_pass"),
-                color_attachments: &[Some(target.get_color_attachment(Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                }))],
+                color_attachments: &[Some(target.get_color_attachment())],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view,
+                    view: &depth.view(),
                     depth_ops: Some(Operations {
                         load: LoadOp::Load,
-                        store: true,
+                        store: StoreOp::Store,
                     }),
                     stencil_ops: None,
                 }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
             };
             let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {
@@ -258,18 +259,17 @@ impl Node for OutlineNode {
         if !transparent_phase.items.is_empty() {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_transparent_pass"),
-                color_attachments: &[Some(target.get_color_attachment(Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                }))],
+                color_attachments: &[Some(target.get_color_attachment())],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view,
+                    view: &depth.view(),
                     depth_ops: Some(Operations {
                         load: LoadOp::Load,
-                        store: true,
+                        store: StoreOp::Store,
                     }),
                     stencil_ops: None,
                 }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
             };
             let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
             if let Some(viewport) = camera.viewport.as_ref() {

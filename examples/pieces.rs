@@ -32,15 +32,12 @@ fn setup(
     // Add sphere with child meshes sticking out of it
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(
-                UVSphere {
-                    radius: 0.75,
-                    sectors: 30,
-                    stacks: 30,
-                }
-                .into(),
-            ),
-            material: materials.add(Color::rgb(0.9, 0.1, 0.1).into()),
+            mesh: meshes.add(Mesh::from(UVSphere {
+                radius: 0.75,
+                sectors: 30,
+                stacks: 30,
+            })),
+            material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
             transform: Transform::from_translation(Vec3::new(0.0, 1.0, 0.0)),
             ..default()
         })
@@ -60,18 +57,15 @@ fn setup(
         .with_children(|parent| {
             parent
                 .spawn(PbrBundle {
-                    mesh: meshes.add(
-                        Capsule {
-                            radius: 0.2,
-                            rings: 15,
-                            depth: 1.0,
-                            latitudes: 15,
-                            longitudes: 15,
-                            ..Default::default()
-                        }
-                        .into(),
-                    ),
-                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    mesh: meshes.add(Mesh::from(Capsule {
+                        radius: 0.2,
+                        rings: 15,
+                        depth: 1.0,
+                        latitudes: 15,
+                        longitudes: 15,
+                        ..Default::default()
+                    })),
+                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::X, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, 0.75)),
                     ..default()
@@ -79,16 +73,13 @@ fn setup(
                 .insert(InheritOutlineBundle::default());
             parent
                 .spawn(PbrBundle {
-                    mesh: meshes.add(
-                        Torus {
-                            radius: 0.5,
-                            ring_radius: 0.1,
-                            subdivisions_segments: 30,
-                            subdivisions_sides: 15,
-                        }
-                        .into(),
-                    ),
-                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    mesh: meshes.add(Mesh::from(Torus {
+                        radius: 0.5,
+                        ring_radius: 0.1,
+                        subdivisions_segments: 30,
+                        subdivisions_sides: 15,
+                    })),
+                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, -0.75)),
                     ..default()
@@ -102,7 +93,7 @@ fn setup(
             size: 5.0,
             subdivisions: 0,
         })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {

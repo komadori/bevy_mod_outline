@@ -82,16 +82,16 @@ pub(crate) fn prepare_outline_view_bind_group(
 pub(crate) struct SetOutlineViewBindGroup<const I: usize>();
 
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<I> {
-    type ViewWorldQuery = (
+    type ViewQuery = (
         Read<ViewUniformOffset>,
         Read<DynamicUniformIndex<OutlineViewUniform>>,
     );
-    type ItemWorldQuery = ();
+    type ItemQuery = ();
     type Param = SRes<OutlineViewBindGroup>;
     fn render<'w>(
         _item: &P,
-        (core_view_data, outline_view_data): ROQueryItem<'w, Self::ViewWorldQuery>,
-        _entity_data: (),
+        (core_view_data, outline_view_data): ROQueryItem<'w, Self::ViewQuery>,
+        _entity_data: Option<()>,
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
