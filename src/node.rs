@@ -217,7 +217,7 @@ impl Node for OutlineNode {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view(),
+                    view: depth.view(),
                     depth_ops: Some(Operations {
                         load: camera_3d.depth_load_op.clone().into(),
                         store: StoreOp::Store,
@@ -239,7 +239,7 @@ impl Node for OutlineNode {
                 label: Some("outline_opaque_pass"),
                 color_attachments: &[Some(target.get_color_attachment())],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view(),
+                    view: depth.view(),
                     depth_ops: Some(Operations {
                         load: LoadOp::Load,
                         store: StoreOp::Store,
@@ -261,7 +261,7 @@ impl Node for OutlineNode {
                 label: Some("outline_transparent_pass"),
                 color_attachments: &[Some(target.get_color_attachment())],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view(),
+                    view: depth.view(),
                     depth_ops: Some(Operations {
                         load: LoadOp::Load,
                         store: StoreOp::Store,
