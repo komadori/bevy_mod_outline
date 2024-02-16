@@ -11,7 +11,7 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "4ebc560dfb0fee5d3728d1d8f7362f484b784e4c", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f83de49b7a9e2c6c3ac4e94b44bcc02806aa8e90", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "bevy_pbr",
@@ -27,7 +27,7 @@ thiserror = "1.0"
 wgpu-types = "0.19"
 
 [dev-dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "4ebc560dfb0fee5d3728d1d8f7362f484b784e4c", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f83de49b7a9e2c6c3ac4e94b44bcc02806aa8e90", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",

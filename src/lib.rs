@@ -23,7 +23,7 @@
 //! [`AutoGenerateOutlineNormalsPlugin`].
 
 use bevy::asset::load_internal_asset;
-use bevy::core_pipeline::core_3d::graph::{Labels3d, SubGraph3d};
+use bevy::core_pipeline::core_3d::graph::{Node3d, Core3d};
 use bevy::prelude::*;
 use bevy::render::batching::{batch_and_prepare_render_phase, write_batched_instance_buffer};
 use bevy::render::extract_component::{
@@ -36,7 +36,7 @@ use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use bevy::ui::graph::LabelsUi;
+use bevy::ui::graph::NodeUi;
 use interpolation::Lerp;
 
 use crate::draw::{
@@ -324,13 +324,13 @@ impl Plugin for OutlinePlugin {
 
         let mut graph = world.resource_mut::<RenderGraph>();
 
-        let draw_3d_graph = graph.get_sub_graph_mut(SubGraph3d).unwrap();
+        let draw_3d_graph = graph.get_sub_graph_mut(Core3d).unwrap();
         draw_3d_graph.add_node(LabelsOutline::OutlinePass, node);
 
         // Run after main 3D pass, but before UI psss
-        draw_3d_graph.add_node_edge(Labels3d::EndMainPass, LabelsOutline::OutlinePass);
+        draw_3d_graph.add_node_edge(Node3d::EndMainPass, LabelsOutline::OutlinePass);
         #[cfg(feature = "bevy_ui")]
-        draw_3d_graph.add_node_edge(LabelsOutline::OutlinePass, LabelsUi::UiPass);
+        draw_3d_graph.add_node_edge(LabelsOutline::OutlinePass, NodeUi::UiPass);
     }
 
     fn finish(&self, app: &mut App) {
