@@ -70,12 +70,10 @@ pub use generate::*;
 pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
     MeshVertexAttribute::new("Outline_Normal", 1585570526, VertexFormat::Float32x3);
 
-/// Name of the render graph node which draws the outlines.
-///
-/// This node runs after the main 3D passes and before the UI pass. The name can be used to
-/// add additional constraints on node execution order with respect to other passes.
+/// Labels for render graph nodes which draw outlines.
 #[derive(Copy, Clone, Debug, RenderLabel, Hash, PartialEq, Eq)]
-pub enum LabelsOutline {
+pub enum NodeOutline {
+    /// This node runs after the main 3D passes and before the UI pass.
     OutlinePass,
 }
 
@@ -307,12 +305,12 @@ impl Plugin for OutlinePlugin {
         let mut graph = world.resource_mut::<RenderGraph>();
 
         let draw_3d_graph = graph.get_sub_graph_mut(Core3d).unwrap();
-        draw_3d_graph.add_node(LabelsOutline::OutlinePass, node);
+        draw_3d_graph.add_node(NodeOutline::OutlinePass, node);
 
         // Run after main 3D pass, but before UI psss
-        draw_3d_graph.add_node_edge(Node3d::EndMainPass, LabelsOutline::OutlinePass);
+        draw_3d_graph.add_node_edge(Node3d::EndMainPass, NodeOutline::OutlinePass);
         #[cfg(feature = "bevy_ui")]
-        draw_3d_graph.add_node_edge(LabelsOutline::OutlinePass, NodeUi::UiPass);
+        draw_3d_graph.add_node_edge(NodeOutline::OutlinePass, NodeUi::UiPass);
     }
 
     fn finish(&self, app: &mut App) {
