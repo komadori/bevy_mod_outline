@@ -12,7 +12,7 @@ vertex extrusion method.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.6"
+bevy_mod_outline = "0.7"
 ```
 
 ## Examples
@@ -66,6 +66,7 @@ cargo run --example morph_targets
 
 | This Version | Bevy version |
 |--------------|--------------|
+| 0.7.x        | 0.13.x       |
 | 0.6.x        | 0.12.x       |
 | 0.5.x        | 0.11.x       |
 | 0.4.x        | 0.10.x       |
