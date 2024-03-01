@@ -79,9 +79,6 @@ cargo run --example morph_targets
 - `bevy_ui` _(default)_ - Adds a render graph edge to prevent clashing with the
 UI. This adds a dependency on the `bevy_ui` crate and can be disabled if it is
 not used.
-- `interpolation_03` - Define `Lerp` trait impls using version 0.3 of the
-`interpolation` crate in addition to 0.2. This will become the default in the
-next breaking release.
 
 ## Licence
 

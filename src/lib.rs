@@ -118,15 +118,6 @@ impl Lerp for OutlineStencil {
     }
 }
 
-#[cfg(feature = "interpolation_03")]
-impl interpolation_03::Lerp for OutlineStencil {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-        <Self as Lerp>::lerp(self, other, scalar)
-    }
-}
-
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Default)]
 pub struct OutlineVolume {
@@ -153,15 +144,6 @@ impl Lerp for OutlineVolume {
                 Color::rgba_linear(r, g, b, a)
             },
         }
-    }
-}
-
-#[cfg(feature = "interpolation_03")]
-impl interpolation_03::Lerp for OutlineVolume {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-        <Self as Lerp>::lerp(self, other, scalar)
     }
 }
 
