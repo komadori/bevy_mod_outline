@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use bevy::ecs::system::lifetimeless::SQuery;
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
-    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshTransforms, MeshUniform,
+    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshPipelineViewLayoutKey,
+    MeshTransforms, MeshUniform,
 };
 use bevy::prelude::*;
 use bevy::render::batching::GetBatchData;
@@ -16,7 +17,7 @@ use bevy::render::render_resource::{
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
 use bevy::render::texture::BevyDefault;
-use bevy::render::view::{ViewTarget, ViewUniform};
+use bevy::render::view::ViewTarget;
 use bevy::{
     pbr::MeshPipeline,
     render::{
@@ -63,6 +64,7 @@ impl PipelineKey {
         pub offset_zero, set_offset_zero: 13;
         pub hdr_format, set_hdr_format: 14;
         pub morph_targets, set_morph_targets: 15;
+        view_key_int, set_view_key_int: 23, 16;
     }
 
     pub(crate) fn new() -> Self {
@@ -141,6 +143,15 @@ impl PipelineKey {
         self.set_morph_targets(morph_targets);
         self
     }
+
+    pub(crate) fn with_view_key(mut self, view_key: MeshPipelineViewLayoutKey) -> Self {
+        self.set_view_key_int(view_key.bits());
+        self
+    }
+
+    pub(crate) fn view_key(&self) -> MeshPipelineViewLayoutKey {
+        MeshPipelineViewLayoutKey::from_bits(self.view_key_int()).unwrap()
+    }
 }
 
 impl From<PipelineKey> for MeshPipelineKey {
@@ -168,28 +179,16 @@ impl FromWorld for OutlinePipeline {
         let render_device = world.get_resource::<RenderDevice>().unwrap();
         let outline_view_bind_group_layout = render_device.create_bind_group_layout(
             "outline_view_bind_group_layout",
-            &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: Some(ViewUniform::min_size()),
-                    },
-                    count: None,
+            &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: Some(OutlineViewUniform::min_size()),
                 },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: Some(OutlineViewUniform::min_size()),
-                    },
-                    count: None,
-                },
-            ],
+                count: None,
+            }],
         );
         let outline_volume_bind_group_layout = render_device.create_bind_group_layout(
             "outline_volume_bind_group_layout",
@@ -258,16 +257,18 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
 
-        let mut bind_layouts = vec![self.outline_view_bind_group_layout.clone()];
-
-        bind_layouts.push(setup_morph_and_skinning_defs(
-            &self.mesh_pipeline.mesh_layouts,
-            layout,
-            5,
-            &key.into(),
-            &mut vertex_defs,
-            &mut buffer_attrs,
-        ));
+        let mut bind_layouts = vec![
+            self.mesh_pipeline.get_view_layout(key.view_key()).clone(),
+            setup_morph_and_skinning_defs(
+                &self.mesh_pipeline.mesh_layouts,
+                layout,
+                5,
+                &key.into(),
+                &mut vertex_defs,
+                &mut buffer_attrs,
+            ),
+            self.outline_view_bind_group_layout.clone(),
+        ];
 
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
