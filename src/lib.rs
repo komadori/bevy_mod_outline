@@ -309,7 +309,7 @@ impl Plugin for OutlinePlugin {
 
         // Run after main 3D pass, but before UI psss
         draw_3d_graph.add_node_edge(Node3d::EndMainPass, NodeOutline::OutlinePass);
-        if let Ok(_) = draw_3d_graph.get_node_state(Node3d::Taa) {
+        if draw_3d_graph.get_node_state(Node3d::Taa).is_ok() {
             draw_3d_graph.add_node_edge(Node3d::Taa, NodeOutline::OutlinePass);
         }
         #[cfg(feature = "bevy_ui")]
