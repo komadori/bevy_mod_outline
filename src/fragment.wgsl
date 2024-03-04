@@ -11,7 +11,7 @@ struct OutlineFragmentUniform {
 };
 
 #ifdef VOLUME
-@group(2) @binding(1)
+@group(3) @binding(1)
 var<uniform> fstage: OutlineFragmentUniform;
 #endif
 

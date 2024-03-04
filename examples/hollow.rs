@@ -13,10 +13,7 @@ fn main() {
             ),
         )
         .add_plugins(OutlinePlugin)
-        .insert_resource(AmbientLight {
-            color: Color::WHITE,
-            brightness: 1.0,
-        })
+        .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(
             Update,

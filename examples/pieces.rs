@@ -1,12 +1,6 @@
 use std::f32::consts::TAU;
 
-use bevy::{
-    prelude::{
-        shape::{Capsule, Plane, Torus, UVSphere},
-        *,
-    },
-    window::close_on_esc,
-};
+use bevy::{prelude::*, window::close_on_esc};
 
 use bevy_mod_outline::*;
 
@@ -32,15 +26,8 @@ fn setup(
     // Add sphere with child meshes sticking out of it
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(
-                UVSphere {
-                    radius: 0.75,
-                    sectors: 30,
-                    stacks: 30,
-                }
-                .into(),
-            ),
-            material: materials.add(Color::rgb(0.9, 0.1, 0.1).into()),
+            mesh: meshes.add(Sphere::new(0.75).mesh().uv(30, 30)),
+            material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
             transform: Transform::from_translation(Vec3::new(0.0, 1.0, 0.0)),
             ..default()
         })
@@ -61,17 +48,14 @@ fn setup(
             parent
                 .spawn(PbrBundle {
                     mesh: meshes.add(
-                        Capsule {
-                            radius: 0.2,
-                            rings: 15,
-                            depth: 1.0,
-                            latitudes: 15,
-                            longitudes: 15,
-                            ..Default::default()
-                        }
-                        .into(),
+                        Capsule3d::new(0.2, 1.0)
+                            .mesh()
+                            .rings(15)
+                            .latitudes(15)
+                            .longitudes(15)
+                            .build(),
                     ),
-                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::X, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, 0.75)),
                     ..default()
@@ -81,14 +65,15 @@ fn setup(
                 .spawn(PbrBundle {
                     mesh: meshes.add(
                         Torus {
-                            radius: 0.5,
-                            ring_radius: 0.1,
-                            subdivisions_segments: 30,
-                            subdivisions_sides: 15,
+                            minor_radius: 0.1,
+                            major_radius: 0.5,
                         }
-                        .into(),
+                        .mesh()
+                        .minor_resolution(15)
+                        .major_resolution(30)
+                        .build(),
                     ),
-                    material: materials.add(Color::rgb(0.1, 0.1, 0.9).into()),
+                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, -0.75)),
                     ..default()
@@ -98,16 +83,12 @@ fn setup(
 
     // Add plane, light source, and camera
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(Plane {
-            size: 5.0,
-            subdivisions: 0,
-        })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
+        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.0,
             shadows_enabled: true,
             ..default()
         },

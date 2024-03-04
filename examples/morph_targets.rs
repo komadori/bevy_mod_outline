@@ -27,10 +27,7 @@ fn main() {
             OutlinePlugin,
             AutoGenerateOutlineNormalsPlugin,
         ))
-        .insert_resource(AmbientLight {
-            brightness: 1.0,
-            ..default()
-        })
+        .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (name_morphs, setup_outlines, setup_animations))
         .run();
