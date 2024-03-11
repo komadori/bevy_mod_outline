@@ -80,12 +80,6 @@ cargo run --example ui_aa
 | 0.2.x        | 0.8.x        |
 | 0.1.x        | 0.7.x        |
 
-## Features
-
-- `bevy_ui` _(default)_ - Adds a render graph edge to prevent clashing with the
-UI. This adds a dependency on the `bevy_ui` crate and can be disabled if it is
-not used.
-
 ## Licence
 
 This crate is licensed under the Apache License, Version 2.0 (see

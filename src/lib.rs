@@ -30,13 +30,12 @@ use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
 use bevy::render::mesh::MeshVertexAttribute;
-use bevy::render::render_graph::{RenderGraph, RenderLabel};
+use bevy::render::render_graph::{RenderGraphApp, RenderLabel};
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use bevy::ui::graph::NodeUi;
 use interpolation::Lerp;
 
 use crate::draw::{
@@ -297,23 +296,17 @@ impl Plugin for OutlinePlugin {
             Render,
             write_batched_instance_buffer::<OutlinePipeline>
                 .in_set(RenderSet::PrepareResourcesFlush),
+        )
+        .add_render_graph_node::<OutlineNode>(Core3d, NodeOutline::OutlinePass)
+        .add_render_graph_edges(
+            Core3d,
+            (
+                Node3d::Tonemapping,
+                NodeOutline::OutlinePass,
+                Node3d::Fxaa,
+                Node3d::EndMainPassPostProcessing,
+            ),
         );
-
-        let world = &mut app.sub_app_mut(RenderApp).world;
-        let node = OutlineNode::new(world);
-
-        let mut graph = world.resource_mut::<RenderGraph>();
-
-        let draw_3d_graph = graph.get_sub_graph_mut(Core3d).unwrap();
-        draw_3d_graph.add_node(NodeOutline::OutlinePass, node);
-
-        // Run after main 3D pass, but before UI psss
-        draw_3d_graph.add_node_edge(Node3d::EndMainPass, NodeOutline::OutlinePass);
-        if draw_3d_graph.get_node_state(Node3d::Taa).is_ok() {
-            draw_3d_graph.add_node_edge(Node3d::Taa, NodeOutline::OutlinePass);
-        }
-        #[cfg(feature = "bevy_ui")]
-        draw_3d_graph.add_node_edge(NodeOutline::OutlinePass, NodeUi::UiPass);
     }
 
     fn finish(&self, app: &mut App) {

@@ -183,8 +183,8 @@ pub(crate) struct OutlineNode {
     >,
 }
 
-impl OutlineNode {
-    pub(crate) fn new(world: &mut World) -> Self {
+impl FromWorld for OutlineNode {
+    fn from_world(world: &mut World) -> Self {
         Self {
             query: world.query_filtered(),
         }
