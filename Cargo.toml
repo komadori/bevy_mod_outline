@@ -32,6 +32,7 @@ bevy = { version = "0.13", default-features = false, features = [
     "bevy_pbr",
     "bevy_scene",
     "bevy_winit",
+    "default_font",
     "png",
     "x11",
 ] }
@@ -67,3 +68,7 @@ path = "examples/hollow.rs"
 [[example]]
 name = "morph_targets"
 path = "examples/morph_targets.rs"
+
+[[example]]
+name = "ui_aa"
+path = "examples/ui_aa.rs"

@@ -62,6 +62,12 @@ An animated morphing glTF model with an outline.
 cargo run --example morph_targets
 ```
 
+A pair of spheres, one outlined, with a UI for selecting different anti-aliasing modes.
+
+```shell
+cargo run --example ui_aa
+```
+
 ## Versions
 
 | This Version | Bevy version |
