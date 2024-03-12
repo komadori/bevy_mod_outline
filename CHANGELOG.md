@@ -1,5 +1,17 @@
 # Changelog
 
+## bevy_mod_outline 0.7.0 (2024-03-12)
+
+### Added
+- Added AsyncSceneInheritOutline(Plugin).
+- Added ui_aa example.
+
+### Changed
+- Updated Bevy dependency to 0.13.
+- Updated interpolation dependency to 0.3.
+- Moved OutlineNode to after tone-mapping in render graph.
+- Removed unneeded bevy_ui and interpolation_03 features.
+
 ## bevy_mod_outline 0.6.2 (2024-02-10)
 
 ### Added
