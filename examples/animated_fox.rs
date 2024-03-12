@@ -2,8 +2,8 @@ use std::f32::consts::PI;
 
 use bevy::{prelude::*, scene::SceneInstance, window::close_on_esc};
 use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlineBundle, OutlinePlugin,
-    OutlineVolume,
+    AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, AutoGenerateOutlineNormalsPlugin,
+    OutlineBundle, OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -15,6 +15,7 @@ fn main() {
             DefaultPlugins,
             OutlinePlugin,
             AutoGenerateOutlineNormalsPlugin,
+            AsyncSceneInheritOutlinePlugin,
         ))
         .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
@@ -73,12 +74,12 @@ fn setup(
                 colour: Color::RED,
             },
             ..default()
-        });
+        })
+        .insert(AsyncSceneInheritOutline);
 }
 
-// Once the scene is loaded, start the animation and add an outline
+// Once the scene is loaded, start the animation
 fn setup_scene_once_loaded(
-    mut commands: Commands,
     scene_query: Query<&SceneInstance>,
     scene_manager: Res<SceneSpawner>,
     mut player_query: Query<&mut AnimationPlayer>,
@@ -90,11 +91,6 @@ fn setup_scene_once_loaded(
             (scene_query.get_single(), player_query.get_single_mut())
         {
             if scene_manager.instance_is_ready(**scene) {
-                for entity in scene_manager.iter_instance_entities(**scene) {
-                    commands
-                        .entity(entity)
-                        .insert(InheritOutlineBundle::default());
-                }
                 player.play(animation.0.clone_weak()).repeat();
                 *done = true;
             }

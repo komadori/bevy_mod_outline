@@ -1,7 +1,10 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance, window::close_on_esc};
-use bevy_mod_outline::*;
+use bevy_mod_outline::{
+    AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, OutlineBundle, OutlinePlugin,
+    OutlineStencil, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
+};
 
 fn main() {
     App::new()
@@ -12,7 +15,7 @@ fn main() {
                     .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
             ),
         )
-        .add_plugins(OutlinePlugin)
+        .add_plugins((OutlinePlugin, AsyncSceneInheritOutlinePlugin))
         .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(
@@ -69,7 +72,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 offset: 0.0,
             },
             ..default()
-        });
+        })
+        .insert(AsyncSceneInheritOutline);
 }
 
 // Once the scene is loaded, start the animation and add an outline
@@ -84,9 +88,6 @@ fn setup_scene_once_loaded(
         if let Ok(scene) = scene_query.get_single() {
             if scene_manager.instance_is_ready(**scene) {
                 for entity in scene_manager.iter_instance_entities(**scene) {
-                    commands
-                        .entity(entity)
-                        .insert(InheritOutlineBundle::default());
                     if let Ok(name) = name_query.get(entity) {
                         if name.as_str() == "inside" {
                             commands.entity(entity).insert(RotatesHue);

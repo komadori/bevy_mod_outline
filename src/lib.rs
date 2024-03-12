@@ -57,11 +57,13 @@ mod draw;
 mod generate;
 mod node;
 mod pipeline;
+mod scene;
 mod uniforms;
 mod view_uniforms;
 
 pub use computed::*;
 pub use generate::*;
+pub use scene::*;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 

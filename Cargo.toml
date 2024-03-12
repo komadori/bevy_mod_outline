@@ -14,10 +14,8 @@ categories = ["game-engines", "rendering"]
 bevy = { version = "0.13", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
+    "bevy_scene",
     "bevy_pbr",
-    "ktx2", 
-    "tonemapping_luts", 
-    "zstd",
     "bevy_core_pipeline",
 ] }
 bitfield = "0.14"
@@ -30,7 +28,6 @@ bevy = { version = "0.13", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",
-    "bevy_scene",
     "bevy_sprite",
     "bevy_text",
     "bevy_ui",
@@ -38,6 +35,9 @@ bevy = { version = "0.13", default-features = false, features = [
     "default_font",
     "png",
     "x11",
+    "ktx2",
+    "tonemapping_luts",
+    "zstd",
 ] }
 
 [[example]]
