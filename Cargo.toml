@@ -24,7 +24,7 @@ thiserror = "1.0"
 wgpu-types = "0.19"
 
 [dev-dependencies]
-bevy = { version = "0.13", default-features = false, features = [
+bevy = { version = "0.13.2", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",

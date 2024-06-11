@@ -10,7 +10,7 @@ use bevy_mod_outline::{OutlineBundle, OutlinePlugin, OutlineRenderLayers, Outlin
 #[bevy_main]
 fn main() {
     App::new()
-        .insert_resource(Msaa::Off) // Disabled temporarily due to bevyengine/bevy#11968.
+        .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
