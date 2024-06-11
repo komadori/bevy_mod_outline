@@ -1,5 +1,16 @@
 # Changelog
 
+## bevy_mod_outline 0.7.1 (2024-06-11)
+
+### Added
+- Added Reflect impls to public Components.
+
+### Fixed
+- Fixed post-processing effects being discarded when MSAA enabled.
+
+### Changed
+- Removed workaround from render_layers example.
+
 ## bevy_mod_outline 0.7.0 (2024-03-12)
 
 ### Added
