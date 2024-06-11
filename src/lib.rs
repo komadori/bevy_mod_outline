@@ -30,13 +30,14 @@ use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
 use bevy::render::mesh::MeshVertexAttribute;
-use bevy::render::render_graph::{RenderGraphApp, RenderLabel};
+use bevy::render::render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use interpolation::Lerp;
+use msaa::MsaaExtraWritebackNode;
 
 use crate::draw::{
     queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
@@ -55,6 +56,7 @@ use crate::view_uniforms::{
 mod computed;
 mod draw;
 mod generate;
+mod msaa;
 mod node;
 mod pipeline;
 mod scene;
@@ -73,7 +75,10 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
 
 /// Labels for render graph nodes which draw outlines.
 #[derive(Copy, Clone, Debug, RenderLabel, Hash, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NodeOutline {
+    /// This node writes back unsampled post-processing effects to the sampled attachment.
+    MsaaExtraWritebackPass,
     /// This node runs after the main 3D passes and before the UI pass.
     OutlinePass,
 }
@@ -265,6 +270,10 @@ impl Plugin for OutlinePlugin {
         )
         .add_systems(
             Render,
+            msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSet::Prepare),
+        )
+        .add_systems(
+            Render,
             (
                 prepare_outline_view_bind_group,
                 prepare_outline_stencil_bind_group,
@@ -299,11 +308,16 @@ impl Plugin for OutlinePlugin {
             write_batched_instance_buffer::<OutlinePipeline>
                 .in_set(RenderSet::PrepareResourcesFlush),
         )
-        .add_render_graph_node::<OutlineNode>(Core3d, NodeOutline::OutlinePass)
+        .add_render_graph_node::<ViewNodeRunner<MsaaExtraWritebackNode>>(
+            Core3d,
+            NodeOutline::MsaaExtraWritebackPass,
+        )
+        .add_render_graph_node::<ViewNodeRunner<OutlineNode>>(Core3d, NodeOutline::OutlinePass)
         .add_render_graph_edges(
             Core3d,
             (
                 Node3d::Tonemapping,
+                NodeOutline::MsaaExtraWritebackPass,
                 NodeOutline::OutlinePass,
                 Node3d::Fxaa,
                 Node3d::EndMainPassPostProcessing,
