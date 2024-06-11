@@ -1,22 +1,19 @@
 use std::cmp::Reverse;
 use std::ops::Range;
 
-use bevy::ecs::system::lifetimeless::Read;
+use bevy::ecs::query::QueryItem;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
-use bevy::render::render_graph::NodeRunError;
+use bevy::render::render_graph::{NodeRunError, ViewNode};
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, RenderPhase,
 };
 use bevy::render::render_resource::{
-    CachedRenderPipelineId, LoadOp, Operations, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, StoreOp,
+    CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+    StoreOp,
 };
-use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
-use bevy::render::{
-    render_graph::{Node, RenderGraphContext},
-    renderer::RenderContext,
-};
+use bevy::render::view::{ViewDepthTexture, ViewTarget};
+use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
 use bevy::utils::nonmax::NonMaxU32;
 use bevy::utils::FloatOrd;
 
@@ -167,49 +164,33 @@ impl CachedRenderPipelinePhaseItem for TransparentOutline {
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub(crate) struct OutlineNode {
-    query: QueryState<
-        (
-            Read<ExtractedCamera>,
-            Read<RenderPhase<StencilOutline>>,
-            Read<RenderPhase<OpaqueOutline>>,
-            Read<RenderPhase<TransparentOutline>>,
-            Read<Camera3d>,
-            Read<ViewTarget>,
-            Read<ViewDepthTexture>,
-        ),
-        With<ExtractedView>,
-    >,
-}
+pub(crate) struct OutlineNode;
 
 impl FromWorld for OutlineNode {
-    fn from_world(world: &mut World) -> Self {
-        Self {
-            query: world.query_filtered(),
-        }
+    fn from_world(_world: &mut World) -> Self {
+        Self
     }
 }
 
-impl Node for OutlineNode {
-    fn update(&mut self, world: &mut World) {
-        self.query.update_archetypes(world);
-    }
+impl ViewNode for OutlineNode {
+    type ViewQuery = (
+        &'static ExtractedCamera,
+        &'static RenderPhase<StencilOutline>,
+        &'static RenderPhase<OpaqueOutline>,
+        &'static RenderPhase<TransparentOutline>,
+        &'static Camera3d,
+        &'static ViewTarget,
+        &'static ViewDepthTexture,
+    );
 
-    fn run(
+    fn run<'w>(
         &self,
         graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext,
-        world: &World,
+        render_context: &mut RenderContext<'w>,
+        (camera, stencil_phase, opaque_phase, transparent_phase, camera_3d, target, depth): QueryItem<'w, Self::ViewQuery>,
+        world: &'w World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();
-        let (camera, stencil_phase, opaque_phase, transparent_phase, camera_3d, target, depth) =
-            match self.query.get_manual(world, view_entity) {
-                Ok(query) => query,
-                Err(_) => {
-                    return Ok(());
-                } // No window
-            };
 
         // If drawing anything, run stencil pass to clear the depth buffer
         if !opaque_phase.items.is_empty() || !transparent_phase.items.is_empty() {
@@ -238,14 +219,7 @@ impl Node for OutlineNode {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_opaque_pass"),
                 color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: depth.view(),
-                    depth_ops: Some(Operations {
-                        load: LoadOp::Load,
-                        store: StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
+                depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
                 timestamp_writes: None,
                 occlusion_query_set: None,
             };
@@ -260,14 +234,7 @@ impl Node for OutlineNode {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_transparent_pass"),
                 color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: depth.view(),
-                    depth_ops: Some(Operations {
-                        load: LoadOp::Load,
-                        store: StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
+                depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
                 timestamp_writes: None,
                 occlusion_query_set: None,
             };
