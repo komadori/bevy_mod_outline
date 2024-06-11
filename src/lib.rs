@@ -84,7 +84,7 @@ pub enum NodeOutline {
 }
 
 /// A component for stenciling meshes during outline rendering.
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Reflect)]
 pub struct OutlineStencil {
     /// Enable rendering of the stencil
     pub enabled: bool,
@@ -123,7 +123,7 @@ impl Lerp for OutlineStencil {
 }
 
 /// A component for rendering outlines around meshes.
-#[derive(Clone, Component, Default)]
+#[derive(Clone, Component, Reflect, Default)]
 pub struct OutlineVolume {
     /// Enable rendering of the outline
     pub visible: bool,
@@ -152,7 +152,9 @@ impl Lerp for OutlineVolume {
 }
 
 /// A component for specifying what layer(s) the outline should be rendered for.
-#[derive(Component, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
+#[derive(
+    Component, Reflect, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default,
+)]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 impl ExtractComponent for OutlineRenderLayers {
@@ -176,7 +178,7 @@ impl ExtractComponent for OutlineRenderLayers {
 }
 
 /// A component which specifies how the outline should be rendered.
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Reflect)]
 #[non_exhaustive]
 pub enum OutlineMode {
     /// Vertex extrusion flattened into a plane facing the camera and intersecting the specified
@@ -195,7 +197,7 @@ impl Default for OutlineMode {
 }
 
 /// A component for inheriting outlines from the parent entity.
-#[derive(Clone, Component, Default)]
+#[derive(Clone, Component, Reflect, Default)]
 pub struct InheritOutline;
 
 /// A bundle for rendering stenciled outlines around meshes.
