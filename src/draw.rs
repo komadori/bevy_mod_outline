@@ -3,8 +3,11 @@ use bevy::core_pipeline::prepass::{
 };
 use bevy::pbr::{DrawMesh, MeshPipelineViewLayoutKey, SetMeshBindGroup, SetMeshViewBindGroup};
 use bevy::prelude::*;
+use bevy::render::mesh::GpuMesh;
 use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_phase::{DrawFunctions, RenderPhase, SetItemPipeline};
+use bevy::render::render_phase::{
+    DrawFunctions, PhaseItemExtraIndex, SetItemPipeline, ViewSortedRenderPhases,
+};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::view::{ExtractedView, RenderLayers};
 
@@ -67,16 +70,17 @@ pub(crate) fn queue_outline_stencil_mesh(
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     pipeline_cache: Res<PipelineCache>,
-    render_meshes: Res<RenderAssets<Mesh>>,
+    render_meshes: Res<RenderAssets<GpuMesh>>,
     material_meshes: Query<(
         Entity,
         &OutlineStencilUniform,
         &ExtractedOutline,
         &OutlineRenderLayers,
     )>,
+    mut stencil_phases: ResMut<ViewSortedRenderPhases<StencilOutline>>,
     mut views: Query<(
         &ExtractedView,
-        &mut RenderPhase<StencilOutline>,
+        Entity,
         Option<&RenderLayers>,
         (
             Has<NormalPrepass>,
@@ -95,9 +99,12 @@ pub(crate) fn queue_outline_stencil_mesh(
         .with_msaa(*msaa)
         .with_pass_type(PassType::Stencil);
 
-    for (view, mut stencil_phase, view_mask, prepasses) in views.iter_mut() {
+    for (view, view_entity, view_mask, prepasses) in views.iter_mut() {
         let rangefinder = view.rangefinder3d();
-        let view_mask = view_mask.copied().unwrap_or_default();
+        let view_mask = view_mask.cloned().unwrap_or_default();
+        let Some(stencil_phase) = stencil_phases.get_mut(&view_entity) else {
+            continue; // No render phase
+        };
         for (entity, stencil_uniform, outline, outline_mask) in material_meshes.iter() {
             if !view_mask.intersects(outline_mask) {
                 continue; // Layer not enabled
@@ -106,7 +113,7 @@ pub(crate) fn queue_outline_stencil_mesh(
                 continue; // No mesh
             };
             let key = base_key
-                .with_primitive_topology(mesh.primitive_topology)
+                .with_primitive_topology(mesh.primitive_topology())
                 .with_depth_mode(outline.depth_mode)
                 .with_offset_zero(stencil_uniform.offset == 0.0)
                 .with_morph_targets(mesh.morph_targets.is_some())
@@ -123,7 +130,7 @@ pub(crate) fn queue_outline_stencil_mesh(
                 draw_function: draw_stencil,
                 distance,
                 batch_range: 0..0,
-                dynamic_offset: None,
+                extra_index: PhaseItemExtraIndex::NONE,
             });
         }
     }
@@ -146,7 +153,7 @@ pub(crate) fn queue_outline_volume_mesh(
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     pipeline_cache: Res<PipelineCache>,
-    render_meshes: Res<RenderAssets<Mesh>>,
+    render_meshes: Res<RenderAssets<GpuMesh>>,
     material_meshes: Query<(
         Entity,
         &OutlineVolumeUniform,
@@ -154,10 +161,11 @@ pub(crate) fn queue_outline_volume_mesh(
         &OutlineFragmentUniform,
         &OutlineRenderLayers,
     )>,
+    mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
+    mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     mut views: Query<(
         &ExtractedView,
-        &mut RenderPhase<OpaqueOutline>,
-        &mut RenderPhase<TransparentOutline>,
+        Entity,
         Option<&RenderLayers>,
         (
             Has<NormalPrepass>,
@@ -178,9 +186,15 @@ pub(crate) fn queue_outline_volume_mesh(
 
     let base_key = PipelineKey::new().with_msaa(*msaa);
 
-    for (view, mut opaque_phase, mut transparent_phase, view_mask, prepasses) in views.iter_mut() {
-        let view_mask = view_mask.copied().unwrap_or_default();
+    for (view, view_entity, view_mask, prepasses) in views.iter_mut() {
+        let view_mask = view_mask.cloned().unwrap_or_default();
         let rangefinder = view.rangefinder3d();
+        let (Some(opaque_phase), Some(transparent_phase)) = (
+            opaque_phases.get_mut(&view_entity),
+            transparent_phases.get_mut(&view_entity),
+        ) else {
+            continue; // No render phase
+        };
         for (entity, volume_uniform, outline, fragment_uniform, outline_mask) in
             material_meshes.iter()
         {
@@ -192,7 +206,7 @@ pub(crate) fn queue_outline_volume_mesh(
             };
             let transparent = fragment_uniform.colour[3] < 1.0;
             let key = base_key
-                .with_primitive_topology(mesh.primitive_topology)
+                .with_primitive_topology(mesh.primitive_topology())
                 .with_pass_type(if transparent {
                     PassType::Transparent
                 } else {
@@ -216,7 +230,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     draw_function: draw_transparent_outline,
                     distance,
                     batch_range: 0..0,
-                    dynamic_offset: None,
+                    extra_index: PhaseItemExtraIndex::NONE,
                 });
             } else {
                 opaque_phase.add(OpaqueOutline {
@@ -225,7 +239,7 @@ pub(crate) fn queue_outline_volume_mesh(
                     draw_function: draw_opaque_outline,
                     distance,
                     batch_range: 0..0,
-                    dynamic_offset: None,
+                    extra_index: PhaseItemExtraIndex::NONE,
                 });
             }
         }

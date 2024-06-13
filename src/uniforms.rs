@@ -88,7 +88,7 @@ pub(crate) fn extract_outline_uniforms(
                     offset: computed.volume.value.offset,
                 })
                 .insert(OutlineFragmentUniform {
-                    colour: computed.volume.value.colour,
+                    colour: computed.volume.value.colour.to_vec4(),
                 });
             }
             if computed.stencil.value.enabled {
