@@ -68,6 +68,12 @@ A pair of spheres, one outlined, with a UI for selecting different anti-aliasing
 cargo run --example ui_aa
 ```
 
+An emissive sphere orbits another sphere, with outlines and HDR bloom post-processing.
+
+```shell
+cargo run --example bloom
+```
+
 ## Versions
 
 | This Version | Bevy version |
