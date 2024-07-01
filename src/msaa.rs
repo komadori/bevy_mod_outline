@@ -8,7 +8,6 @@ use bevy::{
         world::{FromWorld, World},
     },
     render::{
-        color::Color,
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
             BindGroupEntries, CachedRenderPipelineId, LoadOp, Operations, PipelineCache,
@@ -54,7 +53,7 @@ impl ViewNode for MsaaExtraWritebackNode {
                 view: target.sampled_main_texture_view().unwrap(),
                 resolve_target: Some(post_process.destination),
                 ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK.into()),
+                    load: LoadOp::Clear(wgpu_types::Color::BLACK),
                     store: StoreOp::Store,
                 },
             })],

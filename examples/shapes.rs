@@ -1,6 +1,6 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::{prelude::*, window::close_on_esc};
+use bevy::prelude::*;
 
 use bevy_mod_outline::*;
 
@@ -11,7 +11,7 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (close_on_esc, wobble, orbit))
+        .add_systems(Update, (wobble, orbit))
         .run();
 }
 
@@ -27,19 +27,19 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Add cube with generated outline normals
-    let mut cube_mesh = Cuboid::new(1.0, 1.0, 1.0).mesh();
+    let mut cube_mesh = Cuboid::new(1.0, 1.0, 1.0).mesh().build();
     cube_mesh.generate_outline_normals().unwrap();
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(cube_mesh),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9))),
             transform: Transform::from_xyz(0.0, 1.0, 0.0),
             ..default()
         })
         .insert(OutlineBundle {
             outline: OutlineVolume {
                 visible: true,
-                colour: Color::rgba(0.0, 1.0, 0.0, 1.0),
+                colour: Color::srgb(0.0, 1.0, 0.0),
                 width: 25.0,
             },
             ..default()
@@ -59,7 +59,7 @@ fn setup(
                 .major_resolution(20)
                 .build(),
             ),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.9, 0.1, 0.1))),
             transform: Transform::from_xyz(0.0, 1.2, 2.0)
                 .with_rotation(Quat::from_rotation_x(0.5 * PI)),
             ..default()
@@ -67,7 +67,7 @@ fn setup(
         .insert(OutlineBundle {
             outline: OutlineVolume {
                 visible: true,
-                colour: Color::rgba(1.0, 0.0, 1.0, 0.3),
+                colour: Color::srgba(1.0, 0.0, 1.0, 0.3),
                 width: 15.0,
             },
             ..default()
@@ -76,8 +76,8 @@ fn setup(
 
     // Add plane, light source, and camera
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
-        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
+        mesh: meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)).mesh().build()),
+        material: materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {

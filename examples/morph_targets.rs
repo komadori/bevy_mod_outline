@@ -53,7 +53,7 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
             outline: OutlineVolume {
                 visible: true,
                 width: 3.0,
-                colour: Color::RED,
+                colour: Color::srgb(1.0, 0.0, 0.0),
             },
             ..default()
         });
@@ -97,18 +97,22 @@ fn setup_outlines(
 /// Plays an [`AnimationClip`] from the loaded [`Gltf`] on the [`AnimationPlayer`] created by the spawned scene.
 fn setup_animations(
     mut has_setup: Local<bool>,
-    mut players: Query<(&Name, &mut AnimationPlayer)>,
+    mut commands: Commands,
+    mut players: Query<(Entity, &Name, &mut AnimationPlayer)>,
     morph_data: Res<MorphData>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     if *has_setup {
         return;
     }
-    for (name, mut player) in &mut players {
+    for (entity, name, mut player) in &mut players {
         // The name of the entity in the GLTF scene containing the AnimationPlayer for our morph targets is "Main"
         if name.as_str() != "Main" {
             continue;
         }
-        player.play(morph_data.the_wave.clone()).repeat();
+        let (graph, animation) = AnimationGraph::from_clip(morph_data.the_wave.clone());
+        commands.entity(entity).insert(graphs.add(graph));
+        player.play(animation).repeat();
         *has_setup = true;
     }
 }

@@ -25,13 +25,14 @@
 use bevy::asset::load_internal_asset;
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
 use bevy::prelude::*;
-use bevy::render::batching::{batch_and_prepare_render_phase, write_batched_instance_buffer};
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
 use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner};
-use bevy::render::render_phase::{sort_phase_system, AddRenderCommand, DrawFunctions};
+use bevy::render::render_phase::{
+    sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
+};
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
@@ -142,21 +143,13 @@ impl Lerp for OutlineVolume {
         OutlineVolume {
             visible: lerp_bool(self.visible, other.visible, *scalar),
             width: self.width.lerp(other.width, *scalar),
-            colour: {
-                let [r, g, b, a] = self
-                    .colour
-                    .as_linear_rgba_f32()
-                    .lerp(&other.colour.as_linear_rgba_f32(), scalar);
-                Color::rgba_linear(r, g, b, a)
-            },
+            colour: self.colour.mix(&other.colour, *scalar),
         }
     }
 }
 
 /// A component for specifying what layer(s) the outline should be rendered for.
-#[derive(
-    Component, Reflect, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default,
-)]
+#[derive(Component, Reflect, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
 #[reflect(Component, Default)]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
@@ -173,8 +166,8 @@ impl ExtractComponent for OutlineRenderLayers {
     ) -> Option<Self> {
         Some(
             outline_mask
-                .copied()
-                .or_else(|| object_mask.copied().map(OutlineRenderLayers))
+                .cloned()
+                .or_else(|| object_mask.cloned().map(OutlineRenderLayers))
                 .unwrap_or_default(),
         )
     }
@@ -253,6 +246,9 @@ impl Plugin for OutlinePlugin {
             UniformComponentPlugin::<OutlineVolumeUniform>::default(),
             UniformComponentPlugin::<OutlineFragmentUniform>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
+            SortedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
+            SortedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
+            SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::default(),
         ))
         .register_type::<OutlineStencil>()
         .register_type::<OutlineVolume>()
@@ -305,20 +301,6 @@ impl Plugin for OutlinePlugin {
                 sort_phase_system::<TransparentOutline>,
             )
                 .in_set(RenderSet::PhaseSort),
-        )
-        .add_systems(
-            Render,
-            (
-                batch_and_prepare_render_phase::<StencilOutline, OutlinePipeline>,
-                batch_and_prepare_render_phase::<OpaqueOutline, OutlinePipeline>,
-                batch_and_prepare_render_phase::<TransparentOutline, OutlinePipeline>,
-            )
-                .in_set(RenderSet::PrepareResources),
-        )
-        .add_systems(
-            Render,
-            write_batched_instance_buffer::<OutlinePipeline>
-                .in_set(RenderSet::PrepareResourcesFlush),
         )
         .add_render_graph_node::<ViewNodeRunner<MsaaExtraWritebackNode>>(
             Core3d,

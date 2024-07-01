@@ -6,7 +6,7 @@ use crate::{uniforms::DepthMode, InheritOutline, OutlineMode, OutlineStencil, Ou
 pub(crate) struct ComputedVolume {
     pub(crate) enabled: bool,
     pub(crate) offset: f32,
-    pub(crate) colour: Vec4,
+    pub(crate) colour: LinearRgba,
 }
 
 #[derive(Clone, Default)]
@@ -179,9 +179,9 @@ fn update_computed_outline(
             inherited_from: parent_entity,
             volume: if let Some(vol) = volume {
                 Sourced::set(ComputedVolume {
-                    enabled: visibility.get() && vol.visible && vol.colour.a() != 0.0,
+                    enabled: visibility.get() && vol.visible && !vol.colour.is_fully_transparent(),
                     offset: vol.width,
-                    colour: vol.colour.as_linear_rgba_f32().into(),
+                    colour: vol.colour.into(),
                 })
             } else {
                 Sourced::inherit(&parent_computed.volume.value)

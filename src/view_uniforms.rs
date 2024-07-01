@@ -4,7 +4,7 @@ use bevy::ecs::system::SystemParamItem;
 use bevy::prelude::*;
 use bevy::render::extract_component::{ComponentUniforms, DynamicUniformIndex};
 use bevy::render::render_phase::{
-    PhaseItem, RenderCommand, RenderCommandResult, RenderPhase, TrackedRenderPass,
+    PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
@@ -29,6 +29,9 @@ pub(crate) struct OutlineViewBindGroup {
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_view_uniforms(
     mut commands: Commands,
+    mut stencil_phases: ResMut<ViewSortedRenderPhases<StencilOutline>>,
+    mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
+    mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     query: Extract<Query<(Entity, &Camera, Option<&RenderLayers>), With<Camera3d>>>,
 ) {
     for (entity, camera, view_mask) in query.iter() {
@@ -37,15 +40,15 @@ pub(crate) fn extract_outline_view_uniforms(
         }
         if let Some(size) = camera.logical_viewport_size() {
             let mut entity_commands = commands.get_or_spawn(entity);
-            entity_commands
-                .insert(OutlineViewUniform { scale: 2.0 / size })
-                .insert(RenderPhase::<StencilOutline>::default())
-                .insert(RenderPhase::<OpaqueOutline>::default())
-                .insert(RenderPhase::<TransparentOutline>::default());
+            entity_commands.insert(OutlineViewUniform { scale: 2.0 / size });
 
             if let Some(view_mask) = view_mask {
-                entity_commands.insert(*view_mask);
+                entity_commands.insert(view_mask.clone());
             }
+
+            stencil_phases.insert_or_clear(entity);
+            opaque_phases.insert_or_clear(entity);
+            transparent_phases.insert_or_clear(entity);
         }
     }
 }

@@ -4,7 +4,6 @@ use bevy::{
         fxaa::Fxaa,
     },
     prelude::*,
-    window::close_on_esc,
 };
 
 use bevy_mod_outline::*;
@@ -17,7 +16,7 @@ fn main() {
         .insert_resource(Msaa::Off)
         .insert_state(AAMode::NoAA)
         .add_systems(Startup, setup)
-        .add_systems(Update, (close_on_esc, bounce, highlight, interaction))
+        .add_systems(Update, (bounce, highlight, interaction))
         .add_systems(OnEnter(AAMode::MSAAx4), |mut commands: Commands| {
             commands.insert_resource(Msaa::Sample4)
         })
@@ -82,7 +81,7 @@ fn setup(
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(Sphere::new(1.0).mesh().ico(9).unwrap()),
-            material: materials.add(StandardMaterial::from(Color::GRAY)),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5))),
             transform: Transform::from_translation(Vec3::new(-1.5, 0.0, 0.0)),
             ..default()
         })
@@ -90,7 +89,7 @@ fn setup(
             outline: OutlineVolume {
                 visible: true,
                 width: 25.0,
-                colour: Color::YELLOW,
+                colour: Color::srgb(1.0, 1.0, 0.0),
             },
             ..default()
         })
@@ -98,7 +97,7 @@ fn setup(
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(Sphere::new(1.0).mesh().ico(20).unwrap()),
-            material: materials.add(StandardMaterial::from(Color::GRAY)),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5))),
             transform: Transform::from_translation(Vec3::new(1.5, 0.0, 0.0)),
             ..default()
         })
@@ -117,7 +116,6 @@ fn setup(
             for mode in [AAMode::NoAA, AAMode::MSAAx4, AAMode::FXAA, AAMode::TAA] {
                 parent
                     .spawn(ButtonBundle {
-                        background_color: BackgroundColor(Color::WHITE),
                         style: Style {
                             margin: UiRect::all(Val::Px(5.0)),
                             padding: UiRect::all(Val::Px(5.0)),
@@ -126,6 +124,7 @@ fn setup(
                         },
                         ..default()
                     })
+                    .insert(BackgroundColor(Color::WHITE))
                     .insert(mode.clone())
                     .with_children(|parent| {
                         parent.spawn(TextBundle {
@@ -171,7 +170,7 @@ fn bounce(mut query: Query<&mut Transform, With<Bounce>>, timer: Res<Time>, mut 
 fn highlight(mut query: Query<(&mut BorderColor, &AAMode)>, state: Res<State<AAMode>>) {
     for (mut border, m) in query.iter_mut() {
         *border = if m == state.get() {
-            BorderColor(Color::BLUE)
+            BorderColor(Color::srgb(0.0, 0.0, 1.0))
         } else {
             BorderColor(Color::BLACK)
         };

@@ -91,20 +91,20 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #ifdef SKINNED
     let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
 #else
-    let model = bevy_pbr::mesh_functions::get_model_matrix(vertex_no_morph.instance_index);
+    let model = bevy_pbr::mesh_functions::get_world_from_local(vertex_no_morph.instance_index);
 #endif
-    let clip_pos = view.view_proj * (model * vec4<f32>(vertex.position, 1.0));
+    let clip_pos = view.clip_from_world * (model * vec4<f32>(vertex.position, 1.0));
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
 #else
-    let clip_norm = mat4to3(view.view_proj) * (mat4to3(model) * vertex.outline_normal);
+    let clip_norm = mat4to3(view.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
     let ndc_delta = vstage.offset * normalize(clip_norm.xy) * view_uniform.scale * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
     var out: VertexOutput;
     out.position = vec4<f32>(out_xy, clip_pos.zw);
 #ifdef FLAT_DEPTH
-    out.flat_depth = model_origin_z(vstage.origin, view.view_proj);
+    out.flat_depth = model_origin_z(vstage.origin, view.clip_from_world);
 #endif
     return out;
 }

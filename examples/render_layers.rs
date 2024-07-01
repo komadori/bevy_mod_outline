@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::{
     prelude::*,
     render::{camera::Viewport, view::RenderLayers},
-    window::{close_on_esc, PrimaryWindow},
+    window::PrimaryWindow,
 };
 use bevy_mod_outline::{OutlineBundle, OutlinePlugin, OutlineRenderLayers, OutlineVolume};
 
@@ -14,12 +14,12 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (close_on_esc, set_camera_viewports))
+        .add_systems(Update, set_camera_viewports)
         .run();
 }
 
-const OBJECT_LAYER_ID: u8 = 1;
-const OUTLINE_LAYER_ID: u8 = 2;
+const OBJECT_LAYER_ID: usize = 1;
+const OUTLINE_LAYER_ID: usize = 2;
 
 #[derive(Copy, Clone, Component)]
 struct CameraMode {
@@ -45,7 +45,7 @@ fn setup(
                 .major_resolution(40)
                 .build(),
             ),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9))),
             transform: Transform::from_rotation(Quat::from_rotation_x(0.5 * PI))
                 .with_translation(0.8 * Vec3::Y),
             ..default()
@@ -63,8 +63,8 @@ fn setup(
 
     // Add plane and light source
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
-        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
+        mesh: meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)).mesh().build()),
+        material: materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {

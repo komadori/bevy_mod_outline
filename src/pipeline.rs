@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
-use bevy::ecs::system::lifetimeless::SQuery;
+use bevy::ecs::system::lifetimeless::{SQuery, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{
-    setup_morph_and_skinning_defs, MeshFlags, MeshPipelineKey, MeshPipelineViewLayoutKey,
-    MeshTransforms, MeshUniform,
+    setup_morph_and_skinning_defs, MeshFlags, MeshInputUniform, MeshPipelineKey,
+    MeshPipelineViewLayoutKey, MeshTransforms, MeshUniform, RenderMeshInstances,
 };
 use bevy::prelude::*;
-use bevy::render::batching::GetBatchData;
+use bevy::render::batching::{GetBatchData, GetFullBatchData};
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType, BufferSize,
     ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
@@ -21,13 +21,14 @@ use bevy::render::view::ViewTarget;
 use bevy::{
     pbr::MeshPipeline,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
             RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
         },
     },
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
+use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange};
 
 use crate::uniforms::{
@@ -174,7 +175,6 @@ pub(crate) struct OutlinePipeline {
 
 impl FromWorld for OutlinePipeline {
     fn from_world(world: &mut World) -> Self {
-        let world = world.cell();
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
         let outline_view_bind_group_layout = render_device.create_bind_group_layout(
@@ -245,14 +245,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
     fn specialize(
         &self,
         key: Self::Key,
-        layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayoutRef,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
         let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
         let mut fragment_defs = vec![];
         let mut buffer_attrs = Vec::new();
 
-        if layout.contains(Mesh::ATTRIBUTE_POSITION) {
+        if layout.0.contains(Mesh::ATTRIBUTE_POSITION) {
             vertex_defs.push("VERTEX_POSITIONS".into());
             buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
         }
@@ -285,7 +285,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(ShaderDefVal::from("OFFSET_ZERO"));
         } else {
             buffer_attrs.push(
-                if layout.contains(ATTRIBUTE_OUTLINE_NORMAL) {
+                if layout.0.contains(ATTRIBUTE_OUTLINE_NORMAL) {
                     ATTRIBUTE_OUTLINE_NORMAL
                 } else {
                     Mesh::ATTRIBUTE_NORMAL
@@ -316,7 +316,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 bind_layouts.push(self.outline_volume_bind_group_layout.clone());
             }
         }
-        let buffers = vec![layout.get_layout(&buffer_attrs)?];
+        let buffers = vec![layout.0.get_layout(&buffer_attrs)?];
         let mut push_constant_ranges = Vec::with_capacity(1);
         // Proxy for webgl feature flag in bevy
         if WgpuSettings::default().backends == Some(Backends::GL) {
@@ -367,20 +367,59 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = SQuery<&'static ExtractedOutline>;
+    type Param = (SRes<RenderMeshInstances>, SQuery<&'static ExtractedOutline>);
     type CompareData = ();
     type BufferData = MeshUniform;
 
     fn get_batch_data(
-        param: &SystemParamItem<Self::Param>,
+        (_mesh_instances, outline_query): &SystemParamItem<Self::Param>,
         entity: Entity,
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
-        let outline = param.get(entity).unwrap();
+        let outline = outline_query.get(entity).unwrap();
         let ts = MeshTransforms {
-            transform: (&outline.transform).into(),
-            previous_transform: (&outline.transform).into(),
+            world_from_local: (&outline.transform).into(),
+            previous_world_from_local: (&outline.transform).into(),
             flags: MeshFlags::NONE.bits(),
         };
         Some((MeshUniform::new(&ts, None), None))
+    }
+}
+
+impl GetFullBatchData for OutlinePipeline {
+    type BufferInputData = MeshInputUniform;
+
+    fn get_binned_batch_data(
+        _param: &SystemParamItem<Self::Param>,
+        _query_item: Entity,
+    ) -> Option<Self::BufferData> {
+        None
+    }
+
+    fn get_index_and_compare_data(
+        (mesh_instances, _outline_query): &SystemParamItem<Self::Param>,
+        query_item: Entity,
+    ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
+        let RenderMeshInstances::GpuBuilding(ref mesh_instances) = **mesh_instances else {
+            error!("`get_index_and_compare_data` should not be called when GpuBuilding.");
+            return None;
+        };
+        let mesh_instance = mesh_instances.get(&query_item)?;
+        Some((mesh_instance.current_uniform_index, None))
+    }
+
+    fn get_binned_index(
+        _param: &SystemParamItem<Self::Param>,
+        _query_item: Entity,
+    ) -> Option<NonMaxU32> {
+        None
+    }
+
+    fn get_batch_indirect_parameters_index(
+        _param: &SystemParamItem<Self::Param>,
+        _indirect_parameters_buffer: &mut bevy::render::batching::gpu_preprocessing::IndirectParametersBuffer,
+        _entity: Entity,
+        _instance_index: u32,
+    ) -> Option<NonMaxU32> {
+        None
     }
 }

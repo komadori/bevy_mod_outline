@@ -1,6 +1,6 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance, window::close_on_esc};
+use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
     AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, OutlineBundle, OutlinePlugin,
     OutlineStencil, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
@@ -20,12 +20,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (
-                setup_scene_once_loaded,
-                rotates_and_pulses,
-                rotates_hue,
-                close_on_esc,
-            ),
+            (setup_scene_once_loaded, rotates_and_pulses, rotates_hue),
         )
         .run();
 }
@@ -65,7 +60,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             outline: OutlineVolume {
                 visible: true,
                 width: 0.0,
-                colour: Color::BLUE,
+                colour: Color::srgb(0.0, 0.0, 1.0),
             },
             stencil: OutlineStencil {
                 enabled: true,
@@ -121,13 +116,11 @@ fn rotates_hue(
 ) {
     for handle in query.iter() {
         let material = materials.get_mut(handle).unwrap();
-        let mut colour = material.base_color.as_hsla_f32();
-        colour[0] = (colour[0] + 15.0 * timer.delta_seconds()) % 360.0;
-        material.base_color = Color::Hsla {
-            hue: colour[0],
-            saturation: colour[1],
-            lightness: colour[2],
-            alpha: colour[3],
-        };
+        if let Color::Hsla(hsla) = material.base_color {
+            material.base_color = Color::Hsla(Hsla {
+                hue: (hsla.hue + 15.0 * timer.delta_seconds()) % 360.0,
+                ..hsla
+            });
+        }
     }
 }
