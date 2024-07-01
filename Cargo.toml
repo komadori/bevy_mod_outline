@@ -11,7 +11,7 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.14.0-rc.2", default-features = false, features = [
+bevy = { version = "0.14.0-rc.4", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "bevy_scene",
@@ -22,10 +22,10 @@ bitfield = "0.15"
 interpolation = "0.3"
 thiserror = "1.0"
 nonmax = "0.5"
-wgpu-types = "0.19"
+wgpu-types = "0.20"
 
 [dev-dependencies]
-bevy = { version = "0.14.0-rc.2", default-features = false, features = [
+bevy = { version = "0.14.0-rc.4", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",
