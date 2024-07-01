@@ -85,6 +85,7 @@ pub enum NodeOutline {
 
 /// A component for stenciling meshes during outline rendering.
 #[derive(Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct OutlineStencil {
     /// Enable rendering of the stencil
     pub enabled: bool,
@@ -124,6 +125,7 @@ impl Lerp for OutlineStencil {
 
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Reflect, Default)]
+#[reflect(Component, Default)]
 pub struct OutlineVolume {
     /// Enable rendering of the outline
     pub visible: bool,
@@ -155,6 +157,7 @@ impl Lerp for OutlineVolume {
 #[derive(
     Component, Reflect, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default,
 )]
+#[reflect(Component, Default)]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 impl ExtractComponent for OutlineRenderLayers {
@@ -179,6 +182,7 @@ impl ExtractComponent for OutlineRenderLayers {
 
 /// A component which specifies how the outline should be rendered.
 #[derive(Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 #[non_exhaustive]
 pub enum OutlineMode {
     /// Vertex extrusion flattened into a plane facing the camera and intersecting the specified
@@ -198,6 +202,7 @@ impl Default for OutlineMode {
 
 /// A component for inheriting outlines from the parent entity.
 #[derive(Clone, Component, Reflect, Default)]
+#[reflect(Component, Default)]
 pub struct InheritOutline;
 
 /// A bundle for rendering stenciled outlines around meshes.
@@ -249,6 +254,11 @@ impl Plugin for OutlinePlugin {
             UniformComponentPlugin::<OutlineFragmentUniform>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
         ))
+        .register_type::<OutlineStencil>()
+        .register_type::<OutlineVolume>()
+        .register_type::<OutlineRenderLayers>()
+        .register_type::<OutlineMode>()
+        .register_type::<InheritOutline>()
         .add_systems(
             PostUpdate,
             (
