@@ -60,7 +60,7 @@ fn setup(
                     mesh: meshes.add(Sphere::new(0.25).mesh().uv(25, 25)),
                     material: materials.add(StandardMaterial {
                         base_color: Color::srgb(1.0, 0.0, 0.0),
-                        emissive: LinearRgba::rgb(2000.0, 0.0, 0.0),
+                        emissive: LinearRgba::rgb(100.0, 0.0, 0.0),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1.25)),
@@ -89,7 +89,7 @@ fn setup(
             ..default()
         })
         .insert(BloomSettings {
-            intensity: 2.0,
+            intensity: 1.0,
             low_frequency_boost: 0.5,
             low_frequency_boost_curvature: 0.5,
             high_pass_frequency: 0.5,
