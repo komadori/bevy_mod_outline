@@ -1,5 +1,13 @@
 # Changelog
 
+## bevy_mod_outline 0.7.2 (2024-07-05)
+
+### Added
+- Added bloom example.
+
+### Fixed
+- Fixed missing reflect attributes and type registration.
+
 ## bevy_mod_outline 0.7.1 (2024-06-11)
 
 ### Added
