@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use bevy::{prelude::*, window::close_on_esc};
+use bevy::prelude::*;
 
 use bevy_mod_outline::*;
 
@@ -11,7 +11,7 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (close_on_esc, rotates))
+        .add_systems(Update, rotates)
         .run();
 }
 
@@ -27,7 +27,7 @@ fn setup(
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(Sphere::new(0.75).mesh().uv(30, 30)),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.9, 0.1, 0.1))),
+            material: materials.add(StandardMaterial::from(Color::srgb(0.9, 0.1, 0.1))),
             transform: Transform::from_translation(Vec3::new(0.0, 1.0, 0.0)),
             ..default()
         })
@@ -55,7 +55,7 @@ fn setup(
                             .longitudes(15)
                             .build(),
                     ),
-                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
+                    material: materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::X, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, 0.75)),
                     ..default()
@@ -73,7 +73,7 @@ fn setup(
                         .major_resolution(30)
                         .build(),
                     ),
-                    material: materials.add(StandardMaterial::from(Color::rgb(0.1, 0.1, 0.9))),
+                    material: materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9))),
                     transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, TAU / 4.0))
                         .with_translation(Vec3::new(0.0, 0.0, -0.75)),
                     ..default()
@@ -83,8 +83,8 @@ fn setup(
 
     // Add plane, light source, and camera
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::new(Vec3::Y).mesh().size(5.0, 5.0).build()),
-        material: materials.add(StandardMaterial::from(Color::rgb(0.3, 0.5, 0.3))),
+        mesh: meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)).mesh().build()),
+        material: materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3))),
         ..default()
     });
     commands.spawn(PointLightBundle {
@@ -103,6 +103,6 @@ fn setup(
 
 fn rotates(mut query: Query<&mut Transform, With<Rotates>>, timer: Res<Time>) {
     for mut transform in query.iter_mut() {
-        transform.rotate_axis(Vec3::Y, 0.75 * timer.delta_seconds());
+        transform.rotate_axis(Dir3::Y, 0.75 * timer.delta_seconds());
     }
 }

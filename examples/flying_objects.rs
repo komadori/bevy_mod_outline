@@ -1,6 +1,6 @@
 use std::{f32::consts::TAU, num::Wrapping, time::Duration};
 
-use bevy::{prelude::*, window::close_on_esc};
+use bevy::prelude::*;
 
 use bevy_mod_outline::*;
 
@@ -11,10 +11,7 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
-        .add_systems(
-            Update,
-            (close_on_esc, spawn_objects, move_objects, despawn_objects),
-        )
+        .add_systems(Update, (spawn_objects, move_objects, despawn_objects))
         .run();
 }
 
@@ -41,7 +38,7 @@ fn setup(
                 .longitudes(15)
                 .build(),
         ),
-        material: materials.add(StandardMaterial::from(Color::BEIGE)),
+        material: materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5))),
     });
 
     // Add light source and camera
@@ -97,7 +94,11 @@ fn spawn_objects(
                 outline: OutlineVolume {
                     visible: true,
                     width: if b { 10.0 } else { 5.0 },
-                    colour: if b { Color::GREEN } else { Color::RED },
+                    colour: if b {
+                        Color::srgb(0.0, 1.0, 0.0)
+                    } else {
+                        Color::srgb(1.0, 0.0, 0.0)
+                    },
                 },
                 ..default()
             });

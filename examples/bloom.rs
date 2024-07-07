@@ -3,7 +3,6 @@ use std::f32::consts::{PI, TAU};
 use bevy::{
     core_pipeline::bloom::{BloomCompositeMode, BloomPrefilterSettings, BloomSettings},
     prelude::*,
-    window::close_on_esc,
 };
 
 use bevy_mod_outline::*;
@@ -15,7 +14,7 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (close_on_esc, rotates, pulses))
+        .add_systems(Update, (rotates, pulses))
         .run();
 }
 
@@ -60,8 +59,8 @@ fn setup(
                 .spawn(PbrBundle {
                     mesh: meshes.add(Sphere::new(0.25).mesh().uv(25, 25)),
                     material: materials.add(StandardMaterial {
-                        base_color: Color::rgb(1.0, 0.0, 0.0),
-                        emissive: Color::rgb_linear(2000.0, 0.0, 0.0),
+                        base_color: Color::srgb(1.0, 0.0, 0.0),
+                        emissive: LinearRgba::rgb(100.0, 0.0, 0.0),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1.25)),
@@ -90,7 +89,7 @@ fn setup(
             ..default()
         })
         .insert(BloomSettings {
-            intensity: 2.0,
+            intensity: 1.0,
             low_frequency_boost: 0.5,
             low_frequency_boost_curvature: 0.5,
             high_pass_frequency: 0.5,
@@ -104,7 +103,7 @@ fn setup(
 
 fn rotates(mut query: Query<&mut Transform, With<Rotates>>, timer: Res<Time>) {
     for mut transform in query.iter_mut() {
-        transform.rotate_axis(Vec3::Y, 0.75 * timer.delta_seconds());
+        transform.rotate_axis(Dir3::Y, 0.75 * timer.delta_seconds());
     }
 }
 
