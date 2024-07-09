@@ -38,6 +38,7 @@ bevy = { version = "0.14", default-features = false, features = [
     "png",
     "x11",
     "ktx2",
+    "smaa_luts",
     "tonemapping_luts",
     "zstd",
 ] }

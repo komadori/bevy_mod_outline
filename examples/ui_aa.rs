@@ -2,6 +2,7 @@ use bevy::{
     core_pipeline::{
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
         fxaa::Fxaa,
+        smaa::{SmaaPreset, SmaaSettings},
     },
     prelude::*,
 };
@@ -40,6 +41,24 @@ fn main() {
             },
         )
         .add_systems(
+            OnEnter(AAMode::SMAA),
+            |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
+                commands
+                    .entity(query.get_single().unwrap())
+                    .insert(SmaaSettings {
+                        preset: SmaaPreset::Ultra,
+                    });
+            },
+        )
+        .add_systems(
+            OnExit(AAMode::SMAA),
+            |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
+                commands
+                    .entity(query.get_single().unwrap())
+                    .remove::<SmaaSettings>();
+            },
+        )
+        .add_systems(
             OnEnter(AAMode::TAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands
@@ -69,6 +88,7 @@ enum AAMode {
     NoAA,
     MSAAx4,
     FXAA,
+    SMAA,
     TAA,
 }
 
@@ -113,7 +133,13 @@ fn setup(
             ..default()
         })
         .with_children(|parent| {
-            for mode in [AAMode::NoAA, AAMode::MSAAx4, AAMode::FXAA, AAMode::TAA] {
+            for mode in [
+                AAMode::NoAA,
+                AAMode::MSAAx4,
+                AAMode::FXAA,
+                AAMode::SMAA,
+                AAMode::TAA,
+            ] {
                 parent
                     .spawn(ButtonBundle {
                         style: Style {

@@ -315,16 +315,19 @@ impl Plugin for OutlinePlugin {
             NodeOutline::MsaaExtraWritebackPass,
         )
         .add_render_graph_node::<ViewNodeRunner<OutlineNode>>(Core3d, NodeOutline::OutlinePass)
+        // Outlining occurs after tone-mapping...
         .add_render_graph_edges(
             Core3d,
             (
                 Node3d::Tonemapping,
                 NodeOutline::MsaaExtraWritebackPass,
                 NodeOutline::OutlinePass,
-                Node3d::Fxaa,
                 Node3d::EndMainPassPostProcessing,
             ),
-        );
+        )
+        // ...and before any later anti-aliasing.
+        .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Fxaa)
+        .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Smaa);
     }
 
     fn finish(&self, app: &mut App) {
