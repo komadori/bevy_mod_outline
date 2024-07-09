@@ -1,5 +1,15 @@
 # Changelog
 
+## bevy_mod_outline 0.8.0 (2024-07-09)
+
+### Added
+- Added Mix trait impls.
+- Added interpolation feature for Lerp trait impls.
+
+### Changed
+- Updated Bevy dependency to 0.14.
+- Outlines are now drawn in batches.
+
 ## bevy_mod_outline 0.7.2 (2024-07-05)
 
 ### Added
