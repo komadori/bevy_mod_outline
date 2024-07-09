@@ -41,7 +41,6 @@ use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use interpolation::Lerp;
 use msaa::MsaaExtraWritebackNode;
 use uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 
@@ -114,16 +113,28 @@ fn lerp_bool(this: bool, other: bool, scalar: f32) -> bool {
     }
 }
 
-impl Lerp for OutlineStencil {
-    type Scalar = f32;
+macro_rules! impl_lerp {
+    ($t:ty) => {
+        #[cfg(feature = "interpolation")]
+        impl interpolation::Lerp for $t {
+            type Scalar = f32;
 
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+            fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+                self.mix(other, *scalar)
+            }
+        }
+    };
+}
+
+impl Mix for OutlineStencil {
+    fn mix(&self, other: &Self, factor: f32) -> Self {
         OutlineStencil {
-            enabled: lerp_bool(self.enabled, other.enabled, *scalar),
-            offset: self.offset.lerp(other.offset, *scalar),
+            enabled: lerp_bool(self.enabled, other.enabled, factor),
+            offset: self.offset.lerp(other.offset, factor),
         }
     }
 }
+impl_lerp!(OutlineStencil);
 
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Reflect, Default)]
@@ -137,17 +148,16 @@ pub struct OutlineVolume {
     pub colour: Color,
 }
 
-impl Lerp for OutlineVolume {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+impl Mix for OutlineVolume {
+    fn mix(&self, other: &Self, factor: f32) -> Self {
         OutlineVolume {
-            visible: lerp_bool(self.visible, other.visible, *scalar),
-            width: self.width.lerp(other.width, *scalar),
-            colour: self.colour.mix(&other.colour, *scalar),
+            visible: lerp_bool(self.visible, other.visible, factor),
+            width: self.width.lerp(other.width, factor),
+            colour: self.colour.mix(&other.colour, factor),
         }
     }
 }
+impl_lerp!(OutlineVolume);
 
 /// A component for specifying what layer(s) the outline should be rendered for.
 #[derive(Component, Reflect, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]

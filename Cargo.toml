@@ -19,10 +19,13 @@ bevy = { version = "0.14", default-features = false, features = [
     "bevy_core_pipeline",
 ] }
 bitfield = "0.15"
-interpolation = "0.3"
+interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
 nonmax = "0.5"
 wgpu-types = "0.20"
+
+[features]
+default = ["interpolation"]
 
 [dev-dependencies]
 bevy = { version = "0.14", default-features = false, features = [
