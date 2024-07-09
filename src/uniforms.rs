@@ -1,12 +1,9 @@
 use bevy::{
-    ecs::system::{
-        lifetimeless::{Read, SRes},
-        SystemParamItem,
-    },
-    math::Affine3A,
+    ecs::system::{lifetimeless::SRes, SystemParamItem},
+    math::Affine3,
     prelude::*,
     render::{
-        extract_component::{ComponentUniforms, DynamicUniformIndex},
+        batching::no_gpu_preprocessing::BatchedInstanceBuffer,
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
@@ -14,34 +11,29 @@ use bevy::{
     },
 };
 
-use crate::{node::StencilOutline, pipeline::OutlinePipeline, ComputedOutline};
+use crate::{pipeline::OutlinePipeline, ComputedOutline};
 
 #[derive(Component)]
 pub(crate) struct ExtractedOutline {
     pub depth_mode: DepthMode,
-    pub transform: Affine3A,
     pub mesh_id: AssetId<Mesh>,
+    pub instance_data: OutlineInstanceUniform,
 }
 
-#[derive(Clone, Component, ShaderType)]
-pub(crate) struct OutlineStencilUniform {
-    #[align(16)]
-    pub origin: Vec3,
-    pub offset: f32,
+#[derive(Clone, ShaderType)]
+pub struct OutlineInstanceUniform {
+    pub world_from_local: [Vec4; 3],
+    pub origin_in_world: Vec3,
+    pub volume_offset: f32,
+    pub volume_colour: Vec4,
+    pub stencil_offset: f32,
 }
 
-#[derive(Clone, Component, ShaderType)]
-pub(crate) struct OutlineVolumeUniform {
-    #[align(16)]
-    pub origin: Vec3,
-    pub offset: f32,
-}
+#[derive(Component)]
+pub(crate) struct OutlineStencilEnabled;
 
-#[derive(Clone, Component, ShaderType)]
-pub(crate) struct OutlineFragmentUniform {
-    #[align(16)]
-    pub colour: Vec4,
-}
+#[derive(Component)]
+pub(crate) struct OutlineVolumeEnabled;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum DepthMode {
@@ -50,12 +42,7 @@ pub(crate) enum DepthMode {
 }
 
 #[derive(Resource)]
-pub(crate) struct OutlineStencilBindGroup {
-    pub bind_group: BindGroup,
-}
-
-#[derive(Resource)]
-pub(crate) struct OutlineVolumeBindGroup {
+pub(crate) struct OutlineInstanceBindGroup {
     pub bind_group: BindGroup,
 }
 
@@ -79,124 +66,62 @@ pub(crate) fn extract_outline_uniforms(
         if let ComputedOutline(Some(computed)) = computed {
             cmds.insert(ExtractedOutline {
                 depth_mode: computed.mode.value.depth_mode,
-                transform: transform.affine(),
                 mesh_id: mesh.id(),
+                instance_data: OutlineInstanceUniform {
+                    world_from_local: Affine3::from(&transform.affine()).to_transpose(),
+                    origin_in_world: computed.mode.value.world_origin,
+                    stencil_offset: computed.stencil.value.offset,
+                    volume_offset: computed.volume.value.offset,
+                    volume_colour: computed.volume.value.colour.to_vec4(),
+                },
             });
-            if computed.volume.value.enabled {
-                cmds.insert(OutlineVolumeUniform {
-                    origin: computed.mode.value.world_origin,
-                    offset: computed.volume.value.offset,
-                })
-                .insert(OutlineFragmentUniform {
-                    colour: computed.volume.value.colour.to_vec4(),
-                });
-            }
             if computed.stencil.value.enabled {
-                cmds.insert(OutlineStencilUniform {
-                    origin: computed.mode.value.world_origin,
-                    offset: computed.stencil.value.offset,
-                });
+                cmds.insert(OutlineStencilEnabled);
+            }
+            if computed.volume.value.enabled {
+                cmds.insert(OutlineVolumeEnabled);
             }
         }
     }
 }
 
-pub(crate) fn prepare_outline_stencil_bind_group(
+pub(crate) fn prepare_outline_instance_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
+    batched_instance_buffer: Res<BatchedInstanceBuffer<OutlineInstanceUniform>>,
     outline_pipeline: Res<OutlinePipeline>,
-    vertex: Res<ComponentUniforms<OutlineStencilUniform>>,
 ) {
-    if let Some(vertex_binding) = vertex.binding() {
+    if let Some(instance_binding) = batched_instance_buffer.instance_data_binding() {
         let bind_group = render_device.create_bind_group(
-            Some("outline_stencil_bind_group"),
-            &outline_pipeline.outline_stencil_bind_group_layout,
+            "outline_instance_mesh_bind_group",
+            &outline_pipeline.outline_instance_bind_group_layout,
             &[BindGroupEntry {
                 binding: 0,
-                resource: vertex_binding.clone(),
+                resource: instance_binding,
             }],
         );
-        commands.insert_resource(OutlineStencilBindGroup { bind_group });
-    }
+        commands.insert_resource(OutlineInstanceBindGroup { bind_group });
+    };
 }
 
-pub(crate) fn prepare_outline_volume_bind_group(
-    mut commands: Commands,
-    render_device: Res<RenderDevice>,
-    outline_pipeline: Res<OutlinePipeline>,
-    vertex: Res<ComponentUniforms<OutlineVolumeUniform>>,
-    fragment: Res<ComponentUniforms<OutlineFragmentUniform>>,
-) {
-    if let (Some(vertex_binding), Some(fragment_binding)) = (vertex.binding(), fragment.binding()) {
-        let bind_group = render_device.create_bind_group(
-            "outline_volume_bind_group",
-            &outline_pipeline.outline_volume_bind_group_layout,
-            &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: vertex_binding.clone(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: fragment_binding.clone(),
-                },
-            ],
-        );
-        commands.insert_resource(OutlineVolumeBindGroup { bind_group });
-    }
-}
+pub(crate) struct SetOutlineInstanceBindGroup<const I: usize>();
 
-pub(crate) struct SetOutlineStencilBindGroup<const I: usize>();
-
-impl<const I: usize> RenderCommand<StencilOutline> for SetOutlineStencilBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineInstanceBindGroup<I> {
     type ViewQuery = ();
-    type ItemQuery = Read<DynamicUniformIndex<OutlineStencilUniform>>;
-    type Param = SRes<OutlineStencilBindGroup>;
+    type ItemQuery = ();
+    type Param = SRes<OutlineInstanceBindGroup>;
     fn render<'w>(
-        _item: &StencilOutline,
+        item: &P,
         _view_data: (),
-        entity_data: Option<&DynamicUniformIndex<OutlineStencilUniform>>,
+        _entity_data: Option<()>,
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let Some(dyn_uniform) = entity_data else {
-            return RenderCommandResult::Failure;
-        };
+        let dynamic_uniform_index = item.extra_index().as_dynamic_offset().map(|x| x.get());
         pass.set_bind_group(
             I,
             &bind_group.into_inner().bind_group,
-            &[dyn_uniform.index()],
-        );
-        RenderCommandResult::Success
-    }
-}
-
-pub(crate) struct SetOutlineVolumeBindGroup<const I: usize>();
-
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineVolumeBindGroup<I> {
-    type ViewQuery = ();
-    type ItemQuery = (
-        Read<DynamicUniformIndex<OutlineVolumeUniform>>,
-        Read<DynamicUniformIndex<OutlineFragmentUniform>>,
-    );
-    type Param = SRes<OutlineVolumeBindGroup>;
-    fn render<'w>(
-        _item: &P,
-        _view_data: (),
-        entity_data: Option<(
-            &DynamicUniformIndex<OutlineVolumeUniform>,
-            &DynamicUniformIndex<OutlineFragmentUniform>,
-        )>,
-        bind_group: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let Some((vertex, fragment)) = entity_data else {
-            return RenderCommandResult::Failure;
-        };
-        pass.set_bind_group(
-            I,
-            &bind_group.into_inner().bind_group,
-            &[vertex.index(), fragment.index()],
+            dynamic_uniform_index.as_slice(),
         );
         RenderCommandResult::Success
     }

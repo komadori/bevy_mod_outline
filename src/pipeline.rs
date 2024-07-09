@@ -1,18 +1,16 @@
 use std::borrow::Cow;
 
-use bevy::ecs::system::lifetimeless::{SQuery, SRes};
+use bevy::ecs::system::lifetimeless::SQuery;
 use bevy::ecs::system::SystemParamItem;
-use bevy::pbr::{
-    setup_morph_and_skinning_defs, MeshFlags, MeshInputUniform, MeshPipelineKey,
-    MeshPipelineViewLayoutKey, MeshTransforms, MeshUniform, RenderMeshInstances,
-};
+use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey, MeshPipelineViewLayoutKey};
 use bevy::prelude::*;
 use bevy::render::batching::{GetBatchData, GetFullBatchData};
+use bevy::render::render_resource::binding_types::uniform_buffer_sized;
 use bevy::render::render_resource::{
-    BindGroupLayout, BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType, BufferSize,
-    ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
-    FragmentState, FrontFace, MultisampleState, PolygonMode, PrimitiveState, PrimitiveTopology,
-    ShaderDefVal, ShaderSize, ShaderStages, ShaderType, StencilState, TextureFormat, VertexState,
+    BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
+    CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, PrimitiveTopology, ShaderDefVal,
+    ShaderStages, ShaderType, StencilState, TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
@@ -31,10 +29,7 @@ use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange};
 
-use crate::uniforms::{
-    DepthMode, ExtractedOutline, OutlineFragmentUniform, OutlineStencilUniform,
-    OutlineVolumeUniform,
-};
+use crate::uniforms::{DepthMode, ExtractedOutline, OutlineInstanceUniform};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
@@ -169,8 +164,8 @@ impl From<PipelineKey> for MeshPipelineKey {
 pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
     pub outline_view_bind_group_layout: BindGroupLayout,
-    pub outline_stencil_bind_group_layout: BindGroupLayout,
-    pub outline_volume_bind_group_layout: BindGroupLayout,
+    pub outline_instance_bind_group_layout: BindGroupLayout,
+    pub instance_batch_size: Option<u32>,
 }
 
 impl FromWorld for OutlinePipeline {
@@ -178,63 +173,26 @@ impl FromWorld for OutlinePipeline {
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
         let outline_view_bind_group_layout = render_device.create_bind_group_layout(
-            "outline_view_bind_group_layout",
-            &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: Some(OutlineViewUniform::min_size()),
-                },
-                count: None,
-            }],
+            "oiutline_view_bind_group_layout",
+            &BindGroupLayoutEntries::single(
+                ShaderStages::VERTEX,
+                uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
+            ),
         );
-        let outline_volume_bind_group_layout = render_device.create_bind_group_layout(
-            "outline_volume_bind_group_layout",
-            &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: BufferSize::new(OutlineVolumeUniform::SHADER_SIZE.get()),
-                    },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: BufferSize::new(
-                            OutlineFragmentUniform::SHADER_SIZE.get(),
-                        ),
-                    },
-                    count: None,
-                },
-            ],
+        let outline_instance_bind_group_layout = render_device.create_bind_group_layout(
+            "outline_instance_bind_group_layout",
+            &BindGroupLayoutEntries::single(
+                ShaderStages::VERTEX,
+                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(render_device),
+            ),
         );
-        let outline_stencil_bind_group_layout = render_device.create_bind_group_layout(
-            "outline_stencil_bind_group_layout",
-            &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: BufferSize::new(OutlineStencilUniform::SHADER_SIZE.get()),
-                },
-                count: None,
-            }],
-        );
+        let instance_batch_size =
+            GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,
-            outline_stencil_bind_group_layout,
-            outline_volume_bind_group_layout,
+            outline_instance_bind_group_layout,
+            instance_batch_size,
         }
     }
 }
@@ -248,16 +206,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         layout: &MeshVertexBufferLayoutRef,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut targets = vec![];
-        let mut vertex_defs = vec!["MESH_BINDGROUP_1".into()];
+        let mut vertex_defs = vec![];
         let mut fragment_defs = vec![];
-        let mut buffer_attrs = Vec::new();
+        let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
 
-        if layout.0.contains(Mesh::ATTRIBUTE_POSITION) {
-            vertex_defs.push("VERTEX_POSITIONS".into());
-            buffer_attrs.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
-        }
-
-        let mut bind_layouts = vec![
+        let bind_layouts = vec![
             self.mesh_pipeline.get_view_layout(key.view_key()).clone(),
             setup_morph_and_skinning_defs(
                 &self.mesh_pipeline.mesh_layouts,
@@ -268,7 +221,15 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &mut buffer_attrs,
             ),
             self.outline_view_bind_group_layout.clone(),
+            self.outline_instance_bind_group_layout.clone(),
         ];
+
+        if let Some(sz) = self.instance_batch_size {
+            vertex_defs.push(ShaderDefVal::Int(
+                "INSTANCE_BATCH_SIZE".to_string(),
+                sz as i32,
+            ));
+        }
 
         let cull_mode;
         if key.depth_mode() == DepthMode::Flat {
@@ -294,11 +255,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             );
         }
         match key.pass_type() {
-            PassType::Stencil => {
-                bind_layouts.push(self.outline_stencil_bind_group_layout.clone());
-            }
+            PassType::Stencil => {}
             PassType::Opaque | PassType::Transparent => {
-                fragment_defs.push(ShaderDefVal::from("VOLUME"));
+                let val = ShaderDefVal::from("VOLUME");
+                vertex_defs.push(val.clone());
+                fragment_defs.push(val);
                 targets.push(Some(ColorTargetState {
                     format: if key.hdr_format() {
                         ViewTarget::TEXTURE_FORMAT_HDR
@@ -312,8 +273,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                     }),
                     write_mask: ColorWrites::ALL,
                 }));
-
-                bind_layouts.push(self.outline_volume_bind_group_layout.clone());
             }
         }
         let buffers = vec![layout.0.get_layout(&buffer_attrs)?];
@@ -367,51 +326,42 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = (SRes<RenderMeshInstances>, SQuery<&'static ExtractedOutline>);
-    type CompareData = ();
-    type BufferData = MeshUniform;
+    type Param = SQuery<&'static ExtractedOutline>;
+    type CompareData = AssetId<Mesh>;
+    type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
-        (_mesh_instances, outline_query): &SystemParamItem<Self::Param>,
+        outline_query: &SystemParamItem<Self::Param>,
         entity: Entity,
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
         let outline = outline_query.get(entity).unwrap();
-        let ts = MeshTransforms {
-            world_from_local: (&outline.transform).into(),
-            previous_world_from_local: (&outline.transform).into(),
-            flags: MeshFlags::NONE.bits(),
-        };
-        Some((MeshUniform::new(&ts, None), None))
+        Some((outline.instance_data.clone(), Some(outline.mesh_id)))
     }
 }
 
 impl GetFullBatchData for OutlinePipeline {
-    type BufferInputData = MeshInputUniform;
+    type BufferInputData = ();
 
     fn get_binned_batch_data(
-        _param: &SystemParamItem<Self::Param>,
-        _query_item: Entity,
+        outline_query: &SystemParamItem<Self::Param>,
+        entity: Entity,
     ) -> Option<Self::BufferData> {
-        None
+        let outline = outline_query.get(entity).unwrap();
+        Some(outline.instance_data.clone())
     }
 
     fn get_index_and_compare_data(
-        (mesh_instances, _outline_query): &SystemParamItem<Self::Param>,
-        query_item: Entity,
+        _param: &SystemParamItem<Self::Param>,
+        _query_item: Entity,
     ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
-        let RenderMeshInstances::GpuBuilding(ref mesh_instances) = **mesh_instances else {
-            error!("`get_index_and_compare_data` should not be called when GpuBuilding.");
-            return None;
-        };
-        let mesh_instance = mesh_instances.get(&query_item)?;
-        Some((mesh_instance.current_uniform_index, None))
+        unimplemented!("GPU batching is not used.");
     }
 
     fn get_binned_index(
         _param: &SystemParamItem<Self::Param>,
         _query_item: Entity,
     ) -> Option<NonMaxU32> {
-        None
+        unimplemented!("GPU batching is not used.");
     }
 
     fn get_batch_indirect_parameters_index(
@@ -420,6 +370,6 @@ impl GetFullBatchData for OutlinePipeline {
         _entity: Entity,
         _instance_index: u32,
     ) -> Option<NonMaxU32> {
-        None
+        unimplemented!("GPU batching is not used.");
     }
 }

@@ -25,6 +25,9 @@
 use bevy::asset::load_internal_asset;
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
 use bevy::prelude::*;
+use bevy::render::batching::no_gpu_preprocessing::{
+    clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
+};
 use bevy::render::extract_component::{
     ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
 };
@@ -34,22 +37,20 @@ use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
 };
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
+use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use interpolation::Lerp;
 use msaa::MsaaExtraWritebackNode;
+use uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 
 use crate::draw::{
     queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
 };
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
-use crate::uniforms::{
-    extract_outline_uniforms, prepare_outline_stencil_bind_group,
-    prepare_outline_volume_bind_group, set_outline_visibility, OutlineFragmentUniform,
-    OutlineStencilUniform, OutlineVolumeUniform,
-};
+use crate::uniforms::{extract_outline_uniforms, set_outline_visibility};
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
@@ -242,9 +243,6 @@ impl Plugin for OutlinePlugin {
 
         app.add_plugins((
             ExtractComponentPlugin::<OutlineRenderLayers>::default(),
-            UniformComponentPlugin::<OutlineStencilUniform>::default(),
-            UniformComponentPlugin::<OutlineVolumeUniform>::default(),
-            UniformComponentPlugin::<OutlineFragmentUniform>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             SortedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
             SortedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
@@ -284,10 +282,14 @@ impl Plugin for OutlinePlugin {
             Render,
             (
                 prepare_outline_view_bind_group,
-                prepare_outline_stencil_bind_group,
-                prepare_outline_volume_bind_group,
+                prepare_outline_instance_bind_group,
             )
                 .in_set(RenderSet::PrepareBindGroups),
+        )
+        .add_systems(
+            Render,
+            write_batched_instance_buffer::<OutlinePipeline>
+                .in_set(RenderSet::PrepareResourcesFlush),
         )
         .add_systems(
             Render,
@@ -301,6 +303,12 @@ impl Plugin for OutlinePlugin {
                 sort_phase_system::<TransparentOutline>,
             )
                 .in_set(RenderSet::PhaseSort),
+        )
+        .add_systems(
+            Render,
+            clear_batched_cpu_instance_buffers::<OutlinePipeline>
+                .in_set(RenderSet::Cleanup)
+                .after(RenderSet::Render),
         )
         .add_render_graph_node::<ViewNodeRunner<MsaaExtraWritebackNode>>(
             Core3d,
@@ -320,7 +328,11 @@ impl Plugin for OutlinePlugin {
     }
 
     fn finish(&self, app: &mut App) {
-        app.sub_app_mut(RenderApp)
-            .init_resource::<OutlinePipeline>();
+        let render_app = app.sub_app_mut(RenderApp);
+        let render_device = render_app.world().resource::<RenderDevice>();
+        let instance_buffer = BatchedInstanceBuffer::<OutlineInstanceUniform>::new(render_device);
+        render_app
+            .init_resource::<OutlinePipeline>()
+            .insert_resource(instance_buffer);
     }
 }
