@@ -21,7 +21,7 @@ pub(crate) struct ExtractedOutline {
 }
 
 #[derive(Clone, ShaderType)]
-pub struct OutlineInstanceUniform {
+pub(crate) struct OutlineInstanceUniform {
     pub world_from_local: [Vec4; 3],
     pub origin_in_world: Vec3,
     pub volume_offset: f32,
