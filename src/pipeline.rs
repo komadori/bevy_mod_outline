@@ -33,11 +33,14 @@ use crate::uniforms::{DepthMode, ExtractedOutline, OutlineInstanceUniform};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
+pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(158939267822951776165272591102639985656);
+
 pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(2101625026478770097);
+    Handle::weak_from_u128(223498151714529302374103749587714613067);
 
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(12033806834125368121);
+    Handle::weak_from_u128(330091643565174537467176491706815552661);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PassType {

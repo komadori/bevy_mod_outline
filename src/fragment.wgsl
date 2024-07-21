@@ -1,11 +1,4 @@
-struct VertexOutput {
-#ifdef FLAT_DEPTH
-    @location(0) @interpolate(flat) flat_depth: f32,
-#endif
-#ifdef VOLUME
-    @location(1) @interpolate(flat) volume_colour: vec4<f32>,
-#endif
-};
+#import bevy_mod_outline::common::VertexOutput
 
 struct FragmentOutput {
     @location(0) colour: vec4<f32>,

@@ -42,6 +42,7 @@ fn setup(
                 colour: Color::srgb(0.0, 1.0, 0.0),
                 width: 25.0,
             },
+            mode: OutlineMode::RealVertex,
             ..default()
         })
         .insert(Wobbles);

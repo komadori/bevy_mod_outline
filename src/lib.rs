@@ -41,15 +41,17 @@ use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use msaa::MsaaExtraWritebackNode;
-use uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 
 use crate::draw::{
     queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
 };
+use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
-use crate::pipeline::{OutlinePipeline, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE};
+use crate::pipeline::{
+    OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
+};
 use crate::uniforms::{extract_outline_uniforms, set_outline_visibility};
+use crate::uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
@@ -238,6 +240,7 @@ pub struct OutlinePlugin;
 
 impl Plugin for OutlinePlugin {
     fn build(&self, app: &mut App) {
+        load_internal_asset!(app, COMMON_SHADER_HANDLE, "common.wgsl", Shader::from_wgsl);
         load_internal_asset!(
             app,
             OUTLINE_SHADER_HANDLE,
