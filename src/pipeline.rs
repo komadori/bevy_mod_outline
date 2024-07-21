@@ -338,7 +338,10 @@ impl GetBatchData for OutlinePipeline {
         entity: Entity,
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
         let outline = outline_query.get(entity).unwrap();
-        Some((outline.instance_data.clone(), Some(outline.mesh_id)))
+        Some((
+            outline.instance_data.clone(),
+            outline.automatic_batching.then_some(outline.mesh_id),
+        ))
     }
 }
 

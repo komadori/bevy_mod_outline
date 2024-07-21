@@ -3,7 +3,7 @@ use bevy::{
     math::Affine3,
     prelude::*,
     render::{
-        batching::no_gpu_preprocessing::BatchedInstanceBuffer,
+        batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
@@ -17,6 +17,7 @@ use crate::{pipeline::OutlinePipeline, ComputedOutline};
 pub(crate) struct ExtractedOutline {
     pub depth_mode: DepthMode,
     pub mesh_id: AssetId<Mesh>,
+    pub automatic_batching: bool,
     pub instance_data: OutlineInstanceUniform,
 }
 
@@ -59,14 +60,23 @@ pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &Com
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_uniforms(
     mut commands: Commands,
-    query: Extract<Query<(Entity, &ComputedOutline, &GlobalTransform, &Handle<Mesh>)>>,
+    query: Extract<
+        Query<(
+            Entity,
+            &ComputedOutline,
+            &GlobalTransform,
+            &Handle<Mesh>,
+            Has<NoAutomaticBatching>,
+        )>,
+    >,
 ) {
-    for (entity, computed, transform, mesh) in query.iter() {
+    for (entity, computed, transform, mesh, no_automatic_batching) in query.iter() {
         let cmds = &mut commands.get_or_spawn(entity);
         if let ComputedOutline(Some(computed)) = computed {
             cmds.insert(ExtractedOutline {
                 depth_mode: computed.mode.value.depth_mode,
                 mesh_id: mesh.id(),
+                automatic_batching: !no_automatic_batching,
                 instance_data: OutlineInstanceUniform {
                     world_from_local: Affine3::from(&transform.affine()).to_transpose(),
                     origin_in_world: computed.mode.value.world_origin,
