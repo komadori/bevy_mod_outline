@@ -1,5 +1,15 @@
 # Changelog
 
+## bevy_mod_outline 0.8.1 (2024-07-21)
+
+### Added
+- Added support for NoAutomaticBatching.
+
+### Fixed
+- Fixed stencil shader with OutlineMode::RealVertex.
+- Fixed using wrong entity data for skinned/morphed meshes.
+- Fixed panic if entity despawned between extract and render.
+
 ## bevy_mod_outline 0.8.0 (2024-07-09)
 
 ### Added
