@@ -155,11 +155,17 @@ impl PipelineKey {
 
 impl From<PipelineKey> for MeshPipelineKey {
     fn from(key: PipelineKey) -> Self {
+        let mut mesh_key = MeshPipelineKey::empty();
         if key.morph_targets() {
-            MeshPipelineKey::empty() | MeshPipelineKey::MORPH_TARGETS
-        } else {
-            MeshPipelineKey::empty()
+            mesh_key |= MeshPipelineKey::MORPH_TARGETS;
         }
+        if key
+            .view_key()
+            .contains(MeshPipelineViewLayoutKey::MOTION_VECTOR_PREPASS)
+        {
+            mesh_key |= MeshPipelineKey::MOTION_VECTOR_PREPASS;
+        }
+        mesh_key
     }
 }
 
