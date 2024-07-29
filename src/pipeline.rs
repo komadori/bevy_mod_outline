@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use bevy::ecs::system::lifetimeless::SQuery;
 use bevy::ecs::system::SystemParamItem;
-use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey, MeshPipelineViewLayoutKey};
+use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
 use bevy::render::batching::{GetBatchData, GetFullBatchData};
 use bevy::render::render_resource::binding_types::uniform_buffer_sized;
@@ -63,7 +63,7 @@ impl PipelineKey {
         pub offset_zero, set_offset_zero: 13;
         pub hdr_format, set_hdr_format: 14;
         pub morph_targets, set_morph_targets: 15;
-        view_key_int, set_view_key_int: 23, 16;
+        pub motion_vector_prepass, set_motion_vector_prepass: 16;
     }
 
     pub(crate) fn new() -> Self {
@@ -143,13 +143,9 @@ impl PipelineKey {
         self
     }
 
-    pub(crate) fn with_view_key(mut self, view_key: MeshPipelineViewLayoutKey) -> Self {
-        self.set_view_key_int(view_key.bits());
+    pub(crate) fn with_motion_vector_prepass(mut self, motion_vector_prepass: bool) -> Self {
+        self.set_motion_vector_prepass(motion_vector_prepass);
         self
-    }
-
-    pub(crate) fn view_key(&self) -> MeshPipelineViewLayoutKey {
-        MeshPipelineViewLayoutKey::from_bits(self.view_key_int()).unwrap()
     }
 }
 
@@ -159,10 +155,7 @@ impl From<PipelineKey> for MeshPipelineKey {
         if key.morph_targets() {
             mesh_key |= MeshPipelineKey::MORPH_TARGETS;
         }
-        if key
-            .view_key()
-            .contains(MeshPipelineViewLayoutKey::MOTION_VECTOR_PREPASS)
-        {
+        if key.motion_vector_prepass() {
             mesh_key |= MeshPipelineKey::MOTION_VECTOR_PREPASS;
         }
         mesh_key
@@ -220,7 +213,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
 
         let bind_layouts = vec![
-            self.mesh_pipeline.get_view_layout(key.view_key()).clone(),
+            self.outline_view_bind_group_layout.clone(),
             setup_morph_and_skinning_defs(
                 &self.mesh_pipeline.mesh_layouts,
                 layout,
@@ -229,7 +222,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &mut vertex_defs,
                 &mut buffer_attrs,
             ),
-            self.outline_view_bind_group_layout.clone(),
             self.outline_instance_bind_group_layout.clone(),
         ];
 

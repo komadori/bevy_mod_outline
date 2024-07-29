@@ -28,22 +28,20 @@ struct Vertex {
 
 struct OutlineViewUniform {
     @align(16)
+    clip_from_world: mat4x4<f32>,
     scale: vec2<f32>,
 };
 
 @group(0) @binding(0)
-var<uniform> view: View;
+var<uniform> view_uniform: OutlineViewUniform;
 
 #import bevy_pbr::skinning
 #import bevy_pbr::morph
 
-@group(2) @binding(0)
-var<uniform> view_uniform: OutlineViewUniform;
-
 #ifdef INSTANCE_BATCH_SIZE
-@group(3) @binding(0) var<uniform> mesh: array<Instance, #{INSTANCE_BATCH_SIZE}u>;
+@group(2) @binding(0) var<uniform> mesh: array<Instance, #{INSTANCE_BATCH_SIZE}u>;
 #else
-@group(3) @binding(0) var<storage> mesh: array<Instance>;
+@group(2) @binding(0) var<storage> mesh: array<Instance>;
 #endif
 
 #ifdef MORPH_TARGETS
@@ -88,7 +86,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #else
     let model = bevy_render::maths::affine3_to_square(instance.world_from_local);
 #endif
-    let clip_pos = view.clip_from_world * (model * vec4<f32>(vertex.position, 1.0));
+    let clip_pos = view_uniform.clip_from_world * (model * vec4<f32>(vertex.position, 1.0));
 #ifdef VOLUME
     let offset = instance.volume_offset;
 #else
@@ -97,14 +95,14 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
 #else
-    let clip_norm = mat4to3(view.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
+    let clip_norm = mat4to3(view_uniform.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
     let ndc_delta = offset * normalize(clip_norm.xy) * view_uniform.scale * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
     var out: VertexOutput;
     out.position = vec4<f32>(out_xy, clip_pos.zw);
 #ifdef FLAT_DEPTH
-    out.flat_depth = model_origin_z(instance.origin_in_world, view.clip_from_world);
+    out.flat_depth = model_origin_z(instance.origin_in_world, view_uniform.clip_from_world);
 #endif
 #ifdef VOLUME
     out.volume_colour = instance.volume_colour;

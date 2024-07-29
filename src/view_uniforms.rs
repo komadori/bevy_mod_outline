@@ -18,6 +18,7 @@ use crate::pipeline::OutlinePipeline;
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineViewUniform {
     #[align(16)]
+    clip_from_world: Mat4,
     scale: Vec2,
 }
 
@@ -32,15 +33,21 @@ pub(crate) fn extract_outline_view_uniforms(
     mut stencil_phases: ResMut<ViewSortedRenderPhases<StencilOutline>>,
     mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
-    query: Extract<Query<(Entity, &Camera, Option<&RenderLayers>), With<Camera3d>>>,
+    query: Extract<
+        Query<(Entity, &Camera, &GlobalTransform, Option<&RenderLayers>), With<Camera3d>>,
+    >,
 ) {
-    for (entity, camera, view_mask) in query.iter() {
+    for (entity, camera, transform, view_mask) in query.iter() {
         if !camera.is_active {
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
+            let view_from_world = transform.compute_matrix().inverse();
             let mut entity_commands = commands.get_or_spawn(entity);
-            entity_commands.insert(OutlineViewUniform { scale: 2.0 / size });
+            entity_commands.insert(OutlineViewUniform {
+                clip_from_world: camera.clip_from_view() * view_from_world,
+                scale: 2.0 / size,
+            });
 
             if let Some(view_mask) = view_mask {
                 entity_commands.insert(view_mask.clone());
