@@ -75,7 +75,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 
 @vertex
 fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
-    let instance = mesh[vertex_no_morph.instance_index];
+    let iid = vertex_no_morph.instance_index;
 #ifdef MORPH_TARGETS
     var vertex = morph_vertex(vertex_no_morph);
 #else
@@ -84,13 +84,13 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #ifdef SKINNED
     let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
 #else
-    let model = bevy_render::maths::affine3_to_square(instance.world_from_local);
+    let model = bevy_render::maths::affine3_to_square(mesh[iid].world_from_local);
 #endif
     let clip_pos = view_uniform.clip_from_world * (model * vec4<f32>(vertex.position, 1.0));
 #ifdef VOLUME
-    let offset = instance.volume_offset;
+    let offset = mesh[iid].volume_offset;
 #else
-    let offset = instance.stencil_offset;
+    let offset = mesh[iid].stencil_offset;
 #endif
 #ifdef OFFSET_ZERO
     let out_xy = clip_pos.xy;
@@ -102,10 +102,10 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.position = vec4<f32>(out_xy, clip_pos.zw);
 #ifdef FLAT_DEPTH
-    out.flat_depth = model_origin_z(instance.origin_in_world, view_uniform.clip_from_world);
+    out.flat_depth = model_origin_z(mesh[iid].origin_in_world, view_uniform.clip_from_world);
 #endif
 #ifdef VOLUME
-    out.volume_colour = instance.volume_colour;
+    out.volume_colour = mesh[iid].volume_colour;
 #endif
     return out;
 }
