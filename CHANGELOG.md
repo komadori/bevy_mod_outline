@@ -1,5 +1,12 @@
 # Changelog
 
+## bevy_mod_outline 0.8.2 (2024-08-04)
+
+### Fixed
+- Fixed outlining skinned meshes when motion vector prepass enabled.
+- Fixed TAA jitter affecting outlines.
+- Fixed depth precision issue on Metal platforms.
+
 ## bevy_mod_outline 0.8.1 (2024-07-21)
 
 ### Added
