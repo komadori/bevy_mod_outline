@@ -14,9 +14,9 @@ fn process_async_scene_outline(
     for (entity, instance) in async_query.iter() {
         if scene_spawner.instance_is_ready(**instance) {
             for child in scene_spawner.iter_instance_entities(**instance) {
-                commands
-                    .entity(child)
-                    .insert(InheritOutlineBundle::default());
+                if let Some(mut ecmds) = commands.get_entity(child) {
+                    ecmds.insert(InheritOutlineBundle::default());
+                }
             }
             commands.entity(entity).remove::<AsyncSceneInheritOutline>();
         }
