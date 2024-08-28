@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.8.3 (2024-08-28)
+
+### Fixed
+- Fixed panic if a scene entity is despawned straight after spawning.
+
 ## bevy_mod_outline 0.8.2 (2024-08-04)
 
 ### Fixed
