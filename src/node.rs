@@ -14,6 +14,7 @@ use bevy::render::render_resource::{
     CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     StoreOp,
 };
+use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
 
@@ -21,6 +22,7 @@ pub(crate) struct StencilOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
+    pub main_entity: MainEntity,
     pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
@@ -30,6 +32,10 @@ impl PhaseItem for StencilOutline {
     #[inline]
     fn entity(&self) -> Entity {
         self.entity
+    }
+
+    fn main_entity(&self) -> bevy::render::sync_world::MainEntity {
+        self.main_entity
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
@@ -77,6 +83,7 @@ pub(crate) struct OpaqueOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
+    pub main_entity: MainEntity,
     pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
@@ -86,6 +93,10 @@ impl PhaseItem for OpaqueOutline {
     #[inline]
     fn entity(&self) -> Entity {
         self.entity
+    }
+
+    fn main_entity(&self) -> bevy::render::sync_world::MainEntity {
+        self.main_entity
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
@@ -133,6 +144,7 @@ pub(crate) struct TransparentOutline {
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
+    pub main_entity: MainEntity,
     pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
@@ -142,6 +154,10 @@ impl PhaseItem for TransparentOutline {
     #[inline]
     fn entity(&self) -> Entity {
         self.entity
+    }
+
+    fn main_entity(&self) -> bevy::render::sync_world::MainEntity {
+        self.main_entity
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
@@ -238,7 +254,9 @@ impl ViewNode for OutlineNode {
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            stencil_phase.render(&mut tracked_pass, world, view_entity);
+            if let Err(err) = stencil_phase.render(&mut tracked_pass, world, view_entity) {
+                error!("Error encountered while rendering the outline stencil phase {err:?}");
+            }
         }
 
         if !opaque_phase.items.is_empty() {
@@ -253,7 +271,9 @@ impl ViewNode for OutlineNode {
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            opaque_phase.render(&mut tracked_pass, world, view_entity);
+            if let Err(err) = opaque_phase.render(&mut tracked_pass, world, view_entity) {
+                error!("Error encountered while rendering the outline opaque phase {err:?}");
+            }
         }
 
         if !transparent_phase.items.is_empty() {
@@ -268,7 +288,9 @@ impl ViewNode for OutlineNode {
             if let Some(viewport) = camera.viewport.as_ref() {
                 tracked_pass.set_camera_viewport(viewport);
             }
-            transparent_phase.render(&mut tracked_pass, world, view_entity);
+            if let Err(err) = transparent_phase.render(&mut tracked_pass, world, view_entity) {
+                error!("Error encountered while rendering the outline opaque phase {err:?}");
+            }
         }
 
         Ok(())

@@ -1,10 +1,11 @@
 use std::borrow::Cow;
 
-use bevy::ecs::system::lifetimeless::SQuery;
+use bevy::ecs::system::lifetimeless::{SQuery, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
 use bevy::render::batching::{GetBatchData, GetFullBatchData};
+use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_resource::binding_types::uniform_buffer_sized;
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
@@ -14,6 +15,7 @@ use bevy::render::render_resource::{
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
+use bevy::render::sync_world::MainEntity;
 use bevy::render::texture::BevyDefault;
 use bevy::render::view::ViewTarget;
 use bevy::{
@@ -327,17 +329,22 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = SQuery<&'static ExtractedOutline>;
+    type Param = (SQuery<&'static ExtractedOutline>, SRes<MeshAllocator>);
     type CompareData = AssetId<Mesh>;
     type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
-        outline_query: &SystemParamItem<Self::Param>,
-        entity: Entity,
+        (outline_query, mesh_allocator): &SystemParamItem<Self::Param>,
+        (entity, _main_entity): (Entity, MainEntity),
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
         let outline = outline_query.get(entity).ok()?;
+        let mut instance_data = outline.instance_data.clone();
+        instance_data.first_vertex_index = mesh_allocator
+            .mesh_vertex_slice(&outline.mesh_id)
+            .map(|x| x.range.start)
+            .unwrap_or(0);
         Some((
-            outline.instance_data.clone(),
+            instance_data,
             outline.automatic_batching.then_some(outline.mesh_id),
         ))
     }
@@ -347,23 +354,28 @@ impl GetFullBatchData for OutlinePipeline {
     type BufferInputData = ();
 
     fn get_binned_batch_data(
-        outline_query: &SystemParamItem<Self::Param>,
-        entity: Entity,
+        (outline_query, mesh_allocator): &SystemParamItem<Self::Param>,
+        (entity, _main_entity): (Entity, MainEntity),
     ) -> Option<Self::BufferData> {
         let outline = outline_query.get(entity).ok()?;
-        Some(outline.instance_data.clone())
+        let mut instance_data = outline.instance_data.clone();
+        instance_data.first_vertex_index = mesh_allocator
+            .mesh_vertex_slice(&outline.mesh_id)
+            .map(|x| x.range.start)
+            .unwrap_or(0);
+        Some(instance_data)
     }
 
     fn get_index_and_compare_data(
         _param: &SystemParamItem<Self::Param>,
-        _query_item: Entity,
+        (_entity, _main_entity): (Entity, MainEntity),
     ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
         unimplemented!("GPU batching is not used.");
     }
 
     fn get_binned_index(
         _param: &SystemParamItem<Self::Param>,
-        _query_item: Entity,
+        (_entity, _main_entity): (Entity, MainEntity),
     ) -> Option<NonMaxU32> {
         unimplemented!("GPU batching is not used.");
     }
@@ -371,7 +383,7 @@ impl GetFullBatchData for OutlinePipeline {
     fn get_batch_indirect_parameters_index(
         _param: &SystemParamItem<Self::Param>,
         _indirect_parameters_buffer: &mut bevy::render::batching::gpu_preprocessing::IndirectParametersBuffer,
-        _entity: Entity,
+        (_entity, _main_entity): (Entity, MainEntity),
         _instance_index: u32,
     ) -> Option<NonMaxU32> {
         unimplemented!("GPU batching is not used.");

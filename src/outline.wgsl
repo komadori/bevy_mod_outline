@@ -9,6 +9,7 @@ struct Instance {
     volume_offset: f32,
     volume_colour: vec4<f32>,
     stencil_offset: f32,
+    first_vertex_index: u32,
 };
 
 struct Vertex {
@@ -47,13 +48,16 @@ var<uniform> view_uniform: OutlineViewUniform;
 #ifdef MORPH_TARGETS
 fn morph_vertex(vertex_in: Vertex) -> Vertex {
     var vertex = vertex_in;
+    let first_vertex = mesh[vertex.instance_index].first_vertex_index;
+    let vertex_index = vertex.index - first_vertex;
+
     let weight_count = bevy_pbr::morph::layer_count();
     for (var i: u32 = 0u; i < weight_count; i ++) {
         let weight = bevy_pbr::morph::weight_at(i);
         if weight == 0.0 {
             continue;
         }
-        vertex.position += weight * bevy_pbr::morph::morph(vertex.index, bevy_pbr::morph::position_offset, i);
+        vertex.position += weight * bevy_pbr::morph::morph(vertex_index, bevy_pbr::morph::position_offset, i);
     }
     return vertex;
 }

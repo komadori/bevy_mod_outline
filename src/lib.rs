@@ -28,9 +28,7 @@ use bevy::prelude::*;
 use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
-use bevy::render::extract_component::{
-    ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin,
-};
+use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
@@ -42,15 +40,13 @@ use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 
-use crate::draw::{
-    queue_outline_stencil_mesh, queue_outline_volume_mesh, DrawOutline, DrawStencil,
-};
+use crate::draw::{queue_outline_mesh, DrawOutline, DrawStencil};
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
 use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
 };
-use crate::uniforms::{extract_outline_uniforms, set_outline_visibility};
+use crate::uniforms::set_outline_visibility;
 use crate::uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
@@ -140,6 +136,7 @@ impl_lerp!(OutlineStencil);
 
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Reflect, Default)]
+#[require(OutlineStencil)]
 #[reflect(Component, Default)]
 pub struct OutlineVolume {
     /// Enable rendering of the outline
@@ -165,26 +162,6 @@ impl_lerp!(OutlineVolume);
 #[derive(Component, Reflect, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
 #[reflect(Component, Default)]
 pub struct OutlineRenderLayers(pub RenderLayers);
-
-impl ExtractComponent for OutlineRenderLayers {
-    type QueryData = (
-        Option<&'static OutlineRenderLayers>,
-        Option<&'static RenderLayers>,
-    );
-    type QueryFilter = With<ComputedOutline>;
-    type Out = Self;
-
-    fn extract_component(
-        (outline_mask, object_mask): (Option<&OutlineRenderLayers>, Option<&RenderLayers>),
-    ) -> Option<Self> {
-        Some(
-            outline_mask
-                .cloned()
-                .or_else(|| object_mask.cloned().map(OutlineRenderLayers))
-                .unwrap_or_default(),
-        )
-    }
-}
 
 /// A component which specifies how the outline should be rendered.
 #[derive(Clone, Component, Reflect)]
@@ -255,7 +232,7 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugins((
-            ExtractComponentPlugin::<OutlineRenderLayers>::default(),
+            ExtractComponentPlugin::<ComputedOutline>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             SortedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
             SortedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
@@ -266,6 +243,9 @@ impl Plugin for OutlinePlugin {
         .register_type::<OutlineRenderLayers>()
         .register_type::<OutlineMode>()
         .register_type::<InheritOutline>()
+        .register_required_components::<OutlineStencil, ComputedOutline>()
+        .register_required_components::<OutlineVolume, ComputedOutline>()
+        .register_required_components::<InheritOutline, ComputedOutline>()
         .add_systems(
             PostUpdate,
             (
@@ -283,10 +263,7 @@ impl Plugin for OutlinePlugin {
         .add_render_command::<StencilOutline, DrawStencil>()
         .add_render_command::<OpaqueOutline, DrawOutline>()
         .add_render_command::<TransparentOutline, DrawOutline>()
-        .add_systems(
-            ExtractSchedule,
-            (extract_outline_uniforms, extract_outline_view_uniforms),
-        )
+        .add_systems(ExtractSchedule, extract_outline_view_uniforms)
         .add_systems(
             Render,
             msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSet::Prepare),
@@ -304,10 +281,7 @@ impl Plugin for OutlinePlugin {
             write_batched_instance_buffer::<OutlinePipeline>
                 .in_set(RenderSet::PrepareResourcesFlush),
         )
-        .add_systems(
-            Render,
-            (queue_outline_stencil_mesh, queue_outline_volume_mesh).in_set(RenderSet::QueueMeshes),
-        )
+        .add_systems(Render, queue_outline_mesh.in_set(RenderSet::QueueMeshes))
         .add_systems(
             Render,
             (

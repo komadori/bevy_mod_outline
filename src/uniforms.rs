@@ -4,21 +4,25 @@ use bevy::{
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
+        extract_component::ExtractComponent,
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
-        Extract,
+        view::RenderLayers,
     },
 };
 
 use crate::{pipeline::OutlinePipeline, ComputedOutline};
 
 #[derive(Component)]
-pub(crate) struct ExtractedOutline {
-    pub depth_mode: DepthMode,
-    pub mesh_id: AssetId<Mesh>,
-    pub automatic_batching: bool,
-    pub instance_data: OutlineInstanceUniform,
+pub struct ExtractedOutline {
+    pub(crate) stencil: bool,
+    pub(crate) volume: bool,
+    pub(crate) depth_mode: DepthMode,
+    pub(crate) mesh_id: AssetId<Mesh>,
+    pub(crate) automatic_batching: bool,
+    pub(crate) instance_data: OutlineInstanceUniform,
+    pub(crate) layers: RenderLayers,
 }
 
 #[derive(Clone, ShaderType)]
@@ -28,13 +32,8 @@ pub(crate) struct OutlineInstanceUniform {
     pub volume_offset: f32,
     pub volume_colour: Vec4,
     pub stencil_offset: f32,
+    pub first_vertex_index: u32,
 }
-
-#[derive(Component)]
-pub(crate) struct OutlineStencilEnabled;
-
-#[derive(Component)]
-pub(crate) struct OutlineVolumeEnabled;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum DepthMode {
@@ -57,41 +56,41 @@ pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &Com
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub(crate) fn extract_outline_uniforms(
-    mut commands: Commands,
-    query: Extract<
-        Query<(
-            Entity,
-            &ComputedOutline,
-            &GlobalTransform,
-            &Handle<Mesh>,
-            Has<NoAutomaticBatching>,
-        )>,
-    >,
-) {
-    for (entity, computed, transform, mesh, no_automatic_batching) in query.iter() {
-        let cmds = &mut commands.get_or_spawn(entity);
-        if let ComputedOutline(Some(computed)) = computed {
-            cmds.insert(ExtractedOutline {
-                depth_mode: computed.mode.value.depth_mode,
-                mesh_id: mesh.id(),
-                automatic_batching: !no_automatic_batching,
-                instance_data: OutlineInstanceUniform {
-                    world_from_local: Affine3::from(&transform.affine()).to_transpose(),
-                    origin_in_world: computed.mode.value.world_origin,
-                    stencil_offset: computed.stencil.value.offset,
-                    volume_offset: computed.volume.value.offset,
-                    volume_colour: computed.volume.value.colour.to_vec4(),
-                },
-            });
-            if computed.stencil.value.enabled {
-                cmds.insert(OutlineStencilEnabled);
-            }
-            if computed.volume.value.enabled {
-                cmds.insert(OutlineVolumeEnabled);
-            }
-        }
+impl ExtractComponent for ComputedOutline {
+    type QueryData = (
+        &'static ComputedOutline,
+        &'static GlobalTransform,
+        &'static Mesh3d,
+        Has<NoAutomaticBatching>,
+    );
+    type QueryFilter = ();
+    type Out = ExtractedOutline;
+
+    fn extract_component(
+        (computed, transform, mesh, no_automatic_batching): bevy::ecs::query::QueryItem<
+            '_,
+            Self::QueryData,
+        >,
+    ) -> Option<Self::Out> {
+        let ComputedOutline(Some(computed)) = computed else {
+            return None;
+        };
+        Some(ExtractedOutline {
+            stencil: computed.stencil.value.enabled,
+            volume: computed.volume.value.enabled,
+            depth_mode: computed.mode.value.depth_mode,
+            layers: computed.layers.value.clone(),
+            mesh_id: mesh.id(),
+            automatic_batching: !no_automatic_batching,
+            instance_data: OutlineInstanceUniform {
+                world_from_local: Affine3::from(&transform.affine()).to_transpose(),
+                origin_in_world: computed.mode.value.world_origin,
+                stencil_offset: computed.stencil.value.offset,
+                volume_offset: computed.volume.value.offset,
+                volume_colour: computed.volume.value.colour.to_vec4(),
+                first_vertex_index: 0,
+            },
+        })
     }
 }
 

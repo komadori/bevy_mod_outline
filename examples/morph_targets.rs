@@ -9,10 +9,8 @@
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlineBundle, OutlinePlugin,
-    OutlineVolume,
+    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlinePlugin, OutlineVolume,
 };
-use std::f32::consts::PI;
 
 fn main() {
     App::new()
@@ -44,32 +42,23 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
         the_wave: asset_server.load("MorphStressTest.gltf#Animation2"),
         mesh: asset_server.load("MorphStressTest.gltf#Mesh0/Primitive0"),
     });
-    commands
-        .spawn(SceneBundle {
-            scene: asset_server.load("MorphStressTest.gltf#Scene0"),
-            ..default()
-        })
-        .insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                width: 3.0,
-                colour: Color::srgb(1.0, 0.0, 0.0),
-            },
-            ..default()
-        });
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            color: Color::WHITE,
-            illuminance: 19350.0,
-            ..default()
+    commands.spawn((
+        SceneRoot(asset_server.load("MorphStressTest.gltf#Scene0")),
+        OutlineVolume {
+            visible: true,
+            width: 3.0,
+            colour: Color::srgb(1.0, 0.0, 0.0),
         },
-        transform: Transform::from_rotation(Quat::from_rotation_z(PI / 2.0)),
+    ));
+    commands.spawn(DirectionalLight {
+        color: Color::WHITE,
+        illuminance: 19350.0,
         ..default()
     });
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3.0, 2.1, 5.2).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(3.0, 2.1, 5.2).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
 }
 
 /// Adds outlines to the meshes.
@@ -111,7 +100,9 @@ fn setup_animations(
             continue;
         }
         let (graph, animation) = AnimationGraph::from_clip(morph_data.the_wave.clone());
-        commands.entity(entity).insert(graphs.add(graph));
+        commands
+            .entity(entity)
+            .insert(AnimationGraphHandle(graphs.add(graph)));
         player.play(animation).repeat();
         *has_setup = true;
     }

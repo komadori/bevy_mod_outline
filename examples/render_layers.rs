@@ -5,12 +5,11 @@ use bevy::{
     render::{camera::Viewport, view::RenderLayers},
     window::PrimaryWindow,
 };
-use bevy_mod_outline::{OutlineBundle, OutlinePlugin, OutlineRenderLayers, OutlineVolume};
+use bevy_mod_outline::{OutlinePlugin, OutlineRenderLayers, OutlineVolume};
 
 #[bevy_main]
 fn main() {
     App::new()
-        .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
@@ -33,9 +32,9 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Add torus using the regular surface normals for outlining
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(
+    commands.spawn((
+        Mesh3d(
+            meshes.add(
                 Torus {
                     minor_radius: 0.2,
                     major_radius: 0.6,
@@ -45,36 +44,30 @@ fn setup(
                 .major_resolution(40)
                 .build(),
             ),
-            material: materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9))),
-            transform: Transform::from_rotation(Quat::from_rotation_x(0.5 * PI))
-                .with_translation(0.8 * Vec3::Y),
-            ..default()
-        })
-        .insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                colour: Color::WHITE,
-                width: 10.0,
-            },
-            ..default()
-        })
-        .insert(RenderLayers::layer(OBJECT_LAYER_ID))
-        .insert(OutlineRenderLayers(RenderLayers::layer(OUTLINE_LAYER_ID)));
+        ),
+        MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9)))),
+        Transform::from_rotation(Quat::from_rotation_x(0.5 * PI)).with_translation(0.8 * Vec3::Y),
+        OutlineVolume {
+            visible: true,
+            colour: Color::WHITE,
+            width: 10.0,
+        },
+        RenderLayers::layer(OBJECT_LAYER_ID),
+        OutlineRenderLayers(RenderLayers::layer(OUTLINE_LAYER_ID)),
+    ));
 
     // Add plane and light source
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)).mesh().build()),
-        material: materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3))),
-        ..default()
-    });
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)).mesh().build())),
+        MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3)))),
+    ));
+    commands.spawn((
+        PointLight {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 
     // Add cameras for different combinations of render-layers
     for i in 0..4 {
@@ -87,26 +80,25 @@ fn setup(
         if outline_layer {
             layers = layers.with(OUTLINE_LAYER_ID);
         }
-        commands
-            .spawn(Camera3dBundle {
-                camera: Camera {
-                    order: i,
-                    clear_color: if i > 0 {
-                        ClearColorConfig::None
-                    } else {
-                        ClearColorConfig::Default
-                    },
-                    ..default()
+        commands.spawn((
+            Camera3d::default(),
+            Camera {
+                order: i,
+                clear_color: if i > 0 {
+                    ClearColorConfig::None
+                } else {
+                    ClearColorConfig::Default
                 },
-                camera_3d: Camera3d { ..default() },
-                transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
                 ..default()
-            })
-            .insert(CameraMode {
+            },
+            Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            Msaa::Sample4,
+            CameraMode {
                 object_layer,
                 outline_layer,
-            })
-            .insert(layers);
+            },
+            layers,
+        ));
     }
 }
 

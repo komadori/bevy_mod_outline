@@ -9,6 +9,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
+use bevy::render::sync_world::RenderEntity;
 use bevy::render::view::RenderLayers;
 use bevy::render::Extract;
 
@@ -34,7 +35,15 @@ pub(crate) fn extract_outline_view_uniforms(
     mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     query: Extract<
-        Query<(Entity, &Camera, &GlobalTransform, Option<&RenderLayers>), With<Camera3d>>,
+        Query<
+            (
+                &RenderEntity,
+                &Camera,
+                &GlobalTransform,
+                Option<&RenderLayers>,
+            ),
+            With<Camera3d>,
+        >,
     >,
 ) {
     for (entity, camera, transform, view_mask) in query.iter() {
@@ -43,7 +52,7 @@ pub(crate) fn extract_outline_view_uniforms(
         }
         if let Some(size) = camera.logical_viewport_size() {
             let view_from_world = transform.compute_matrix().inverse();
-            let mut entity_commands = commands.get_or_spawn(entity);
+            let mut entity_commands = commands.entity(entity.id());
             entity_commands.insert(OutlineViewUniform {
                 clip_from_world: camera.clip_from_view() * view_from_world,
                 scale: 2.0 / size,
@@ -51,11 +60,13 @@ pub(crate) fn extract_outline_view_uniforms(
 
             if let Some(view_mask) = view_mask {
                 entity_commands.insert(view_mask.clone());
+            } else {
+                entity_commands.remove::<RenderLayers>();
             }
 
-            stencil_phases.insert_or_clear(entity);
-            opaque_phases.insert_or_clear(entity);
-            transparent_phases.insert_or_clear(entity);
+            stencil_phases.insert_or_clear(entity.id());
+            opaque_phases.insert_or_clear(entity.id());
+            transparent_phases.insert_or_clear(entity.id());
         }
     }
 }

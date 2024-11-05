@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
     AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, AutoGenerateOutlineNormalsPlugin,
-    OutlineBundle, OutlinePlugin, OutlineVolume,
+    OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -33,48 +33,42 @@ fn setup(
     commands.insert_resource(Fox(asset_server.load("Fox.glb#Animation0")));
 
     // Camera
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(100.0, 100.0, 150.0)
-            .looking_at(Vec3::new(0.0, 20.0, 0.0), Vec3::Y),
-        ..default()
-    });
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(100.0, 100.0, 150.0).looking_at(Vec3::new(0.0, 20.0, 0.0), Vec3::Y),
+    ));
 
     // Plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(
-            Plane3d::new(Vec3::Y, Vec2::new(500000.0, 500000.0))
-                .mesh()
-                .build(),
+    commands.spawn((
+        Mesh3d(
+            meshes.add(
+                Plane3d::new(Vec3::Y, Vec2::new(500000.0, 500000.0))
+                    .mesh()
+                    .build(),
+            ),
         ),
-        material: materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3))),
-        ..default()
-    });
+        MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3)))),
+    ));
 
     // Light
-    commands.spawn(DirectionalLightBundle {
-        transform: Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             shadows_enabled: true,
             ..default()
         },
-        ..default()
-    });
+        Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
+    ));
 
     // Fox
-    commands
-        .spawn(SceneBundle {
-            scene: asset_server.load("Fox.glb#Scene0"),
-            ..default()
-        })
-        .insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                width: 3.0,
-                colour: Color::srgb(1.0, 0.0, 0.0),
-            },
-            ..default()
-        })
-        .insert(AsyncSceneInheritOutline);
+    commands.spawn((
+        SceneRoot(asset_server.load("Fox.glb#Scene0")),
+        OutlineVolume {
+            visible: true,
+            width: 3.0,
+            colour: Color::srgb(1.0, 0.0, 0.0),
+        },
+        AsyncSceneInheritOutline,
+    ));
 }
 
 // Once the scene is loaded, start the animation
@@ -93,7 +87,9 @@ fn setup_scene_once_loaded(
         {
             if scene_manager.instance_is_ready(**scene) {
                 let (graph, animation) = AnimationGraph::from_clip(animation.0.clone());
-                commands.entity(entity).insert(graphs.add(graph));
+                commands
+                    .entity(entity)
+                    .insert(AnimationGraphHandle(graphs.add(graph)));
                 player.play(animation).repeat();
                 *done = true;
             }

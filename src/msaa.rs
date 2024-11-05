@@ -85,10 +85,9 @@ pub(crate) fn prepare_msaa_extra_writeback_pipelines(
     pipeline_cache: Res<PipelineCache>,
     mut pipelines: ResMut<SpecializedRenderPipelines<BlitPipeline>>,
     blit_pipeline: Res<BlitPipeline>,
-    view_targets: Query<(Entity, &ViewTarget)>,
-    msaa: Res<Msaa>,
+    view_targets: Query<(Entity, &ViewTarget, &Msaa)>,
 ) {
-    for (entity, view_target) in view_targets.iter() {
+    for (entity, view_target, msaa) in view_targets.iter() {
         if *msaa != Msaa::Off {
             let key = BlitPipelineKey {
                 texture_format: view_target.main_texture_format(),
@@ -100,6 +99,10 @@ pub(crate) fn prepare_msaa_extra_writeback_pipelines(
             commands
                 .entity(entity)
                 .insert(MsaaExtraWritebackPipeline(pipeline));
+        } else {
+            commands
+                .entity(entity)
+                .remove::<MsaaExtraWritebackPipeline>();
         }
     }
 }

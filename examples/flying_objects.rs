@@ -7,7 +7,6 @@ use bevy_mod_outline::*;
 #[bevy_main]
 fn main() {
     App::new()
-        .insert_resource(Msaa::Sample4)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((DefaultPlugins, OutlinePlugin))
         .add_systems(Startup, setup)
@@ -42,17 +41,15 @@ fn setup(
     });
 
     // Add light source and camera
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: 750.0,
-            ..default()
-        },
+    commands.spawn(DirectionalLight {
+        illuminance: 750.0,
         ..default()
     });
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Msaa::Sample4,
+    ));
 }
 
 struct SpawnState(Timer, Wrapping<u64>);
@@ -78,36 +75,28 @@ fn spawn_objects(
         let x = ((timer.1 .0 >> 40) as i8 as f32) / 128.0;
         let y = ((timer.1 .0 >> 32) as i8 as f32) / 128.0;
         let b = (timer.1 .0 >> 48) & 1 == 1;
-        commands
-            .spawn(PbrBundle {
-                mesh: assets.mesh.clone(),
-                material: assets.material.clone(),
-                transform: Transform::from_rotation(Quat::from_axis_angle(
-                    Vec3::new(1.0, 0.0, 0.0),
-                    0.25 * TAU,
-                ))
+        commands.spawn((
+            Mesh3d(assets.mesh.clone()),
+            MeshMaterial3d(assets.material.clone()),
+            Transform::from_rotation(Quat::from_axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.25 * TAU))
                 .with_translation(Vec3::new(15.0 * x, 15.0 * y, 0.0)),
-                ..default()
-            })
-            .insert(FlyingObject)
-            .insert(OutlineBundle {
-                outline: OutlineVolume {
-                    visible: true,
-                    width: if b { 10.0 } else { 5.0 },
-                    colour: if b {
-                        Color::srgb(0.0, 1.0, 0.0)
-                    } else {
-                        Color::srgb(1.0, 0.0, 0.0)
-                    },
+            OutlineVolume {
+                visible: true,
+                width: if b { 10.0 } else { 5.0 },
+                colour: if b {
+                    Color::srgb(0.0, 1.0, 0.0)
+                } else {
+                    Color::srgb(1.0, 0.0, 0.0)
                 },
-                ..default()
-            });
+            },
+            FlyingObject,
+        ));
     }
 }
 
 fn move_objects(time: Res<Time>, mut query: Query<&mut Transform, With<FlyingObject>>) {
     for mut t in query.iter_mut() {
-        t.translation += Vec3::new(0.0, 0.0, 5.0 * time.delta_seconds());
+        t.translation += Vec3::new(0.0, 0.0, 5.0 * time.delta_secs());
     }
 }
 

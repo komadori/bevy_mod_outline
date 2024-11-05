@@ -1,6 +1,9 @@
-use bevy::{ecs::query::QueryItem, prelude::*};
+use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
 
-use crate::{uniforms::DepthMode, InheritOutline, OutlineMode, OutlineStencil, OutlineVolume};
+use crate::{
+    uniforms::DepthMode, InheritOutline, OutlineMode, OutlineRenderLayers, OutlineStencil,
+    OutlineVolume,
+};
 
 #[derive(Clone, Default)]
 pub(crate) struct ComputedVolume {
@@ -25,7 +28,7 @@ impl Default for ComputedMode {
     fn default() -> Self {
         Self {
             world_origin: Vec3::NAN,
-            depth_mode: DepthMode::Real,
+            depth_mode: DepthMode::Flat,
         }
     }
 }
@@ -74,6 +77,7 @@ pub(crate) struct ComputedInternal {
     pub(crate) volume: Sourced<ComputedVolume>,
     pub(crate) stencil: Sourced<ComputedStencil>,
     pub(crate) mode: Sourced<ComputedMode>,
+    pub(crate) layers: Sourced<RenderLayers>,
 }
 
 /// A component for storing the computed depth at which the outline lies.
@@ -86,6 +90,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlineVolume>>,
     Option<Ref<'a, OutlineStencil>>,
     Option<Ref<'a, OutlineMode>>,
+    Option<Ref<'a, OutlineRenderLayers>>,
 );
 
 #[allow(clippy::type_complexity)]
@@ -154,7 +159,7 @@ fn propagate_computed_outline(
 
 fn update_computed_outline(
     computed: &mut ComputedOutline,
-    (visibility, transform, volume, stencil, mode): QueryItem<'_, OutlineComponents>,
+    (visibility, transform, volume, stencil, mode, layers): QueryItem<'_, OutlineComponents>,
     parent_computed: &ComputedInternal,
     parent_entity: Option<Entity>,
     force_update: bool,
@@ -171,10 +176,16 @@ fn update_computed_outline(
                 || computed.volume.is_changed(&volume)
                 || computed.stencil.is_changed(&stencil)
                 || computed.mode.is_changed(&mode)
+                || computed.layers.is_changed(&layers)
         } else {
             true
         };
     if changed {
+        let fallback_mode = if parent_computed.mode.value.world_origin.is_nan() {
+            Some(OutlineMode::default())
+        } else {
+            None
+        };
         *computed = ComputedOutline(Some(ComputedInternal {
             inherited_from: parent_entity,
             volume: if let Some(vol) = volume {
@@ -194,12 +205,12 @@ fn update_computed_outline(
             } else {
                 Sourced::inherit(&parent_computed.stencil.value)
             },
-            mode: if let Some(m) = mode {
-                Sourced::set(match m.as_ref() {
+            mode: if let Some(m) = mode.as_deref().cloned().or(fallback_mode) {
+                Sourced::set(match m {
                     OutlineMode::FlatVertex {
                         model_origin: origin,
                     } => ComputedMode {
-                        world_origin: transform.compute_matrix().project_point3(*origin),
+                        world_origin: transform.compute_matrix().project_point3(origin),
                         depth_mode: DepthMode::Flat,
                     },
                     OutlineMode::RealVertex => ComputedMode {
@@ -209,6 +220,11 @@ fn update_computed_outline(
                 })
             } else {
                 Sourced::inherit(&parent_computed.mode.value)
+            },
+            layers: if let Some(layers) = layers {
+                Sourced::set(layers.0.clone())
+            } else {
+                Sourced::inherit(&parent_computed.layers.value)
             },
         }));
     }
