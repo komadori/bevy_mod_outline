@@ -16,7 +16,6 @@ use bevy::render::render_resource::{
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
 use bevy::render::sync_world::MainEntity;
-use bevy::render::texture::BevyDefault;
 use bevy::render::view::ViewTarget;
 use bevy::{
     pbr::MeshPipeline,
@@ -27,6 +26,7 @@ use bevy::{
         },
     },
 };
+use bevy_image::BevyDefault;
 use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange};
@@ -324,6 +324,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             },
             push_constant_ranges,
             label: Some(Cow::Borrowed("outline_pipeline")),
+            zero_initialize_workgroup_memory: false,
         })
     }
 }
