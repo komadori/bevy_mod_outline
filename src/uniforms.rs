@@ -1,11 +1,9 @@
 use bevy::{
-    ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::Affine3,
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
         extract_component::ExtractComponent,
-        render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{BindGroup, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
         view::RenderLayers,
@@ -111,27 +109,4 @@ pub(crate) fn prepare_outline_instance_bind_group(
         );
         commands.insert_resource(OutlineInstanceBindGroup { bind_group });
     };
-}
-
-pub(crate) struct SetOutlineInstanceBindGroup<const I: usize>();
-
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineInstanceBindGroup<I> {
-    type ViewQuery = ();
-    type ItemQuery = ();
-    type Param = SRes<OutlineInstanceBindGroup>;
-    fn render<'w>(
-        item: &P,
-        _view_data: (),
-        _entity_data: Option<()>,
-        bind_group: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let dynamic_uniform_index = item.extra_index().as_dynamic_offset().map(|x| x.get());
-        pass.set_bind_group(
-            I,
-            &bind_group.into_inner().bind_group,
-            dynamic_uniform_index.as_slice(),
-        );
-        RenderCommandResult::Success
-    }
 }

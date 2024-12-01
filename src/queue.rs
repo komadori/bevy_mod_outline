@@ -1,35 +1,16 @@
 use bevy::core_pipeline::prepass::MotionVectorPrepass;
-use bevy::pbr::{DrawMesh, SetMeshBindGroup};
 use bevy::prelude::*;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_phase::{
-    DrawFunctions, PhaseItemExtraIndex, SetItemPipeline, ViewSortedRenderPhases,
-};
+use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, RenderLayers};
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
-use crate::uniforms::{ExtractedOutline, SetOutlineInstanceBindGroup};
-use crate::view_uniforms::SetOutlineViewBindGroup;
-
-pub(crate) type DrawStencil = (
-    SetItemPipeline,
-    SetOutlineViewBindGroup<0>,
-    SetMeshBindGroup<1>,
-    SetOutlineInstanceBindGroup<2>,
-    DrawMesh,
-);
-
-pub(crate) type DrawOutline = (
-    SetItemPipeline,
-    SetOutlineViewBindGroup<0>,
-    SetMeshBindGroup<1>,
-    SetOutlineInstanceBindGroup<2>,
-    DrawMesh,
-);
+use crate::render::{DrawOutline, DrawStencil};
+use crate::uniforms::ExtractedOutline;
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn queue_outline_mesh(

@@ -1,11 +1,6 @@
-use bevy::ecs::query::ROQueryItem;
-use bevy::ecs::system::lifetimeless::{Read, SRes};
-use bevy::ecs::system::SystemParamItem;
 use bevy::prelude::*;
-use bevy::render::extract_component::{ComponentUniforms, DynamicUniformIndex};
-use bevy::render::render_phase::{
-    PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass, ViewSortedRenderPhases,
-};
+use bevy::render::extract_component::ComponentUniforms;
+use bevy::render::render_phase::ViewSortedRenderPhases;
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
@@ -25,7 +20,7 @@ pub(crate) struct OutlineViewUniform {
 
 #[derive(Resource)]
 pub(crate) struct OutlineViewBindGroup {
-    bind_group: BindGroup,
+    pub(crate) bind_group: BindGroup,
 }
 
 #[allow(clippy::type_complexity)]
@@ -87,23 +82,5 @@ pub(crate) fn prepare_outline_view_bind_group(
             }],
         );
         commands.insert_resource(OutlineViewBindGroup { bind_group });
-    }
-}
-
-pub(crate) struct SetOutlineViewBindGroup<const I: usize>();
-
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<I> {
-    type ViewQuery = Read<DynamicUniformIndex<OutlineViewUniform>>;
-    type ItemQuery = ();
-    type Param = SRes<OutlineViewBindGroup>;
-    fn render<'w>(
-        _item: &P,
-        view_data: ROQueryItem<'w, Self::ViewQuery>,
-        _entity_data: Option<()>,
-        bind_group: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        pass.set_bind_group(I, &bind_group.into_inner().bind_group, &[view_data.index()]);
-        RenderCommandResult::Success
     }
 }
