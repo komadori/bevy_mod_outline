@@ -2,8 +2,8 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, OutlinePlugin, OutlineStencil,
-    OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
+    scene::{AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin},
+    OutlinePlugin, OutlineStencil, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
 };
 
 fn main() {

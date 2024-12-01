@@ -60,13 +60,14 @@ mod node;
 mod pipeline;
 mod queue;
 mod render;
-mod scene;
 mod uniforms;
 mod view_uniforms;
 
 pub use computed::*;
 pub use generate::*;
-pub use scene::*;
+
+#[cfg(feature = "scene")]
+pub mod scene;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 

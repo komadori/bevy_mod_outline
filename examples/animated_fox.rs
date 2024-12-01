@@ -2,8 +2,8 @@ use std::f32::consts::PI;
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin, AutoGenerateOutlineNormalsPlugin,
-    OutlinePlugin, OutlineVolume,
+    scene::{AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin},
+    AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
