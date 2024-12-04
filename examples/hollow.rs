@@ -2,8 +2,8 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    scene::{AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin},
-    OutlinePlugin, OutlineStencil, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
+    AsyncSceneInheritOutline, OutlinePlugin, OutlineStencil, OutlineVolume,
+    ATTRIBUTE_OUTLINE_NORMAL,
 };
 
 fn main() {
@@ -15,7 +15,7 @@ fn main() {
                     .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
             ),
         )
-        .add_plugins((OutlinePlugin, AsyncSceneInheritOutlinePlugin))
+        .add_plugins(OutlinePlugin)
         .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(
@@ -60,7 +60,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             enabled: true,
             offset: 0.0,
         },
-        AsyncSceneInheritOutline,
+        AsyncSceneInheritOutline::default(),
     ));
 }
 

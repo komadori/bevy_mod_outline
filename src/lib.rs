@@ -40,6 +40,7 @@ use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use render::{DrawOutline, DrawStencil};
+use scene::AsyncSceneInheritOutlineSystems;
 
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -67,7 +68,9 @@ pub use computed::*;
 pub use generate::*;
 
 #[cfg(feature = "scene")]
-pub mod scene;
+mod scene;
+#[cfg(feature = "scene")]
+pub use scene::*;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
@@ -318,6 +321,9 @@ impl Plugin for OutlinePlugin {
         // ...and before any later anti-aliasing.
         .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Fxaa)
         .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Smaa);
+
+        #[cfg(feature = "scene")]
+        app.init_resource::<AsyncSceneInheritOutlineSystems>();
     }
 
     fn finish(&self, app: &mut App) {

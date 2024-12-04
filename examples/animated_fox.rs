@@ -2,8 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    scene::{AsyncSceneInheritOutline, AsyncSceneInheritOutlinePlugin},
-    AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
+    AsyncSceneInheritOutline, AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -15,7 +14,6 @@ fn main() {
             DefaultPlugins,
             OutlinePlugin,
             AutoGenerateOutlineNormalsPlugin,
-            AsyncSceneInheritOutlinePlugin,
         ))
         .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
@@ -67,7 +65,7 @@ fn setup(
             width: 3.0,
             colour: Color::srgb(1.0, 0.0, 0.0),
         },
-        AsyncSceneInheritOutline,
+        AsyncSceneInheritOutline::default(),
     ));
 }
 
