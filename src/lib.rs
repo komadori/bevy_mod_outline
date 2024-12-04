@@ -121,27 +121,32 @@ fn lerp_bool(this: bool, other: bool, scalar: f32) -> bool {
 }
 
 macro_rules! impl_lerp {
-    ($t:ty) => {
+    ($t:ty, $e:expr) => {
+        impl Ease for $t {
+            fn interpolating_curve_unbounded(start: Self, end: Self) -> impl Curve<Self> {
+                FunctionCurve::new(Interval::UNIT, move |t| $e(&start, &end, t))
+            }
+        }
+
         #[cfg(feature = "interpolation")]
         impl interpolation::Lerp for $t {
             type Scalar = f32;
 
             fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-                self.mix(other, *scalar)
+                $e(self, other, *scalar)
             }
         }
     };
 }
 
-impl Mix for OutlineStencil {
-    fn mix(&self, other: &Self, factor: f32) -> Self {
-        OutlineStencil {
-            enabled: lerp_bool(self.enabled, other.enabled, factor),
-            offset: self.offset.lerp(other.offset, factor),
-        }
+fn lerp_stencil(start: &OutlineStencil, end: &OutlineStencil, t: f32) -> OutlineStencil {
+    OutlineStencil {
+        enabled: lerp_bool(start.enabled, end.enabled, t),
+        offset: start.offset.lerp(end.offset, t),
     }
 }
-impl_lerp!(OutlineStencil);
+
+impl_lerp!(OutlineStencil, lerp_stencil);
 
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Default)]
@@ -157,16 +162,15 @@ pub struct OutlineVolume {
     pub colour: Color,
 }
 
-impl Mix for OutlineVolume {
-    fn mix(&self, other: &Self, factor: f32) -> Self {
-        OutlineVolume {
-            visible: lerp_bool(self.visible, other.visible, factor),
-            width: self.width.lerp(other.width, factor),
-            colour: self.colour.mix(&other.colour, factor),
-        }
+fn lerp_volume(start: &OutlineVolume, end: &OutlineVolume, t: f32) -> OutlineVolume {
+    OutlineVolume {
+        visible: lerp_bool(start.visible, end.visible, t),
+        width: start.width.lerp(end.width, t),
+        colour: start.colour.mix(&end.colour, t),
     }
 }
-impl_lerp!(OutlineVolume);
+
+impl_lerp!(OutlineVolume, lerp_volume);
 
 /// A component for specifying what layer(s) the outline should be rendered for.
 #[derive(Component, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
