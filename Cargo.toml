@@ -23,7 +23,8 @@ nonmax = "0.5"
 wgpu-types = "23"
 
 [features]
-default = ["interpolation", "scene"]
+default = ["interpolation", "reflect", "scene"]
+reflect = []
 scene = ["bevy/bevy_scene"]
 
 [dev-dependencies]

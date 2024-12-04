@@ -91,8 +91,9 @@ pub enum NodeOutline {
 }
 
 /// A component for stenciling meshes during outline rendering.
-#[derive(Clone, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Clone, Component)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineStencil {
     /// Enable rendering of the stencil
     pub enabled: bool,
@@ -143,9 +144,10 @@ impl Mix for OutlineStencil {
 impl_lerp!(OutlineStencil);
 
 /// A component for rendering outlines around meshes.
-#[derive(Clone, Component, Reflect, Default)]
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
 #[require(OutlineStencil)]
-#[reflect(Component, Default)]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineVolume {
     /// Enable rendering of the outline
     pub visible: bool,
@@ -167,13 +169,15 @@ impl Mix for OutlineVolume {
 impl_lerp!(OutlineVolume);
 
 /// A component for specifying what layer(s) the outline should be rendered for.
-#[derive(Component, Reflect, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
-#[reflect(Component, Default)]
+#[derive(Component, Clone, PartialEq, Eq, PartialOrd, Ord, Deref, DerefMut, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 /// A component which specifies how the outline should be rendered.
-#[derive(Clone, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Clone, Component)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
 #[non_exhaustive]
 pub enum OutlineMode {
     /// Vertex extrusion flattened into a plane facing the camera and intersecting the specified
@@ -192,8 +196,9 @@ impl Default for OutlineMode {
 }
 
 /// A component for inheriting outlines from the parent entity.
-#[derive(Clone, Component, Reflect, Default)]
-#[reflect(Component, Default)]
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct InheritOutline;
 
 /// Adds support for rendering outlines.
@@ -222,11 +227,6 @@ impl Plugin for OutlinePlugin {
             SortedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
             SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::default(),
         ))
-        .register_type::<OutlineStencil>()
-        .register_type::<OutlineVolume>()
-        .register_type::<OutlineRenderLayers>()
-        .register_type::<OutlineMode>()
-        .register_type::<InheritOutline>()
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
@@ -299,6 +299,13 @@ impl Plugin for OutlinePlugin {
         // ...and before any later anti-aliasing.
         .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Fxaa)
         .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Smaa);
+
+        #[cfg(feature = "reflect")]
+        app.register_type::<OutlineStencil>()
+            .register_type::<OutlineVolume>()
+            .register_type::<OutlineRenderLayers>()
+            .register_type::<OutlineMode>()
+            .register_type::<InheritOutline>();
 
         #[cfg(feature = "scene")]
         app.init_resource::<AsyncSceneInheritOutlineSystems>();
