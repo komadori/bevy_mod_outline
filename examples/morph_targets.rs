@@ -9,7 +9,7 @@
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AutoGenerateOutlineNormalsPlugin, InheritOutlineBundle, OutlinePlugin, OutlineVolume,
+    AutoGenerateOutlineNormalsPlugin, InheritOutline, OutlinePlugin, OutlineVolume,
 };
 
 fn main() {
@@ -74,9 +74,7 @@ fn setup_outlines(
     if let Ok(scene) = scene_query.get_single() {
         if scene_manager.instance_is_ready(**scene) {
             for entity in scene_manager.iter_instance_entities(**scene) {
-                commands
-                    .entity(entity)
-                    .insert(InheritOutlineBundle::default());
+                commands.entity(entity).insert(InheritOutline);
                 *has_setup = true;
             }
         }

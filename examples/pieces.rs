@@ -54,7 +54,7 @@ fn setup(
                 MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9)))),
                 Transform::from_rotation(Quat::from_axis_angle(Vec3::X, TAU / 4.0))
                     .with_translation(Vec3::new(0.0, 0.0, 0.75)),
-                InheritOutlineBundle::default(),
+                InheritOutline,
             ));
             parent.spawn((
                 Mesh3d(
@@ -72,7 +72,7 @@ fn setup(
                 MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9)))),
                 Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, TAU / 4.0))
                     .with_translation(Vec3::new(0.0, 0.0, -0.75)),
-                InheritOutlineBundle::default(),
+                InheritOutline,
             ));
         });
 

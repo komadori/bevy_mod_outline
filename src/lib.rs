@@ -13,9 +13,7 @@
 //! The [`OutlineMode`] component specifies the rendering method. Outlines may be flattened into
 //! a plane in order to further avoid clipping, or left in real space.
 //!
-//! The [`OutlineBundle`] and [`OutlineStencilBundle`] bundles can be used to add the right
-//! components, including the required [`ComputedOutline`] component. Outlines can be inherited
-//! from the parent via the [`InheritOutline`] component and [`InheritOutlineBundle`].
+//! Outlines can be inherited from the parent via the [`InheritOutline`] component.
 //!
 //! Vertex extrusion works best with meshes that have smooth surfaces. To avoid visual
 //! artefacts when outlining meshes with hard edges, see the
@@ -71,6 +69,10 @@ pub use generate::*;
 mod scene;
 #[cfg(feature = "scene")]
 pub use scene::*;
+
+/// Legacy bundles.
+#[deprecated(since = "0.9.0", note = "Use required components instead")]
+pub mod bundles;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
@@ -193,30 +195,6 @@ impl Default for OutlineMode {
 #[derive(Clone, Component, Reflect, Default)]
 #[reflect(Component, Default)]
 pub struct InheritOutline;
-
-/// A bundle for rendering stenciled outlines around meshes.
-#[derive(Bundle, Clone, Default)]
-pub struct OutlineBundle {
-    pub outline: OutlineVolume,
-    pub stencil: OutlineStencil,
-    pub mode: OutlineMode,
-    pub computed: ComputedOutline,
-}
-
-/// A bundle for stenciling meshes in the outlining pass.
-#[derive(Bundle, Clone, Default)]
-pub struct OutlineStencilBundle {
-    pub stencil: OutlineStencil,
-    pub mode: OutlineMode,
-    pub computed: ComputedOutline,
-}
-
-/// A bundle for inheriting outlines from the parent entity.
-#[derive(Bundle, Clone, Default)]
-pub struct InheritOutlineBundle {
-    pub inherit: InheritOutline,
-    pub computed: ComputedOutline,
-}
 
 /// Adds support for rendering outlines.
 pub struct OutlinePlugin;

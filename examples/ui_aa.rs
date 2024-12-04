@@ -105,21 +105,17 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Add spheres
-    commands
-        .spawn((
-            Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(9).unwrap())),
-            MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5)))),
-            Transform::from_translation(Vec3::new(-1.5, 0.0, 0.0)),
-        ))
-        .insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                width: 25.0,
-                colour: Color::srgb(1.0, 1.0, 0.0),
-            },
-            ..default()
-        })
-        .insert(Bounce);
+    commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(9).unwrap())),
+        MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5)))),
+        Transform::from_translation(Vec3::new(-1.5, 0.0, 0.0)),
+        OutlineVolume {
+            visible: true,
+            width: 25.0,
+            colour: Color::srgb(1.0, 1.0, 0.0),
+        },
+        Bounce,
+    ));
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(20).unwrap())),
         MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.5, 0.5, 0.5)))),
@@ -203,14 +199,11 @@ fn interaction(
 ) {
     let mut any_pressed = false;
     for (i, m) in query.iter() {
-        match i {
-            Interaction::Pressed => {
-                any_pressed = true;
-                if *armed {
-                    state.set(m.clone());
-                }
+        if *i == Interaction::Pressed {
+            any_pressed = true;
+            if *armed {
+                state.set(m.clone());
             }
-            _ => {}
         }
     }
     *armed = !any_pressed;
