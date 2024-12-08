@@ -151,7 +151,6 @@ impl_lerp!(OutlineStencil, lerp_stencil);
 /// A component for rendering outlines around meshes.
 #[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
-#[require(OutlineStencil)]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineVolume {
     /// Enable rendering of the outline

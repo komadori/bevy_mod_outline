@@ -5,14 +5,14 @@ use crate::{
     OutlineVolume,
 };
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ComputedVolume {
     pub(crate) enabled: bool,
     pub(crate) offset: f32,
     pub(crate) colour: LinearRgba,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ComputedStencil {
     pub(crate) enabled: bool,
     pub(crate) offset: f32,
@@ -24,32 +24,22 @@ pub(crate) struct ComputedMode {
     pub(crate) depth_mode: DepthMode,
 }
 
-impl Default for ComputedMode {
-    fn default() -> Self {
-        Self {
-            world_origin: Vec3::NAN,
-            depth_mode: DepthMode::Flat,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Source {
-    #[default]
     Set,
     Inherited,
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct Sourced<T: Clone + Default> {
+#[derive(Clone)]
+pub(crate) struct Sourced<T: Clone> {
     pub(crate) value: T,
     pub(crate) source: Source,
 }
 
-impl<T: Clone + Default> Sourced<T> {
-    pub fn inherit(value: &T) -> Self {
+impl<T: Clone> Sourced<T> {
+    pub fn inherit(sourced: &Sourced<T>) -> Self {
         Sourced {
-            value: value.clone(),
+            value: sourced.value.clone(),
             source: Source::Inherited,
         }
     }
@@ -71,7 +61,7 @@ impl<T: Clone + Default> Sourced<T> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ComputedInternal {
     pub(crate) inherited_from: Option<Entity>,
     pub(crate) volume: Sourced<ComputedVolume>,
@@ -108,7 +98,7 @@ pub(crate) fn compute_outline(
     child_query: Query<&Children>,
 ) {
     for (entity, mut computed, components, children) in root_query.iter_mut() {
-        let changed = update_computed_outline(&mut computed, components, &default(), None, false);
+        let changed = update_computed_outline(&mut computed, components, None, None, false);
         if let Some(cs) = children {
             let parent_computed = computed.0.as_ref().unwrap();
             for child in cs.iter() {
@@ -137,7 +127,7 @@ fn propagate_computed_outline(
         let changed = update_computed_outline(
             &mut computed,
             components,
-            parent_computed,
+            Some(parent_computed),
             Some(parent_entity),
             parent_changed,
         );
@@ -157,10 +147,24 @@ fn propagate_computed_outline(
     }
 }
 
+trait OptionExt<T> {
+    fn only_if(self, b: bool) -> Option<T>;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    fn only_if(self, b: bool) -> Self {
+        if b {
+            self
+        } else {
+            None
+        }
+    }
+}
+
 fn update_computed_outline(
     computed: &mut ComputedOutline,
     (visibility, transform, volume, stencil, mode, layers): QueryItem<'_, OutlineComponents>,
-    parent_computed: &ComputedInternal,
+    parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,
 ) -> bool {
@@ -181,32 +185,32 @@ fn update_computed_outline(
             true
         };
     if changed {
-        let fallback_mode = if parent_computed.mode.value.world_origin.is_nan() {
-            Some(OutlineMode::default())
-        } else {
-            None
-        };
         *computed = ComputedOutline(Some(ComputedInternal {
             inherited_from: parent_entity,
-            volume: if let Some(vol) = volume {
+            volume: if let Some(parent_computed) = parent_computed.only_if(volume.is_none()) {
+                Sourced::inherit(&parent_computed.volume)
+            } else {
+                let vol = volume.as_deref().cloned().unwrap_or_default();
                 Sourced::set(ComputedVolume {
                     enabled: visibility.get() && vol.visible && !vol.colour.is_fully_transparent(),
                     offset: vol.width,
                     colour: vol.colour.into(),
                 })
-            } else {
-                Sourced::inherit(&parent_computed.volume.value)
             },
-            stencil: if let Some(sten) = stencil {
+            stencil: if let Some(parent_computed) = parent_computed.only_if(stencil.is_none()) {
+                Sourced::inherit(&parent_computed.stencil)
+            } else {
+                let sten = stencil.as_deref().cloned().unwrap_or_default();
                 Sourced::set(ComputedStencil {
                     enabled: visibility.get() && sten.enabled,
                     offset: sten.offset,
                 })
-            } else {
-                Sourced::inherit(&parent_computed.stencil.value)
             },
-            mode: if let Some(m) = mode.as_deref().cloned().or(fallback_mode) {
-                Sourced::set(match m {
+            mode: if let Some(parent_computed) = parent_computed.only_if(mode.is_none()) {
+                Sourced::inherit(&parent_computed.mode)
+            } else {
+                let mode = mode.as_deref().cloned().unwrap_or_default();
+                Sourced::set(match mode {
                     OutlineMode::FlatVertex {
                         model_origin: origin,
                     } => ComputedMode {
@@ -218,15 +222,106 @@ fn update_computed_outline(
                         depth_mode: DepthMode::Real,
                     },
                 })
-            } else {
-                Sourced::inherit(&parent_computed.mode.value)
             },
-            layers: if let Some(layers) = layers {
-                Sourced::set(layers.0.clone())
+            layers: if let Some(parent_computed) = parent_computed.only_if(layers.is_none()) {
+                Sourced::inherit(&parent_computed.layers)
             } else {
-                Sourced::inherit(&parent_computed.layers.value)
+                let layers = layers.as_deref().cloned().unwrap_or_default();
+                Sourced::set(layers.0)
             },
         }));
     }
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup() -> (App, Entity) {
+        let mut app = App::new();
+        app.add_systems(Update, compute_outline);
+        let entity = app
+            .world_mut()
+            .spawn((
+                ComputedOutline::default(),
+                InheritedVisibility::VISIBLE,
+                GlobalTransform::default(),
+            ))
+            .id();
+        (app, entity)
+    }
+
+    #[test]
+    fn test_defaults() {
+        let (mut app, entity) = setup();
+        app.update();
+
+        let computed = app
+            .world()
+            .get::<ComputedOutline>(entity)
+            .expect("Entity should have ComputedOutline");
+        let internal = computed
+            .0
+            .as_ref()
+            .expect("ComputedOutline should have Some value after update");
+        assert!(internal.stencil.value.enabled);
+        assert!(!internal.volume.value.enabled);
+    }
+
+    #[test]
+    fn test_volume_propagation() {
+        let (mut app, parent) = setup();
+
+        // Create a child entity that inherits outline properties
+        let child = app
+            .world_mut()
+            .spawn((
+                InheritOutline,
+                ComputedOutline::default(),
+                InheritedVisibility::VISIBLE,
+                GlobalTransform::default(),
+            ))
+            .set_parent(parent)
+            .id();
+
+        // Add an OutlineVolume to the parent
+        let volume = OutlineVolume {
+            visible: true,
+            width: 2.0,
+            colour: Color::WHITE,
+        };
+        app.world_mut().entity_mut(parent).insert(volume.clone());
+
+        // Update the system
+        app.update();
+
+        // Check parent computed outline
+        let parent_computed = app
+            .world()
+            .get::<ComputedOutline>(parent)
+            .expect("Parent entity should have ComputedOutline component");
+        let parent_internal = parent_computed
+            .0
+            .as_ref()
+            .expect("Parent ComputedOutline should have Some value after update");
+        assert!(parent_internal.volume.value.enabled);
+        assert_eq!(parent_internal.volume.value.offset, 2.0);
+        assert_eq!(parent_internal.volume.source, Source::Set);
+        assert_eq!(parent_internal.inherited_from, None);
+
+        // Check child computed outline
+        let child_computed = app
+            .world()
+            .get::<ComputedOutline>(child)
+            .expect("Child entity should have ComputedOutline component");
+        let child_internal = child_computed
+            .0
+            .as_ref()
+            .expect("Child ComputedOutline should have Some value after update");
+        assert!(child_internal.volume.value.enabled);
+        assert_eq!(child_internal.volume.value.offset, 2.0);
+        assert_eq!(child_internal.volume.source, Source::Inherited);
+        assert_eq!(child_internal.inherited_from, Some(parent));
+    }
 }
