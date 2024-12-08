@@ -177,7 +177,7 @@ impl FromWorld for OutlinePipeline {
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
         let outline_view_bind_group_layout = render_device.create_bind_group_layout(
-            "oiutline_view_bind_group_layout",
+            "outline_view_bind_group_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
                 uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
