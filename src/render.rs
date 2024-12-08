@@ -60,13 +60,6 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<
         RenderCommandResult::Success
     }
 }
-pub(crate) type DrawStencil = (
-    SetItemPipeline,
-    SetOutlineViewBindGroup<0>,
-    SetMeshBindGroup<1>,
-    SetOutlineInstanceBindGroup<2>,
-    DrawMesh,
-);
 
 pub(crate) type DrawOutline = (
     SetItemPipeline,

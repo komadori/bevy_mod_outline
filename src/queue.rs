@@ -9,7 +9,7 @@ use bevy::render::view::{ExtractedView, RenderLayers};
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
-use crate::render::{DrawOutline, DrawStencil};
+use crate::render::DrawOutline;
 use crate::uniforms::ExtractedOutline;
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -35,7 +35,7 @@ pub(crate) fn queue_outline_mesh(
 ) {
     let draw_stencil = stencil_draw_functions
         .read()
-        .get_id::<DrawStencil>()
+        .get_id::<DrawOutline>()
         .unwrap();
     let draw_opaque_outline = opaque_draw_functions
         .read()

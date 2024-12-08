@@ -37,7 +37,7 @@ use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use render::{DrawOutline, DrawStencil};
+use render::DrawOutline;
 use scene::AsyncSceneInheritOutlineSystems;
 
 use crate::msaa::MsaaExtraWritebackNode;
@@ -247,7 +247,7 @@ impl Plugin for OutlinePlugin {
         .init_resource::<DrawFunctions<OpaqueOutline>>()
         .init_resource::<DrawFunctions<TransparentOutline>>()
         .init_resource::<SpecializedMeshPipelines<OutlinePipeline>>()
-        .add_render_command::<StencilOutline, DrawStencil>()
+        .add_render_command::<StencilOutline, DrawOutline>()
         .add_render_command::<OpaqueOutline, DrawOutline>()
         .add_render_command::<TransparentOutline, DrawOutline>()
         .add_systems(ExtractSchedule, extract_outline_view_uniforms)
