@@ -1,14 +1,15 @@
 use std::cmp::Reverse;
 use std::ops::Range;
 
+use bevy::asset::UntypedAssetId;
 use bevy::ecs::query::QueryItem;
 use bevy::math::FloatOrd;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::render_graph::{NodeRunError, ViewNode};
 use bevy::render::render_phase::{
-    CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, PhaseItemExtraIndex, SortedPhaseItem,
-    ViewSortedRenderPhases,
+    BinnedPhaseItem, CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, PhaseItemExtraIndex,
+    SortedPhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{
     CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
@@ -18,12 +19,17 @@ use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
 
-pub(crate) struct StencilOutline {
-    pub distance: f32,
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct OutlineBinKey {
     pub pipeline: CachedRenderPipelineId,
+    pub draw_function: DrawFunctionId,
+    pub asset_id: UntypedAssetId,
+}
+
+pub(crate) struct StencilOutline {
+    pub key: OutlineBinKey,
     pub entity: Entity,
     pub main_entity: MainEntity,
-    pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
 }
@@ -39,7 +45,7 @@ impl PhaseItem for StencilOutline {
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
-        self.draw_function
+        self.key.draw_function
     }
 
     fn batch_range(&self) -> &std::ops::Range<u32> {
@@ -64,27 +70,36 @@ impl PhaseItem for StencilOutline {
     }
 }
 
-impl SortedPhaseItem for StencilOutline {
-    type SortKey = Reverse<FloatOrd>;
+impl BinnedPhaseItem for StencilOutline {
+    type BinKey = OutlineBinKey;
 
-    fn sort_key(&self) -> Self::SortKey {
-        Reverse(FloatOrd(self.distance))
+    fn new(
+        key: Self::BinKey,
+        representative_entity: (Entity, MainEntity),
+        batch_range: Range<u32>,
+        extra_index: PhaseItemExtraIndex,
+    ) -> Self {
+        Self {
+            key,
+            entity: representative_entity.0,
+            main_entity: representative_entity.1,
+            batch_range,
+            extra_index,
+        }
     }
 }
 
 impl CachedRenderPipelinePhaseItem for StencilOutline {
     #[inline]
     fn cached_pipeline(&self) -> CachedRenderPipelineId {
-        self.pipeline
+        self.key.pipeline
     }
 }
 
 pub(crate) struct OpaqueOutline {
-    pub distance: f32,
-    pub pipeline: CachedRenderPipelineId,
+    pub key: OutlineBinKey,
     pub entity: Entity,
     pub main_entity: MainEntity,
-    pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
 }
@@ -100,7 +115,7 @@ impl PhaseItem for OpaqueOutline {
     }
 
     fn draw_function(&self) -> bevy::render::render_phase::DrawFunctionId {
-        self.draw_function
+        self.key.draw_function
     }
 
     fn batch_range(&self) -> &Range<u32> {
@@ -125,18 +140,29 @@ impl PhaseItem for OpaqueOutline {
     }
 }
 
-impl SortedPhaseItem for OpaqueOutline {
-    type SortKey = Reverse<FloatOrd>;
+impl BinnedPhaseItem for OpaqueOutline {
+    type BinKey = OutlineBinKey;
 
-    fn sort_key(&self) -> Self::SortKey {
-        Reverse(FloatOrd(self.distance))
+    fn new(
+        key: Self::BinKey,
+        representative_entity: (Entity, MainEntity),
+        batch_range: Range<u32>,
+        extra_index: PhaseItemExtraIndex,
+    ) -> Self {
+        OpaqueOutline {
+            key,
+            entity: representative_entity.0,
+            main_entity: representative_entity.1,
+            batch_range,
+            extra_index,
+        }
     }
 }
 
 impl CachedRenderPipelinePhaseItem for OpaqueOutline {
     #[inline]
     fn cached_pipeline(&self) -> CachedRenderPipelineId {
-        self.pipeline
+        self.key.pipeline
     }
 }
 
@@ -222,10 +248,10 @@ impl ViewNode for OutlineNode {
         let view_entity = graph.view_entity();
         let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
             world
-                .get_resource::<ViewSortedRenderPhases<StencilOutline>>()
+                .get_resource::<ViewBinnedRenderPhases<StencilOutline>>()
                 .and_then(|ps| ps.get(&view_entity)),
             world
-                .get_resource::<ViewSortedRenderPhases<OpaqueOutline>>()
+                .get_resource::<ViewBinnedRenderPhases<OpaqueOutline>>()
                 .and_then(|ps| ps.get(&view_entity)),
             world
                 .get_resource::<ViewSortedRenderPhases<TransparentOutline>>()
@@ -235,7 +261,7 @@ impl ViewNode for OutlineNode {
         };
 
         // If drawing anything, run stencil pass to clear the depth buffer
-        if !opaque_phase.items.is_empty() || !transparent_phase.items.is_empty() {
+        if !opaque_phase.is_empty() || !transparent_phase.items.is_empty() {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],
@@ -259,7 +285,7 @@ impl ViewNode for OutlineNode {
             }
         }
 
-        if !opaque_phase.items.is_empty() {
+        if !opaque_phase.is_empty() {
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_opaque_pass"),
                 color_attachments: &[Some(target.get_color_attachment())],

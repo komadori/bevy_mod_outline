@@ -2,12 +2,15 @@ use bevy::core_pipeline::prepass::MotionVectorPrepass;
 use bevy::prelude::*;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
+use bevy::render::render_phase::{
+    BinnedRenderPhaseType, DrawFunctions, PhaseItemExtraIndex, ViewBinnedRenderPhases,
+    ViewSortedRenderPhases,
+};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, RenderLayers};
 
-use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
+use crate::node::{OpaqueOutline, OutlineBinKey, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::render::DrawOutline;
 use crate::uniforms::ExtractedOutline;
@@ -22,8 +25,8 @@ pub(crate) fn queue_outline_mesh(
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline)>,
-    mut stencil_phases: ResMut<ViewSortedRenderPhases<StencilOutline>>,
-    mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
+    mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
+    mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     mut views: Query<(
         &ExtractedView,
@@ -70,9 +73,6 @@ pub(crate) fn queue_outline_mesh(
                 .with_depth_mode(outline.depth_mode)
                 .with_morph_targets(mesh.morph_targets.is_some())
                 .with_motion_vector_prepass(motion_vector_prepass);
-            let world_plane = outline.instance_data.world_plane_origin
-                + world_from_view.mul_vec3(-Vec3::Z) * outline.instance_data.world_plane_offset;
-            let distance = rangefinder.distance_translation(&world_plane);
             if outline.stencil {
                 let stencil_key = instance_base_key
                     .with_vertex_offset_zero(outline.instance_data.stencil_offset == 0.0)
@@ -84,15 +84,15 @@ pub(crate) fn queue_outline_mesh(
                     stencil_key,
                     &mesh.layout,
                 ) {
-                    stencil_phase.add(StencilOutline {
-                        entity,
-                        main_entity: *main_entity,
-                        pipeline,
-                        draw_function: draw_stencil,
-                        distance,
-                        batch_range: 0..0,
-                        extra_index: PhaseItemExtraIndex::NONE,
-                    });
+                    stencil_phase.add(
+                        OutlineBinKey {
+                            pipeline,
+                            draw_function: draw_stencil,
+                            asset_id: outline.mesh_id.untyped(),
+                        },
+                        (entity, *main_entity),
+                        BinnedRenderPhaseType::BatchableMesh,
+                    );
                 }
             }
             if outline.volume {
@@ -110,6 +110,10 @@ pub(crate) fn queue_outline_mesh(
                     pipelines.specialize(&pipeline_cache, &outline_pipeline, draw_key, &mesh.layout)
                 {
                     if transparent {
+                        let world_plane = outline.instance_data.world_plane_origin
+                            + world_from_view.mul_vec3(-Vec3::Z)
+                                * outline.instance_data.world_plane_offset;
+                        let distance = rangefinder.distance_translation(&world_plane);
                         transparent_phase.add(TransparentOutline {
                             entity,
                             main_entity: *main_entity,
@@ -120,15 +124,15 @@ pub(crate) fn queue_outline_mesh(
                             extra_index: PhaseItemExtraIndex::NONE,
                         });
                     } else {
-                        opaque_phase.add(OpaqueOutline {
-                            entity,
-                            main_entity: *main_entity,
-                            pipeline,
-                            draw_function: draw_opaque_outline,
-                            distance,
-                            batch_range: 0..1,
-                            extra_index: PhaseItemExtraIndex::NONE,
-                        });
+                        opaque_phase.add(
+                            OutlineBinKey {
+                                pipeline,
+                                draw_function: draw_opaque_outline,
+                                asset_id: outline.mesh_id.untyped(),
+                            },
+                            (entity, *main_entity),
+                            BinnedRenderPhaseType::BatchableMesh,
+                        );
                     }
                 }
             }

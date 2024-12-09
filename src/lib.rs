@@ -35,7 +35,8 @@ use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPl
 use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
-    sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
+    sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions,
+    SortedRenderPhasePlugin,
 };
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
@@ -258,8 +259,8 @@ impl Plugin for OutlinePlugin {
         app.add_plugins((
             ExtractComponentPlugin::<ComputedOutline>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
-            SortedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
-            SortedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
+            BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
+            BinnedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
             SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::default(),
         ))
         .register_required_components::<OutlineStencil, ComputedOutline>()
@@ -303,12 +304,7 @@ impl Plugin for OutlinePlugin {
         .add_systems(Render, queue_outline_mesh.in_set(RenderSet::QueueMeshes))
         .add_systems(
             Render,
-            (
-                sort_phase_system::<StencilOutline>,
-                sort_phase_system::<OpaqueOutline>,
-                sort_phase_system::<TransparentOutline>,
-            )
-                .in_set(RenderSet::PhaseSort),
+            sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort),
         )
         .add_systems(
             Render,

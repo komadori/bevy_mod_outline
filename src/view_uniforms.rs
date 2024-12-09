@@ -1,7 +1,7 @@
 use bevy::math::Affine3A;
 use bevy::prelude::*;
 use bevy::render::extract_component::ComponentUniforms;
-use bevy::render::render_phase::ViewSortedRenderPhases;
+use bevy::render::render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases};
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
@@ -29,8 +29,8 @@ pub(crate) struct OutlineViewBindGroup {
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_view_uniforms(
     mut commands: Commands,
-    mut stencil_phases: ResMut<ViewSortedRenderPhases<StencilOutline>>,
-    mut opaque_phases: ResMut<ViewSortedRenderPhases<OpaqueOutline>>,
+    mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
+    mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     query: Extract<
         Query<
