@@ -26,7 +26,8 @@ pub struct ExtractedOutline {
 #[derive(Clone, ShaderType)]
 pub(crate) struct OutlineInstanceUniform {
     pub world_from_local: [Vec4; 3],
-    pub origin_in_world: Vec3,
+    pub world_plane_origin: Vec3,
+    pub world_plane_offset: Vec3,
     pub volume_offset: f32,
     pub volume_colour: Vec4,
     pub stencil_offset: f32,
@@ -82,7 +83,8 @@ impl ExtractComponent for ComputedOutline {
             automatic_batching: !no_automatic_batching,
             instance_data: OutlineInstanceUniform {
                 world_from_local: Affine3::from(&transform.affine()).to_transpose(),
-                origin_in_world: computed.mode.value.world_origin,
+                world_plane_origin: computed.depth.value.world_plane_origin,
+                world_plane_offset: computed.depth.value.world_plane_offset,
                 stencil_offset: computed.stencil.value.offset,
                 volume_offset: computed.volume.value.offset,
                 volume_colour: computed.volume.value.colour.to_vec4(),

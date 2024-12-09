@@ -1,3 +1,4 @@
+use bevy::math::Affine3A;
 use bevy::prelude::*;
 use bevy::render::extract_component::ComponentUniforms;
 use bevy::render::render_phase::ViewSortedRenderPhases;
@@ -15,6 +16,8 @@ use crate::pipeline::OutlinePipeline;
 pub(crate) struct OutlineViewUniform {
     #[align(16)]
     clip_from_world: Mat4,
+    world_from_view_a: [Vec4; 2],
+    world_from_view_b: f32,
     scale: Vec2,
 }
 
@@ -41,15 +44,29 @@ pub(crate) fn extract_outline_view_uniforms(
         >,
     >,
 ) {
+    fn transpose_3x3(m: &Affine3A) -> ([Vec4; 2], f32) {
+        let transpose_3x3 = m.matrix3.transpose();
+        (
+            [
+                (transpose_3x3.x_axis, transpose_3x3.y_axis.x).into(),
+                (transpose_3x3.y_axis.yz(), transpose_3x3.z_axis.xy()).into(),
+            ],
+            transpose_3x3.z_axis.z,
+        )
+    }
+
     for (entity, camera, transform, view_mask) in query.iter() {
         if !camera.is_active {
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
             let view_from_world = transform.compute_matrix().inverse();
+            let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             let mut entity_commands = commands.entity(entity.id());
             entity_commands.insert(OutlineViewUniform {
                 clip_from_world: camera.clip_from_view() * view_from_world,
+                world_from_view_a,
+                world_from_view_b,
                 scale: 2.0 / size,
             });
 

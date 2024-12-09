@@ -1,22 +1,27 @@
-//! This crate provides a Bevy plugin, [`OutlinePlugin`], and associated components for
-//! rendering outlines around meshes using the vertex extrusion method.
+//! This crate provides a Bevy plugin, [`OutlinePlugin`], and associated
+//! components for rendering outlines around meshes using the vertex extrusion
+//! method.
 //!
-//! Outlines are rendered in a seperate pass following the main 3D pass. The effect of this
-//! pass is to present the outlines in depth sorted order according to the model translation
-//! of each mesh. This ensures that outlines are not clipped by non-outline geometry.
+//! Outlines are rendered in a seperate pass following the main 3D pass and
+//! using a separate depth buffer. This ensures that outlines are not clipped
+//! by non-outline geometry.
 //!
-//! The [`OutlineVolume`] component will, by itself, cover the original object entirely with
-//! the outline colour. The [`OutlineStencil`] component must also be added to prevent the body
-//! of an object from being filled it. This must be added to any entity which needs to appear on
-//! top of an outline.
+//! An outline consists of two parts, a volume and a stencil. The volume
+//! will, by itself, cover the original object entirely with the outline
+//! colour. The stencil prevents the body of an object from being filled in.
+//! These parts are controlled by the [`OutlineVolume`] and [`OutlineStencil`]
+//! components respectively.
 //!
-//! The [`OutlineMode`] component specifies the rendering method. Outlines may be flattened into
-//! a plane in order to further avoid clipping, or left in real space.
+//! The [`OutlineMode`] component specifies the rendering method. Outlines may
+//! be flattened into a plane in order to further avoid clipping, or left in
+//! real space. The depth of flat outlines can be controlled using the
+//! [`OutlinePlaneDepth`] component.
 //!
-//! Outlines can be inherited from the parent via the [`InheritOutline`] component.
+//! Outlines can be inherited from the parent via the [`InheritOutline`]
+//! component.
 //!
-//! Vertex extrusion works best with meshes that have smooth surfaces. To avoid visual
-//! artefacts when outlining meshes with hard edges, see the
+//! Vertex extrusion works best with meshes that have smooth surfaces. To
+//! avoid visual artefacts when outlining meshes with hard edges, see the
 //! [`OutlineMeshExt::generate_outline_normals`] function and the
 //! [`AutoGenerateOutlineNormalsPlugin`].
 
@@ -178,24 +183,51 @@ impl_lerp!(OutlineVolume, lerp_volume);
 pub struct OutlineRenderLayers(pub RenderLayers);
 
 /// A component which specifies how the outline should be rendered.
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 #[non_exhaustive]
 pub enum OutlineMode {
-    /// Vertex extrusion flattened into a plane facing the camera and intersecting the specified
-    /// point in model-space.
-    FlatVertex { model_origin: Vec3 },
+    /// Vertex extrusion flattened into a billboard. (default)
+    #[default]
+    FlatVertex,
     /// Vertex extrusion in real model-space.
     RealVertex,
 }
 
-impl Default for OutlineMode {
-    fn default() -> Self {
-        OutlineMode::FlatVertex {
-            model_origin: Vec3::ZERO,
-        }
+impl OutlineMode {
+    pub fn is_flat(&self) -> bool {
+        matches!(self, OutlineMode::FlatVertex)
     }
+}
+
+/// A component which controls the depth sorting of flat outlines and stencils.
+///
+/// By flattening an outline into a plane, we avoid it being partially clipped
+/// by other outlines. However, naive positioning of the outline planes can
+/// cause an outline to be drawn behind the outline of an object it is actually
+/// in front of. This component allows you to control the point in an object's
+/// model-space through which the outline plane passes.
+///
+/// The plane point in model-space is calculated by adding the `model_plane_origin`
+/// coordinate to the `model_plane_offset` vector multiplied by the model-space
+/// eye vector. The latter component allows you to move the plane towards or away
+/// from the camera in a view independent manner.
+///
+/// This component only affects outlines which have a flat [`OutlineMode`].
+/// The plane point will be calculated using the transform of the entity to
+/// which this component is attached. When inherited, the already calculated
+/// value in world-space will be used by the children so that the parent and
+/// child will share the same outline plane.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct OutlinePlaneDepth {
+    /// The point in model-space through which the outline plane passes, before
+    /// the view dependent offset is applied.
+    pub model_plane_origin: Vec3,
+    /// An offset to the plane point multiplied by the model-space eye vector.
+    pub model_plane_offset: Vec3,
 }
 
 /// A component for inheriting outlines from the parent entity.

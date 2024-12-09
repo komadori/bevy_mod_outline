@@ -1,8 +1,8 @@
 use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
 
 use crate::{
-    uniforms::DepthMode, InheritOutline, OutlineMode, OutlineRenderLayers, OutlineStencil,
-    OutlineVolume,
+    uniforms::DepthMode, InheritOutline, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
+    OutlineStencil, OutlineVolume,
 };
 
 #[derive(Clone)]
@@ -20,8 +20,13 @@ pub(crate) struct ComputedStencil {
 
 #[derive(Clone)]
 pub(crate) struct ComputedMode {
-    pub(crate) world_origin: Vec3,
     pub(crate) depth_mode: DepthMode,
+}
+
+#[derive(Clone)]
+pub(crate) struct ComputedDepth {
+    pub(crate) world_plane_origin: Vec3,
+    pub(crate) world_plane_offset: Vec3,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -67,6 +72,7 @@ pub(crate) struct ComputedInternal {
     pub(crate) volume: Sourced<ComputedVolume>,
     pub(crate) stencil: Sourced<ComputedStencil>,
     pub(crate) mode: Sourced<ComputedMode>,
+    pub(crate) depth: Sourced<ComputedDepth>,
     pub(crate) layers: Sourced<RenderLayers>,
 }
 
@@ -80,6 +86,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlineVolume>>,
     Option<Ref<'a, OutlineStencil>>,
     Option<Ref<'a, OutlineMode>>,
+    Option<Ref<'a, OutlinePlaneDepth>>,
     Option<Ref<'a, OutlineRenderLayers>>,
 );
 
@@ -163,7 +170,7 @@ impl<T> OptionExt<T> for Option<T> {
 
 fn update_computed_outline(
     computed: &mut ComputedOutline,
-    (visibility, transform, volume, stencil, mode, layers): QueryItem<'_, OutlineComponents>,
+    (visibility, transform, volume, stencil, mode, depth, layers): QueryItem<'_, OutlineComponents>,
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,
@@ -172,14 +179,11 @@ fn update_computed_outline(
         || if let ComputedOutline(Some(computed)) = computed {
             computed.inherited_from != parent_entity
                 || visibility.is_changed()
-                || (transform.is_changed()
-                    && mode
-                        .as_ref()
-                        .map(|r| matches!(r.as_ref(), OutlineMode::FlatVertex { .. }))
-                        .unwrap_or(false))
+                || transform.is_changed()
                 || computed.volume.is_changed(&volume)
                 || computed.stencil.is_changed(&stencil)
                 || computed.mode.is_changed(&mode)
+                || computed.depth.is_changed(&depth)
                 || computed.layers.is_changed(&layers)
         } else {
             true
@@ -211,16 +215,25 @@ fn update_computed_outline(
             } else {
                 let mode = mode.as_deref().cloned().unwrap_or_default();
                 Sourced::set(match mode {
-                    OutlineMode::FlatVertex {
-                        model_origin: origin,
-                    } => ComputedMode {
-                        world_origin: transform.compute_matrix().project_point3(origin),
+                    OutlineMode::FlatVertex => ComputedMode {
                         depth_mode: DepthMode::Flat,
                     },
                     OutlineMode::RealVertex => ComputedMode {
-                        world_origin: Vec3::NAN,
                         depth_mode: DepthMode::Real,
                     },
+                })
+            },
+            depth: if let Some(parent_computed) = parent_computed.only_if(depth.is_none()) {
+                Sourced::inherit(&parent_computed.depth)
+            } else {
+                let dep = depth.as_deref().cloned().unwrap_or_default();
+                let affine = transform.affine();
+                let inverse = transform.affine().matrix3.inverse();
+                Sourced::set(ComputedDepth {
+                    world_plane_origin: (affine.matrix3.mul_vec3a(dep.model_plane_offset.into())
+                        + affine.translation)
+                        .into(),
+                    world_plane_offset: inverse.mul_vec3(dep.model_plane_offset),
                 })
             },
             layers: if let Some(parent_computed) = parent_computed.only_if(layers.is_none()) {

@@ -5,7 +5,8 @@
 
 struct Instance {
     world_from_local: mat3x4<f32>,
-    origin_in_world: vec3<f32>,
+    world_plane_origin: vec3<f32>,
+    world_plane_offset: vec3<f32>,
     volume_offset: f32,
     volume_colour: vec4<f32>,
     stencil_offset: f32,
@@ -15,7 +16,7 @@ struct Instance {
 struct Vertex {
     @location(0) position: vec3<f32>,
     @builtin(instance_index) instance_index: u32,
-#ifndef OFFSET_ZERO
+#ifndef VERTEX_OFFSET_ZERO
     @location(1) outline_normal: vec3<f32>,
 #endif
 #ifdef SKINNED
@@ -30,6 +31,8 @@ struct Vertex {
 struct OutlineViewUniform {
     @align(16)
     clip_from_world: mat4x4<f32>,
+    world_from_view_a: mat2x4<f32>,
+    world_from_view_b: f32,
     scale: vec2<f32>,
 };
 
@@ -96,7 +99,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #else
     let offset = mesh[iid].stencil_offset;
 #endif
-#ifdef OFFSET_ZERO
+#ifdef VERTEX_OFFSET_ZERO
     let out_xy = clip_pos.xy;
 #else
     let clip_norm = mat4to3(view_uniform.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
@@ -106,7 +109,14 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.position = vec4<f32>(out_xy, clip_pos.zw);
 #ifdef FLAT_DEPTH
-    out.flat_depth = model_origin_z(mesh[iid].origin_in_world, view_uniform.clip_from_world);
+#ifdef PLANE_OFFSET_ZERO
+    let world_plane = mesh[iid].world_plane_origin;
+#else
+    let world_from_view = bevy_render::maths::mat2x4_f32_to_mat3x3_unpack(view_uniform.world_from_view_a, view_uniform.world_from_view_b);
+    let model_eye = normalize(world_from_view * vec3<f32>(0.0, 0.0, -1.0));
+    let world_plane = mesh[iid].world_plane_origin + model_eye * mesh[iid].world_plane_offset;
+#endif
+    out.flat_depth = model_origin_z(world_plane, view_uniform.clip_from_world);
 #endif
 #ifdef VOLUME
     out.volume_colour = mesh[iid].volume_colour;

@@ -49,6 +49,7 @@ pub(crate) fn queue_outline_mesh(
     for (view, view_entity, view_mask, motion_vector_prepass, msaa) in views.iter_mut() {
         let base_key = PipelineKey::new().with_msaa(*msaa);
         let view_mask = view_mask.cloned().unwrap_or_default();
+        let world_from_view = view.world_from_view.affine().matrix3;
         let rangefinder = view.rangefinder3d();
         let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
             stencil_phases.get_mut(&view_entity),
@@ -69,12 +70,13 @@ pub(crate) fn queue_outline_mesh(
                 .with_depth_mode(outline.depth_mode)
                 .with_morph_targets(mesh.morph_targets.is_some())
                 .with_motion_vector_prepass(motion_vector_prepass);
-            let distance = rangefinder.distance(&Mat4::from_translation(
-                outline.instance_data.origin_in_world,
-            ));
+            let world_plane = outline.instance_data.world_plane_origin
+                + world_from_view.mul_vec3(-Vec3::Z) * outline.instance_data.world_plane_offset;
+            let distance = rangefinder.distance_translation(&world_plane);
             if outline.stencil {
                 let stencil_key = instance_base_key
-                    .with_offset_zero(outline.instance_data.stencil_offset == 0.0)
+                    .with_vertex_offset_zero(outline.instance_data.stencil_offset == 0.0)
+                    .with_plane_offset_zero(outline.instance_data.world_plane_offset == Vec3::ZERO)
                     .with_pass_type(PassType::Stencil);
                 if let Ok(pipeline) = pipelines.specialize(
                     &pipeline_cache,
@@ -96,7 +98,8 @@ pub(crate) fn queue_outline_mesh(
             if outline.volume {
                 let transparent = outline.instance_data.volume_colour[3] < 1.0;
                 let draw_key = instance_base_key
-                    .with_offset_zero(outline.instance_data.volume_offset == 0.0)
+                    .with_vertex_offset_zero(outline.instance_data.volume_offset == 0.0)
+                    .with_plane_offset_zero(outline.instance_data.world_plane_offset == Vec3::ZERO)
                     .with_pass_type(if transparent {
                         PassType::Transparent
                     } else {

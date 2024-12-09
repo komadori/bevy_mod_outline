@@ -62,10 +62,11 @@ impl PipelineKey {
         primitive_topology_int, set_primitive_topology_int: 8, 6;
         pass_type_int, set_pass_type_int: 10, 9;
         depth_mode_int, set_depth_mode_int: 12, 11;
-        pub offset_zero, set_offset_zero: 13;
-        pub hdr_format, set_hdr_format: 14;
-        pub morph_targets, set_morph_targets: 15;
-        pub motion_vector_prepass, set_motion_vector_prepass: 16;
+        pub vertex_offset_zero, set_vertex_offset_zero: 13;
+        pub plane_offset_zero, set_plane_offset_zero: 14;
+        pub hdr_format, set_hdr_format: 15;
+        pub morph_targets, set_morph_targets: 16;
+        pub motion_vector_prepass, set_motion_vector_prepass: 17;
     }
 
     pub(crate) fn new() -> Self {
@@ -130,8 +131,13 @@ impl PipelineKey {
         }
     }
 
-    pub(crate) fn with_offset_zero(mut self, offset_zero: bool) -> Self {
-        self.set_offset_zero(offset_zero);
+    pub(crate) fn with_vertex_offset_zero(mut self, vertex_offset_zero: bool) -> Self {
+        self.set_vertex_offset_zero(vertex_offset_zero);
+        self
+    }
+
+    pub(crate) fn with_plane_offset_zero(mut self, plane_offset_zero: bool) -> Self {
+        self.set_plane_offset_zero(plane_offset_zero);
         self
     }
 
@@ -245,8 +251,8 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         } else {
             cull_mode = Some(Face::Front);
         }
-        if key.offset_zero() {
-            vertex_defs.push(ShaderDefVal::from("OFFSET_ZERO"));
+        if key.vertex_offset_zero() {
+            vertex_defs.push(ShaderDefVal::from("VERTEX_OFFSET_ZERO"));
         } else {
             buffer_attrs.push(
                 if layout.0.contains(ATTRIBUTE_OUTLINE_NORMAL) {
@@ -256,6 +262,9 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 }
                 .at_shader_location(1),
             );
+        }
+        if key.plane_offset_zero() {
+            vertex_defs.push(ShaderDefVal::from("PLANE_OFFSET_ZERO"));
         }
         match key.pass_type() {
             PassType::Stencil => {}
