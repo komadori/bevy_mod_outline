@@ -18,6 +18,9 @@ use bevy::render::render_resource::{
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
+use wgpu_types::ImageSubresourceRange;
+
+use crate::view_uniforms::OutlineQueueStatus;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct OutlineBinKey {
@@ -236,13 +239,14 @@ impl ViewNode for OutlineNode {
         &'static Camera3d,
         &'static ViewTarget,
         &'static ViewDepthTexture,
+        &'static OutlineQueueStatus,
     );
 
     fn run<'w>(
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (camera, camera_3d, target, depth): QueryItem<'w, Self::ViewQuery>,
+        (camera, camera_3d, target, depth, queue_status): QueryItem<'w, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();
@@ -261,7 +265,11 @@ impl ViewNode for OutlineNode {
         };
 
         // If drawing anything, run stencil pass to clear the depth buffer
-        if !opaque_phase.is_empty() || !transparent_phase.items.is_empty() {
+        if queue_status.has_volume {
+            render_context
+                .command_encoder()
+                .clear_texture(&depth.texture, &ImageSubresourceRange::default());
+
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],

@@ -26,6 +26,11 @@ pub(crate) struct OutlineViewBindGroup {
     pub(crate) bind_group: BindGroup,
 }
 
+#[derive(Component, Default)]
+pub(crate) struct OutlineQueueStatus {
+    pub(crate) has_volume: bool,
+}
+
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outline_view_uniforms(
     mut commands: Commands,
@@ -63,12 +68,14 @@ pub(crate) fn extract_outline_view_uniforms(
             let view_from_world = transform.compute_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             let mut entity_commands = commands.entity(entity.id());
-            entity_commands.insert(OutlineViewUniform {
-                clip_from_world: camera.clip_from_view() * view_from_world,
-                world_from_view_a,
-                world_from_view_b,
-                scale: 2.0 / size,
-            });
+            entity_commands
+                .insert(OutlineViewUniform {
+                    clip_from_world: camera.clip_from_view() * view_from_world,
+                    world_from_view_a,
+                    world_from_view_b,
+                    scale: 2.0 / size,
+                })
+                .insert(OutlineQueueStatus::default());
 
             if let Some(view_mask) = view_mask {
                 entity_commands.insert(view_mask.clone());

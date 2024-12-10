@@ -13,7 +13,8 @@ use bevy::render::view::{ExtractedView, RenderLayers};
 use crate::node::{OpaqueOutline, OutlineBinKey, StencilOutline, TransparentOutline};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::render::DrawOutline;
-use crate::uniforms::ExtractedOutline;
+use crate::uniforms::{DrawMode, ExtractedOutline};
+use crate::view_uniforms::OutlineQueueStatus;
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn queue_outline_mesh(
@@ -34,6 +35,7 @@ pub(crate) fn queue_outline_mesh(
         Option<&RenderLayers>,
         Has<MotionVectorPrepass>,
         &Msaa,
+        &mut OutlineQueueStatus,
     )>,
 ) {
     let draw_stencil = stencil_draw_functions
@@ -49,7 +51,9 @@ pub(crate) fn queue_outline_mesh(
         .get_id::<DrawOutline>()
         .unwrap();
 
-    for (view, view_entity, view_mask, motion_vector_prepass, msaa) in views.iter_mut() {
+    for (view, view_entity, view_mask, motion_vector_prepass, msaa, mut queue_status) in
+        views.iter_mut()
+    {
         let base_key = PipelineKey::new().with_msaa(*msaa);
         let view_mask = view_mask.cloned().unwrap_or_default();
         let world_from_view = view.world_from_view.affine().matrix3;
@@ -95,7 +99,8 @@ pub(crate) fn queue_outline_mesh(
                     );
                 }
             }
-            if outline.volume {
+            if outline.volume && outline.draw_mode == DrawMode::Extrude {
+                queue_status.has_volume = true;
                 let transparent = outline.instance_data.volume_colour[3] < 1.0;
                 let draw_key = instance_base_key
                     .with_vertex_offset_zero(outline.instance_data.volume_offset == 0.0)

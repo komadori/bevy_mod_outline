@@ -1,6 +1,6 @@
 //! This crate provides a Bevy plugin, [`OutlinePlugin`], and associated
 //! components for rendering outlines around meshes using the vertex extrusion
-//! method.
+//! and jump flood methods.
 //!
 //! Outlines are rendered in a seperate pass following the main 3D pass and
 //! using a separate depth buffer. This ensures that outlines are not clipped
@@ -24,6 +24,9 @@
 //! avoid visual artefacts when outlining meshes with hard edges, see the
 //! [`OutlineMeshExt::generate_outline_normals`] function and the
 //! [`AutoGenerateOutlineNormalsPlugin`].
+//!
+//! Jump flood support is currently experimental and can be enabled by
+//! adding the [`OutlineMode::FloodFlat`] component.
 
 use bevy::asset::load_internal_asset;
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
@@ -33,7 +36,7 @@ use bevy::render::batching::no_gpu_preprocessing::{
 };
 use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::mesh::MeshVertexAttribute;
-use bevy::render::render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner};
+use bevy::render::render_graph::{EmptyNode, RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions,
     SortedRenderPhasePlugin,
@@ -43,8 +46,6 @@ use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
-use render::DrawOutline;
-use scene::AsyncSceneInheritOutlineSystems;
 
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -52,6 +53,7 @@ use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
 };
 use crate::queue::queue_outline_mesh;
+use crate::render::DrawOutline;
 use crate::uniforms::set_outline_visibility;
 use crate::uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
 use crate::view_uniforms::{
@@ -59,6 +61,7 @@ use crate::view_uniforms::{
 };
 
 mod computed;
+mod flood;
 mod generate;
 mod msaa;
 mod node;
@@ -92,8 +95,12 @@ pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
 pub enum NodeOutline {
     /// This node writes back unsampled post-processing effects to the sampled attachment.
     MsaaExtraWritebackPass,
+    /// This node runs the jump flood algorithm for outlines
+    FloodPass,
     /// This node runs after the main 3D passes and before the UI pass.
     OutlinePass,
+    /// This node marks the end of the outline passes.
+    EndOutlinePasses,
 }
 
 /// A component for stenciling meshes during outline rendering.
@@ -191,15 +198,11 @@ pub struct OutlineRenderLayers(pub RenderLayers);
 pub enum OutlineMode {
     /// Vertex extrusion flattened into a billboard. (default)
     #[default]
-    FlatVertex,
+    ExtrudeFlat,
     /// Vertex extrusion in real model-space.
-    RealVertex,
-}
-
-impl OutlineMode {
-    pub fn is_flat(&self) -> bool {
-        matches!(self, OutlineMode::FlatVertex)
-    }
+    ExtrudeReal,
+    // Jump-flood into a billboard.
+    FloodFlat,
 }
 
 /// A component which controls the depth sorting of flat outlines and stencils.
@@ -317,6 +320,7 @@ impl Plugin for OutlinePlugin {
             NodeOutline::MsaaExtraWritebackPass,
         )
         .add_render_graph_node::<ViewNodeRunner<OutlineNode>>(Core3d, NodeOutline::OutlinePass)
+        .add_render_graph_node::<EmptyNode>(Core3d, NodeOutline::EndOutlinePasses)
         // Outlining occurs after tone-mapping...
         .add_render_graph_edges(
             Core3d,
@@ -324,12 +328,13 @@ impl Plugin for OutlinePlugin {
                 Node3d::Tonemapping,
                 NodeOutline::MsaaExtraWritebackPass,
                 NodeOutline::OutlinePass,
+                NodeOutline::EndOutlinePasses,
                 Node3d::EndMainPassPostProcessing,
             ),
         )
         // ...and before any later anti-aliasing.
-        .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Fxaa)
-        .add_render_graph_edge(Core3d, NodeOutline::OutlinePass, Node3d::Smaa);
+        .add_render_graph_edge(Core3d, NodeOutline::EndOutlinePasses, Node3d::Fxaa)
+        .add_render_graph_edge(Core3d, NodeOutline::EndOutlinePasses, Node3d::Smaa);
 
         #[cfg(feature = "reflect")]
         app.register_type::<OutlineStencil>()
@@ -340,6 +345,9 @@ impl Plugin for OutlinePlugin {
 
         #[cfg(feature = "scene")]
         app.init_resource::<AsyncSceneInheritOutlineSystems>();
+
+        // TODO: Feature flag
+        app.add_plugins(flood::FloodPlugin);
     }
 
     fn finish(&self, app: &mut App) {

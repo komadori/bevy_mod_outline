@@ -1,8 +1,9 @@
 use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
 
 use crate::{
-    uniforms::DepthMode, InheritOutline, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
-    OutlineStencil, OutlineVolume,
+    uniforms::{DepthMode, DrawMode},
+    InheritOutline, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil,
+    OutlineVolume,
 };
 
 #[derive(Clone)]
@@ -21,6 +22,7 @@ pub(crate) struct ComputedStencil {
 #[derive(Clone)]
 pub(crate) struct ComputedMode {
     pub(crate) depth_mode: DepthMode,
+    pub(crate) draw_mode: DrawMode,
 }
 
 #[derive(Clone)]
@@ -215,11 +217,17 @@ fn update_computed_outline(
             } else {
                 let mode = mode.as_deref().cloned().unwrap_or_default();
                 Sourced::set(match mode {
-                    OutlineMode::FlatVertex => ComputedMode {
+                    OutlineMode::ExtrudeFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
+                        draw_mode: DrawMode::Extrude,
                     },
-                    OutlineMode::RealVertex => ComputedMode {
+                    OutlineMode::ExtrudeReal => ComputedMode {
                         depth_mode: DepthMode::Real,
+                        draw_mode: DrawMode::Extrude,
+                    },
+                    OutlineMode::FloodFlat => ComputedMode {
+                        depth_mode: DepthMode::Flat,
+                        draw_mode: DrawMode::JumpFlood,
                     },
                 })
             },

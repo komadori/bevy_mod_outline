@@ -49,6 +49,7 @@ pub(crate) enum PassType {
     Stencil = 1,
     Opaque = 2,
     Transparent = 3,
+    FloodInit = 4,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -60,13 +61,13 @@ impl PipelineKey {
         u32;
         msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
         primitive_topology_int, set_primitive_topology_int: 8, 6;
-        pass_type_int, set_pass_type_int: 10, 9;
-        depth_mode_int, set_depth_mode_int: 12, 11;
-        pub vertex_offset_zero, set_vertex_offset_zero: 13;
-        pub plane_offset_zero, set_plane_offset_zero: 14;
-        pub hdr_format, set_hdr_format: 15;
-        pub morph_targets, set_morph_targets: 16;
-        pub motion_vector_prepass, set_motion_vector_prepass: 17;
+        pass_type_int, set_pass_type_int: 11, 9;
+        depth_mode_int, set_depth_mode_int: 13, 12;
+        pub vertex_offset_zero, set_vertex_offset_zero: 14;
+        pub plane_offset_zero, set_plane_offset_zero: 15;
+        pub hdr_format, set_hdr_format: 16;
+        pub morph_targets, set_morph_targets: 17;
+        pub motion_vector_prepass, set_motion_vector_prepass: 18;
     }
 
     pub(crate) fn new() -> Self {
@@ -114,6 +115,7 @@ impl PipelineKey {
             x if x == PassType::Stencil as u32 => PassType::Stencil,
             x if x == PassType::Opaque as u32 => PassType::Opaque,
             x if x == PassType::Transparent as u32 => PassType::Transparent,
+            x if x == PassType::FloodInit as u32 => PassType::FloodInit,
             x => panic!("Invalid value for PassType: {}", x),
         }
     }
@@ -286,7 +288,28 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                     write_mask: ColorWrites::ALL,
                 }));
             }
+            PassType::FloodInit => {
+                let val = ShaderDefVal::from("FLOOD_INIT");
+                vertex_defs.push(val.clone());
+                fragment_defs.push(val);
+                targets.push(Some(ColorTargetState {
+                    format: TextureFormat::Rgba16Float,
+                    blend: Some(BlendState::REPLACE),
+                    write_mask: ColorWrites::ALL,
+                }));
+            }
         }
+        let depth_stencil = if key.pass_type() == PassType::FloodInit {
+            None
+        } else {
+            Some(DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Greater,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            })
+        };
         let buffers = vec![layout.0.get_layout(&buffer_attrs)?];
         let mut push_constant_ranges = Vec::with_capacity(1);
         // Proxy for webgl feature flag in bevy
@@ -319,13 +342,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 topology: key.primitive_topology(),
                 strip_index_format: None,
             },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Greater,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
+            depth_stencil,
             multisample: MultisampleState {
                 count: key.msaa().samples(),
                 mask: !0,

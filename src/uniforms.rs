@@ -17,6 +17,7 @@ pub struct ExtractedOutline {
     pub(crate) stencil: bool,
     pub(crate) volume: bool,
     pub(crate) depth_mode: DepthMode,
+    pub(crate) draw_mode: DrawMode,
     pub(crate) mesh_id: AssetId<Mesh>,
     pub(crate) automatic_batching: bool,
     pub(crate) instance_data: OutlineInstanceUniform,
@@ -38,6 +39,12 @@ pub(crate) struct OutlineInstanceUniform {
 pub(crate) enum DepthMode {
     Flat = 1,
     Real = 2,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum DrawMode {
+    Extrude = 1,
+    JumpFlood = 2,
 }
 
 #[derive(Resource)]
@@ -78,9 +85,11 @@ impl ExtractComponent for ComputedOutline {
             stencil: computed.stencil.value.enabled,
             volume: computed.volume.value.enabled,
             depth_mode: computed.mode.value.depth_mode,
+            draw_mode: computed.mode.value.draw_mode,
             layers: computed.layers.value.clone(),
             mesh_id: mesh.id(),
-            automatic_batching: !no_automatic_batching,
+            automatic_batching: !no_automatic_batching
+                && computed.mode.value.draw_mode == DrawMode::Extrude,
             instance_data: OutlineInstanceUniform {
                 world_from_local: Affine3::from(&transform.affine()).to_transpose(),
                 world_plane_origin: computed.depth.value.world_plane_origin,
