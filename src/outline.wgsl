@@ -33,6 +33,7 @@ struct OutlineViewUniform {
     clip_from_world: mat4x4<f32>,
     world_from_view_a: mat2x4<f32>,
     world_from_view_b: f32,
+    aspect: f32,
     scale: vec2<f32>,
 };
 
@@ -103,7 +104,8 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     let out_xy = clip_pos.xy;
 #else
     let clip_norm = mat4to3(view_uniform.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
-    let ndc_delta = offset * normalize(clip_norm.xy) * view_uniform.scale * clip_pos.w;
+    let corrected_norm = normalize(clip_norm.xy * vec2<f32>(view_uniform.aspect, 1.0));
+    let ndc_delta = offset * corrected_norm * view_uniform.scale * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
     var out: VertexOutput;

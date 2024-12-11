@@ -17,6 +17,7 @@ pub(crate) struct OutlineViewUniform {
     clip_from_world: Mat4,
     world_from_view_a: [Vec4; 2],
     world_from_view_b: f32,
+    aspect: f32,
     scale: Vec2,
 }
 
@@ -62,6 +63,7 @@ pub(crate) fn extract_outline_view_uniforms(
                     clip_from_world: camera.clip_from_view() * view_from_world,
                     world_from_view_a,
                     world_from_view_b,
+                    aspect: size.x / size.y,
                     scale: 2.0 / size,
                 })
                 .insert(OutlineQueueStatus::default());
