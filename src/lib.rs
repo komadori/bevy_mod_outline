@@ -61,7 +61,6 @@ use crate::view_uniforms::{
 };
 
 mod computed;
-mod flood;
 mod generate;
 mod msaa;
 mod node;
@@ -73,6 +72,9 @@ mod view_uniforms;
 
 pub use computed::*;
 pub use generate::*;
+
+#[cfg(feature = "flood")]
+mod flood;
 
 #[cfg(feature = "scene")]
 mod scene;
@@ -202,6 +204,7 @@ pub enum OutlineMode {
     /// Vertex extrusion in real model-space.
     ExtrudeReal,
     // Jump-flood into a billboard.
+    #[cfg(feature = "flood")]
     FloodFlat,
 }
 
@@ -346,7 +349,7 @@ impl Plugin for OutlinePlugin {
         #[cfg(feature = "scene")]
         app.init_resource::<AsyncSceneInheritOutlineSystems>();
 
-        // TODO: Feature flag
+        #[cfg(feature = "flood")]
         app.add_plugins(flood::FloodPlugin);
     }
 

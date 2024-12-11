@@ -44,6 +44,7 @@ pub(crate) enum DepthMode {
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum DrawMode {
     Extrude = 1,
+    #[cfg(feature = "flood")]
     JumpFlood = 2,
 }
 

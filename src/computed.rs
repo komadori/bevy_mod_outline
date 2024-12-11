@@ -225,6 +225,7 @@ fn update_computed_outline(
                         depth_mode: DepthMode::Real,
                         draw_mode: DrawMode::Extrude,
                     },
+                    #[cfg(feature = "flood")]
                     OutlineMode::FloodFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::JumpFlood,

@@ -90,8 +90,11 @@ cargo run --example bloom
 
 ## Features
 
+- `flood` _(default)_ Enable support for the jump flood algorithm.
 - `interpolation` _(default)_ - Define `Lerp` trait impls using the
 `interpolation` crate.
+- `reflect` _(default)_ Define `Reflect` trait impls for the components.
+- `scene` _(default)_ Enable the `AsyncSceneInheritOutline` component.
 
 ## Licence
 
