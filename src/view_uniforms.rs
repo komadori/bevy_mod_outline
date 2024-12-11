@@ -6,7 +6,6 @@ use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::sync_world::RenderEntity;
-use bevy::render::view::RenderLayers;
 use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
@@ -37,17 +36,7 @@ pub(crate) fn extract_outline_view_uniforms(
     mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
-    query: Extract<
-        Query<
-            (
-                &RenderEntity,
-                &Camera,
-                &GlobalTransform,
-                Option<&RenderLayers>,
-            ),
-            With<Camera3d>,
-        >,
-    >,
+    query: Extract<Query<(&RenderEntity, &Camera, &GlobalTransform), With<Camera3d>>>,
 ) {
     fn transpose_3x3(m: &Affine3A) -> ([Vec4; 2], f32) {
         let transpose_3x3 = m.matrix3.transpose();
@@ -60,15 +49,15 @@ pub(crate) fn extract_outline_view_uniforms(
         )
     }
 
-    for (entity, camera, transform, view_mask) in query.iter() {
+    for (entity, camera, transform) in query.iter() {
         if !camera.is_active {
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
             let view_from_world = transform.compute_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
-            let mut entity_commands = commands.entity(entity.id());
-            entity_commands
+            commands
+                .entity(entity.id())
                 .insert(OutlineViewUniform {
                     clip_from_world: camera.clip_from_view() * view_from_world,
                     world_from_view_a,
@@ -76,12 +65,6 @@ pub(crate) fn extract_outline_view_uniforms(
                     scale: 2.0 / size,
                 })
                 .insert(OutlineQueueStatus::default());
-
-            if let Some(view_mask) = view_mask {
-                entity_commands.insert(view_mask.clone());
-            } else {
-                entity_commands.remove::<RenderLayers>();
-            }
 
             stencil_phases.insert_or_clear(entity.id());
             opaque_phases.insert_or_clear(entity.id());
