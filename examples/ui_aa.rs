@@ -90,7 +90,7 @@ struct Bounce;
 #[derive(Component)]
 struct TheCamera;
 
-#[derive(States, Component, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, States, Component, Debug, PartialEq, Eq, Hash)]
 enum AAMode {
     NoAA,
     MSAAx4,
@@ -125,10 +125,10 @@ fn setup(
 
     // Add buttons
     commands
-        .spawn((Node {
+        .spawn(Node {
             flex_direction: FlexDirection::Column,
             ..default()
-        },))
+        })
         .with_children(|parent| {
             for mode in [
                 AAMode::NoAA,
@@ -142,18 +142,21 @@ fn setup(
                         Button,
                         Node {
                             margin: UiRect::all(Val::Px(5.0)),
-                            padding: UiRect::all(Val::Px(5.0)),
+                            padding: UiRect::all(Val::Px(10.0)),
                             border: UiRect::all(Val::Px(5.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
                             ..default()
                         },
+                        BorderColor(Color::BLACK),
+                        BorderRadius::MAX,
+                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                        mode,
                     ))
-                    .insert(BackgroundColor(Color::WHITE))
-                    .insert(mode.clone())
-                    .insert(Text::default())
                     .with_children(|parent| {
                         parent
-                            .spawn(TextSpan(format!("{:?}", mode)))
-                            .insert(TextColor(Color::BLACK));
+                            .spawn(Text::new(format!("{:?}", mode)))
+                            .insert(TextColor(Color::WHITE));
                     });
             }
         });
@@ -202,7 +205,7 @@ fn interaction(
         if *i == Interaction::Pressed {
             any_pressed = true;
             if *armed {
-                state.set(m.clone());
+                state.set(*m);
             }
         }
     }

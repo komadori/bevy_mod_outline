@@ -68,6 +68,12 @@ A pair of spheres, one outlined, with a UI for selecting different anti-aliasing
 cargo run --example ui_aa
 ```
 
+An outlined non-manifold shape, with a UI for selecting different outlining methods and shapes.
+
+```shell
+cargo run --example ui_mode
+```
+
 An emissive sphere orbits another sphere, with outlines and HDR bloom post-processing.
 
 ```shell

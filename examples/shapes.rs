@@ -27,7 +27,9 @@ fn setup(
 ) {
     // Add cube with generated outline normals
     let mut cube_mesh = Cuboid::new(1.0, 1.0, 1.0).mesh().build();
-    cube_mesh.generate_outline_normals().unwrap();
+    cube_mesh
+        .generate_outline_normals(&GenerateOutlineNormalsSettings::default())
+        .unwrap();
     commands.spawn((
         Mesh3d(meshes.add(cube_mesh)),
         MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.1, 0.1, 0.9)))),

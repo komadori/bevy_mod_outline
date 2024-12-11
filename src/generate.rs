@@ -48,6 +48,30 @@ impl Iterator for IndexIterator<'_> {
 
 impl ExactSizeIterator for IndexIterator<'_> {}
 
+/// Settings for generating mesh outline normals.
+#[derive(Clone, Default)]
+pub struct GenerateOutlineNormalsSettings {
+    ignore_vertex_normals: bool,
+    stretch_edges: bool,
+}
+
+/// Settings for generating mesh outline normals.
+impl GenerateOutlineNormalsSettings {
+    /// If true, any pre-existing vertex normals are ignored and freshly
+    /// calculated face normals are used when generating outline normals.
+    pub fn with_ignore_vertex_normals(mut self, value: bool) -> Self {
+        self.ignore_vertex_normals = value;
+        self
+    }
+
+    /// If true, an extra component is added to the generated outline normals
+    /// to angle them outwards at edges of non-manifold meshes.
+    pub fn with_stretch_edges(mut self, value: bool) -> Self {
+        self.stretch_edges = value;
+        self
+    }
+}
+
 /// Failed to generate outline normals for the mesh.
 #[derive(thiserror::Error, Debug)]
 pub enum GenerateOutlineNormalsError {
@@ -60,7 +84,7 @@ pub enum GenerateOutlineNormalsError {
 }
 
 /// Extension methods for [`Mesh`].
-pub trait OutlineMeshExt {
+pub trait OutlineMeshExt: Sized {
     /// Generates outline normals for the mesh.
     ///
     /// Vertex extrusion only works for meshes with smooth surface normals. Hard edges cause
@@ -72,11 +96,23 @@ pub trait OutlineMeshExt {
     /// outline thickness.
     ///
     /// This function only supports meshes with TriangleList topology.
-    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError>;
+    fn generate_outline_normals(
+        &mut self,
+        settings: &GenerateOutlineNormalsSettings,
+    ) -> Result<(), GenerateOutlineNormalsError>;
+
+    /// Chainable version of [`generate_outline_normals`](OutlineMeshExt::generate_outline_normals).
+    fn with_generated_outline_normals(
+        self,
+        settings: &GenerateOutlineNormalsSettings,
+    ) -> Result<Self, GenerateOutlineNormalsError>;
 }
 
 impl OutlineMeshExt for Mesh {
-    fn generate_outline_normals(&mut self) -> Result<(), GenerateOutlineNormalsError> {
+    fn generate_outline_normals(
+        &mut self,
+        settings: &GenerateOutlineNormalsSettings,
+    ) -> Result<(), GenerateOutlineNormalsError> {
         if self.primitive_topology() != PrimitiveTopology::TriangleList {
             return Err(GenerateOutlineNormalsError::UnsupportedPrimitiveTopology(
                 self.primitive_topology(),
@@ -93,7 +129,7 @@ impl OutlineMeshExt for Mesh {
             )),
         }?;
         let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL) {
-            Some(VertexAttributeValues::Float32x3(p)) => Some(p),
+            Some(VertexAttributeValues::Float32x3(p)) if !settings.ignore_vertex_normals => Some(p),
             _ => None,
         };
         let mut map = HashMap::<[FloatOrd; 3], Vec3>::with_capacity(positions.len());
@@ -115,6 +151,13 @@ impl OutlineMeshExt for Mesh {
                         // Calculate face normal
                         (p1 - p0).cross(p2 - p0).normalize_or_zero()
                     };
+                if settings.stretch_edges {
+                    let face_normal = (p1 - p0).cross(p2 - p0);
+                    let perp1 = Dir3::new(face_normal.cross(p0 - p1)).unwrap();
+                    let perp2 = Dir3::new(face_normal.cross(p2 - p0)).unwrap();
+                    let stretch = perp1.slerp(perp2, 0.5).as_vec3();
+                    *n += angle * stretch;
+                }
             }
         }
         let mut outlines = Vec::with_capacity(positions.len());
@@ -134,12 +177,20 @@ impl OutlineMeshExt for Mesh {
         );
         Ok(())
     }
+
+    fn with_generated_outline_normals(
+        mut self,
+        settings: &GenerateOutlineNormalsSettings,
+    ) -> Result<Self, GenerateOutlineNormalsError> {
+        self.generate_outline_normals(settings).map(|_| self)
+    }
 }
 
 fn auto_generate_outline_normals(
     mut meshes: ResMut<Assets<Mesh>>,
     mut events: EventReader<'_, '_, AssetEvent<Mesh>>,
     mut squelch: Local<HashSet<AssetId<Mesh>>>,
+    plugin: Res<AutoGenerateOutlineNormalsPlugin>,
 ) {
     for event in events.read() {
         match event {
@@ -148,7 +199,7 @@ fn auto_generate_outline_normals(
                     // Suppress modification events created by this system
                     squelch.remove(id);
                 } else if let Some(mesh) = meshes.get_mut(*id) {
-                    let _ = mesh.generate_outline_normals();
+                    let _ = mesh.generate_outline_normals(&plugin.settings);
                     squelch.insert(*id);
                 }
             }
@@ -166,10 +217,20 @@ fn auto_generate_outline_normals(
 /// This is provided as a convenience for simple projects. It runs the outline normal
 /// generator every time a mesh asset is created or modified without consideration for
 /// whether this is necessary or appropriate.
-pub struct AutoGenerateOutlineNormalsPlugin;
+#[derive(Clone, Default, Resource)]
+pub struct AutoGenerateOutlineNormalsPlugin {
+    settings: GenerateOutlineNormalsSettings,
+}
+
+impl AutoGenerateOutlineNormalsPlugin {
+    pub fn new(settings: GenerateOutlineNormalsSettings) -> Self {
+        Self { settings }
+    }
+}
 
 impl Plugin for AutoGenerateOutlineNormalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, auto_generate_outline_normals);
+        app.insert_resource(self.clone())
+            .add_systems(Update, auto_generate_outline_normals);
     }
 }

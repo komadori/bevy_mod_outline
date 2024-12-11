@@ -23,7 +23,7 @@ fn main() {
                 ..default()
             }),
             OutlinePlugin,
-            AutoGenerateOutlineNormalsPlugin,
+            AutoGenerateOutlineNormalsPlugin::default(),
         ))
         .insert_resource(AmbientLight::default())
         .add_systems(Startup, setup)
