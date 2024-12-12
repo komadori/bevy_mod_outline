@@ -34,7 +34,9 @@ pub(crate) struct ComputedDepth {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Source {
     Set,
+    SetFallback,
     Inherited,
+    Default,
 }
 
 #[derive(Clone)]
@@ -44,27 +46,63 @@ pub(crate) struct Sourced<T: Clone> {
 }
 
 impl<T: Clone> Sourced<T> {
-    pub fn inherit(sourced: &Sourced<T>) -> Self {
-        Sourced {
-            value: sourced.value.clone(),
-            source: Source::Inherited,
-        }
+    pub fn set<U: Clone + Default>(
+        value: Option<Ref<U>>,
+        inherit: Option<T>,
+        f: impl FnOnce(&U) -> T,
+    ) -> Self {
+        Self::set_with_fallback::<U, U>(value, None, inherit, f)
     }
 
-    pub fn set(value: T) -> Self {
-        Sourced {
-            value,
-            source: Source::Set,
-        }
-    }
-
-    pub fn is_changed<U: Component>(&self, tuple: &Option<Ref<U>>) -> bool {
-        tuple.is_some() != matches!(self.source, Source::Set)
-            || if let Some(r) = tuple {
-                r.is_changed()
-            } else {
-                false
+    pub fn set_with_fallback<U: Default, V: Clone + Into<U>>(
+        value: Option<Ref<U>>,
+        fallback: Option<Ref<V>>,
+        inherit: Option<T>,
+        f: impl FnOnce(&U) -> T,
+    ) -> Self {
+        if let Some(v) = value {
+            Sourced {
+                value: f(&v),
+                source: Source::Set,
             }
+        } else if let Some(v) = fallback {
+            Sourced {
+                value: f(&v.clone().into()),
+                source: Source::SetFallback,
+            }
+        } else if let Some(v) = inherit {
+            Sourced {
+                value: v,
+                source: Source::Inherited,
+            }
+        } else {
+            Sourced {
+                value: f(&U::default()),
+                source: Source::Default,
+            }
+        }
+    }
+
+    pub fn is_changed<U>(&self, value: &Option<Ref<U>>, inherit: bool) -> bool {
+        self.is_changed_with_fallback::<U, U>(value, &None, inherit)
+    }
+
+    pub fn is_changed_with_fallback<U, V>(
+        &self,
+        value: &Option<Ref<U>>,
+        fallback: &Option<Ref<V>>,
+        inherit: bool,
+    ) -> bool {
+        let (source, changed) = if let Some(r) = value {
+            (Source::Set, r.is_changed())
+        } else if let Some(r) = fallback {
+            (Source::SetFallback, r.is_changed())
+        } else if inherit {
+            (Source::Inherited, false)
+        } else {
+            (Source::Default, false)
+        };
+        source != self.source || changed
     }
 }
 
@@ -90,6 +128,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlineMode>>,
     Option<Ref<'a, OutlinePlaneDepth>>,
     Option<Ref<'a, OutlineRenderLayers>>,
+    Option<Ref<'a, RenderLayers>>,
 );
 
 #[allow(clippy::type_complexity)]
@@ -156,67 +195,56 @@ fn propagate_computed_outline(
     }
 }
 
-trait OptionExt<T> {
-    fn only_if(self, b: bool) -> Option<T>;
-}
-
-impl<T> OptionExt<T> for Option<T> {
-    fn only_if(self, b: bool) -> Self {
-        if b {
-            self
-        } else {
-            None
-        }
-    }
-}
-
 fn update_computed_outline(
-    computed: &mut ComputedOutline,
-    (visibility, transform, volume, stencil, mode, depth, layers): QueryItem<'_, OutlineComponents>,
+    computed: &mut Mut<'_, ComputedOutline>,
+    (visibility, transform, volume, stencil, mode, depth, layers, fallback_layers): QueryItem<
+        '_,
+        OutlineComponents,
+    >,
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,
 ) -> bool {
+    let has_parent = parent_computed.is_some();
     let changed = force_update
-        || if let ComputedOutline(Some(computed)) = computed {
+        || if let ComputedOutline(Some(computed)) = computed.as_ref() {
             computed.inherited_from != parent_entity
                 || visibility.is_changed()
                 || transform.is_changed()
-                || computed.volume.is_changed(&volume)
-                || computed.stencil.is_changed(&stencil)
-                || computed.mode.is_changed(&mode)
-                || computed.depth.is_changed(&depth)
-                || computed.layers.is_changed(&layers)
+                || computed.volume.is_changed(&volume, has_parent)
+                || computed.stencil.is_changed(&stencil, has_parent)
+                || computed.mode.is_changed(&mode, has_parent)
+                || computed.depth.is_changed(&depth, has_parent)
+                || computed
+                    .layers
+                    .is_changed_with_fallback(&layers, &fallback_layers, has_parent)
         } else {
             true
         };
     if changed {
-        *computed = ComputedOutline(Some(ComputedInternal {
+        computed.0 = Some(ComputedInternal {
             inherited_from: parent_entity,
-            volume: if let Some(parent_computed) = parent_computed.only_if(volume.is_none()) {
-                Sourced::inherit(&parent_computed.volume)
-            } else {
-                let vol = volume.as_deref().cloned().unwrap_or_default();
-                Sourced::set(ComputedVolume {
+            volume: Sourced::set(
+                volume,
+                parent_computed.map(|p| p.volume.value.clone()),
+                |vol| ComputedVolume {
                     enabled: visibility.get() && vol.visible && !vol.colour.is_fully_transparent(),
                     offset: vol.width,
                     colour: vol.colour.into(),
-                })
-            },
-            stencil: if let Some(parent_computed) = parent_computed.only_if(stencil.is_none()) {
-                Sourced::inherit(&parent_computed.stencil)
-            } else {
-                let sten = stencil.as_deref().cloned().unwrap_or_default();
-                Sourced::set(ComputedStencil {
+                },
+            ),
+            stencil: Sourced::set(
+                stencil,
+                parent_computed.map(|p| p.stencil.value.clone()),
+                |sten| ComputedStencil {
                     enabled: visibility.get() && sten.enabled,
                     offset: sten.offset,
-                })
-            },
-            mode: if let Some(parent_computed) = parent_computed.only_if(mode.is_none()) {
-                Sourced::inherit(&parent_computed.mode)
-            } else {
-                let mode = mode.as_deref().cloned().unwrap_or_default();
-                Sourced::set(match mode {
+                },
+            ),
+            mode: Sourced::set(
+                mode,
+                parent_computed.map(|p| p.mode.value.clone()),
+                |mode| match mode {
                     OutlineMode::ExtrudeFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::Extrude,
@@ -230,34 +258,39 @@ fn update_computed_outline(
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::JumpFlood,
                     },
-                })
-            },
-            depth: if let Some(parent_computed) = parent_computed.only_if(depth.is_none()) {
-                Sourced::inherit(&parent_computed.depth)
-            } else {
-                let dep = depth.as_deref().cloned().unwrap_or_default();
-                let affine = transform.affine();
-                let inverse = transform.affine().matrix3.inverse();
-                Sourced::set(ComputedDepth {
-                    world_plane_origin: (affine.matrix3.mul_vec3a(dep.model_plane_offset.into())
-                        + affine.translation)
-                        .into(),
-                    world_plane_offset: inverse.mul_vec3(dep.model_plane_offset),
-                })
-            },
-            layers: if let Some(parent_computed) = parent_computed.only_if(layers.is_none()) {
-                Sourced::inherit(&parent_computed.layers)
-            } else {
-                let layers = layers.as_deref().cloned().unwrap_or_default();
-                Sourced::set(layers.0)
-            },
-        }));
+                },
+            ),
+            depth: Sourced::set(
+                depth,
+                parent_computed.map(|p| p.depth.value.clone()),
+                |dep| {
+                    let affine = transform.affine();
+                    let inverse = transform.affine().matrix3.inverse();
+                    ComputedDepth {
+                        world_plane_origin: (affine
+                            .matrix3
+                            .mul_vec3a(dep.model_plane_offset.into())
+                            + affine.translation)
+                            .into(),
+                        world_plane_offset: inverse.mul_vec3(dep.model_plane_offset),
+                    }
+                },
+            ),
+            layers: Sourced::set_with_fallback(
+                layers,
+                fallback_layers,
+                parent_computed.map(|p| p.layers.value.clone()),
+                |layers| layers.0.clone(),
+            ),
+        });
     }
     changed
 }
 
 #[cfg(test)]
 mod tests {
+    use bevy::ecs::system::RunSystemOnce;
+
     use super::*;
 
     fn setup() -> (App, Entity) {
@@ -289,6 +322,18 @@ mod tests {
             .expect("ComputedOutline should have Some value after update");
         assert!(internal.stencil.value.enabled);
         assert!(!internal.volume.value.enabled);
+
+        // Update the system again and check that nothing has changed
+        let tick = app
+            .world_mut()
+            .run_system_once(|query: Query<Ref<ComputedOutline>>| query.single().last_changed())
+            .unwrap();
+        app.update();
+        app.world_mut()
+            .run_system_once(move |query: Query<Ref<ComputedOutline>>| {
+                assert_eq!(query.single().last_changed(), tick);
+            })
+            .unwrap();
     }
 
     #[test]

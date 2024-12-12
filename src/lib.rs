@@ -192,6 +192,12 @@ impl_lerp!(OutlineVolume, lerp_volume);
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineRenderLayers(pub RenderLayers);
 
+impl From<RenderLayers> for OutlineRenderLayers {
+    fn from(value: RenderLayers) -> Self {
+        OutlineRenderLayers(value)
+    }
+}
+
 /// A component which specifies how the outline should be rendered.
 #[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
