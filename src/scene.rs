@@ -6,7 +6,7 @@ use bevy::{
     scene::{InstanceId, SceneInstance, SceneInstanceReady},
 };
 
-use crate::InheritOutline;
+use crate::{ComputedOutline, InheritOutline};
 
 #[derive(Default)]
 enum InternalState {
@@ -108,7 +108,7 @@ fn remove_outline(
         InternalState::SceneProcessed(iid) => {
             for child in scene_spawner.iter_instance_entities(iid) {
                 if let Some(mut ecmds) = commands.get_entity(child) {
-                    ecmds.remove::<InheritOutline>();
+                    ecmds.remove::<(InheritOutline, ComputedOutline)>();
                 }
             }
         }
