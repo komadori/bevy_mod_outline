@@ -1,5 +1,23 @@
 # Changelog
 
+## bevy_mod_outline 0.9.0 (2024-12-12)
+
+### Added
+- Added support for the jump flood algorithm.
+- Added OutlinePlaneDepth for better depth control.
+- Added edge stretching setting to outline normal generator.
+- Added feature flags for Reflect impls and scene utilities.
+- Added Ease trait impls.
+
+### Fixed
+- Fixed outlines being distorted by the viewport aspect ratio.
+
+### Changed
+- Updated Bevy dependency to 0.15.
+- Migrated from bundles to required components.
+- Changed AsyncSceneInheritOutline to be reversible.
+- Removed ill-conceived Mix impls.
+
 ## bevy_mod_outline 0.8.3 (2024-08-28)
 
 ### Fixed

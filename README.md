@@ -6,7 +6,7 @@
 ![Screenshot of bevy_mod_outline's shapes example](https://github.com/bevyengine/bevy-assets/blob/main/Assets/3D/bevy_mod_outline.png?raw=true)
 
 This crate provides a Bevy plugin for drawing outlines around meshes using the
-vertex extrusion method.
+vertex extrusion and jump flood methods.
 
 ## Dependency
 
