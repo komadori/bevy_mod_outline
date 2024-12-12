@@ -2,7 +2,7 @@ use bevy::{
     core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     prelude::*,
     render::{
-        extract_component::ComponentUniforms,
+        extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
             BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
@@ -84,7 +84,7 @@ impl ComposeOutputPipelineKey {
     }
 }
 
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub(crate) struct ComposeOutputPipeline {
     pub(crate) layout: BindGroupLayout,
     pub(crate) sampler: Sampler,
@@ -186,36 +186,73 @@ pub(crate) fn prepare_compose_output_pass(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn compose_output_pass(
-    pipeline: &ComposeOutputPipeline,
-    render_pipeline: &RenderPipeline,
-    render_context: &mut RenderContext<'_>,
-    uniforms: &ComponentUniforms<ComposeOutputUniform>,
-    dynamic_index: u32,
-    input: &CachedTexture,
-    view_target: &ViewTarget,
-    view_depth: &ViewDepthTexture,
-) {
-    let bind_group = render_context.render_device().create_bind_group(
-        "outline_flood_compose_output_bind_group",
-        &pipeline.layout,
-        &BindGroupEntries::sequential((
-            &input.default_view,
-            &pipeline.sampler,
-            uniforms.binding().unwrap(),
-        )),
-    );
+pub(crate) struct ComposeOutputPass<'w> {
+    world: &'w World,
+    pipeline: &'w ComposeOutputPipeline,
+    render_pipeline: RenderPipeline,
+    compose_output_uniforms: &'w ComponentUniforms<ComposeOutputUniform>,
+    view_target: &'w ViewTarget,
+    view_depth: &'w ViewDepthTexture,
+}
 
-    let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-        label: Some("outline_flood_compose_output_pass"),
-        color_attachments: &[Some(view_target.get_color_attachment())],
-        depth_stencil_attachment: Some(view_depth.get_attachment(StoreOp::Store)),
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
+impl<'w> ComposeOutputPass<'w> {
+    pub fn new(
+        world: &'w World,
+        compose_output_view: &ComposeOutputView,
+        view_target: &'w ViewTarget,
+        view_depth: &'w ViewDepthTexture,
+    ) -> Self {
+        let pipeline = world.resource::<ComposeOutputPipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let render_pipeline = pipeline_cache
+            .get_render_pipeline(compose_output_view.pipeline_id)
+            .unwrap()
+            .clone();
+        let compose_output_uniforms = world.resource::<ComponentUniforms<ComposeOutputUniform>>();
 
-    render_pass.set_render_pipeline(render_pipeline);
-    render_pass.set_bind_group(0, &bind_group, &[dynamic_index]);
-    render_pass.draw(0..3, 0..1);
+        Self {
+            world,
+            pipeline,
+            render_pipeline,
+            compose_output_uniforms,
+            view_target,
+            view_depth,
+        }
+    }
+
+    pub fn execute(
+        &self,
+        render_context: &mut RenderContext<'_>,
+        render_entity: Entity,
+        input: &CachedTexture,
+    ) {
+        let dynamic_index = self
+            .world
+            .entity(render_entity)
+            .get::<DynamicUniformIndex<ComposeOutputUniform>>()
+            .unwrap()
+            .index();
+
+        let bind_group = render_context.render_device().create_bind_group(
+            "outline_flood_compose_output_bind_group",
+            &self.pipeline.layout,
+            &BindGroupEntries::sequential((
+                &input.default_view,
+                &self.pipeline.sampler,
+                self.compose_output_uniforms.binding().unwrap(),
+            )),
+        );
+
+        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("outline_flood_compose_output_pass"),
+            color_attachments: &[Some(self.view_target.get_color_attachment())],
+            depth_stencil_attachment: Some(self.view_depth.get_attachment(StoreOp::Store)),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_render_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, &bind_group, &[dynamic_index]);
+        render_pass.draw(0..3, 0..1);
+    }
 }

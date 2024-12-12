@@ -87,50 +87,79 @@ pub(crate) fn queue_flood_meshes(
                     draw_function: draw_flood,
                     batch_range: 0..0,
                     extra_index: PhaseItemExtraIndex::NONE,
+                    volume_offset: outline.instance_data.volume_offset,
                 });
             }
         }
     }
 }
 
-pub(crate) fn flood_init_pass(
-    world: &World,
+pub(crate) struct FloodInitPass<'w> {
+    world: &'w World,
     view_entity: Entity,
-    flood_phase: &SortedRenderPhase<FloodOutline>,
-    i: usize,
-    camera: &ExtractedCamera,
-    render_context: &mut RenderContext<'_>,
-    output: &CachedTexture,
-) {
-    render_context
-        .command_encoder()
-        .clear_texture(&output.texture, &ImageSubresourceRange::default());
+    flood_phase: &'w SortedRenderPhase<FloodOutline>,
+    camera: &'w ExtractedCamera,
+}
 
-    let color_attachment = RenderPassColorAttachment {
-        view: &output.default_view,
-        resolve_target: None,
-        ops: Operations {
-            load: LoadOp::Clear(wgpu_types::Color {
-                r: -1.0,
-                g: -1.0,
-                b: -1.0,
-                a: 0.0,
-            }),
-            store: StoreOp::Store,
-        },
-    };
-
-    let mut init_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-        label: Some("outline_flood_init"),
-        color_attachments: &[Some(color_attachment)],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
-    if let Some(viewport) = camera.viewport.as_ref() {
-        init_pass.set_camera_viewport(viewport);
+impl<'w> FloodInitPass<'w> {
+    pub fn new(
+        world: &'w World,
+        view_entity: Entity,
+        flood_phase: &'w SortedRenderPhase<FloodOutline>,
+        camera: &'w ExtractedCamera,
+    ) -> Self {
+        Self {
+            world,
+            view_entity,
+            flood_phase,
+            camera,
+        }
     }
-    if let Err(err) = flood_phase.render_range(&mut init_pass, world, view_entity, i..=i) {
-        error!("Error encountered while rendering the outline flood init phase {err:?}");
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute(
+        &mut self,
+        render_context: &mut RenderContext<'_>,
+        index: usize,
+        output: &CachedTexture,
+    ) {
+        render_context
+            .command_encoder()
+            .clear_texture(&output.texture, &ImageSubresourceRange::default());
+
+        let color_attachment = RenderPassColorAttachment {
+            view: &output.default_view,
+            resolve_target: None,
+            ops: Operations {
+                load: LoadOp::Clear(wgpu_types::Color {
+                    r: -1.0,
+                    g: -1.0,
+                    b: -1.0,
+                    a: 0.0,
+                }),
+                store: StoreOp::Store,
+            },
+        };
+
+        let mut init_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("outline_flood_init"),
+            color_attachments: &[Some(color_attachment)],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        if let Some(viewport) = self.camera.viewport.as_ref() {
+            init_pass.set_camera_viewport(viewport);
+        }
+
+        if let Err(err) = self.flood_phase.render_range(
+            &mut init_pass,
+            self.world,
+            self.view_entity,
+            index..=index,
+        ) {
+            error!("Error encountered while rendering the outline flood init phase {err:?}");
+        }
     }
 }

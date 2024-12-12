@@ -1,10 +1,7 @@
 use bevy::ecs::query::QueryItem;
-use bevy::render::extract_component::{ComponentUniforms, DynamicUniformIndex};
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, ViewSortedRenderPhases,
 };
-use bevy::render::render_resource::PipelineCache;
-use bevy::render::renderer::RenderQueue;
 use bevy::render::view::ViewDepthTexture;
 use bevy::{
     math::FloatOrd,
@@ -21,11 +18,10 @@ use bevy::{
 };
 use std::ops::Range;
 
-use super::compose_output::ComposeOutputView;
-use super::{
-    compose_output_pass, flood_init_pass, jump_flood_pass, ComposeOutputPipeline,
-    ComposeOutputUniform, FloodTextures, JumpFloodPipeline,
-};
+use super::compose_output::{ComposeOutputPass, ComposeOutputView};
+use super::flood_init::FloodInitPass;
+use super::jump_flood::JumpFloodPass;
+use super::FloodTextures;
 
 #[derive(Debug)]
 pub struct FloodOutline {
@@ -36,6 +32,7 @@ pub struct FloodOutline {
     pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
+    pub volume_offset: f32,
 }
 
 impl PhaseItem for FloodOutline {
@@ -126,77 +123,35 @@ impl ViewNode for FloodNode {
 
         let mut flood_textures = flood_textures.clone();
 
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let jump_flood_pipeline = world.resource::<JumpFloodPipeline>();
-        let Some(jump_flood_render) =
-            pipeline_cache.get_render_pipeline(jump_flood_pipeline.pipeline_id)
-        else {
-            return Ok(());
-        };
-        let compose_output_pipeline = world.resource::<ComposeOutputPipeline>();
-        let Some(compose_output_render) =
-            pipeline_cache.get_render_pipeline(compose_output_view.pipeline_id)
-        else {
-            return Ok(());
-        };
+        let mut flood_init_pass = FloodInitPass::new(world, view_entity, flood_phase, camera);
+        let mut jump_flood_pass = JumpFloodPass::new(world);
+        let compose_output_pass = ComposeOutputPass::new(world, compose_output_view, target, depth);
 
-        let compose_output_uniforms = world.resource::<ComponentUniforms<ComposeOutputUniform>>();
-        let render_queue = world.resource::<RenderQueue>();
+        for index in 0..flood_phase.items.len() {
+            let item = &flood_phase.items[index];
 
-        for i in 0..flood_phase.items.len() {
-            let render_entity = flood_phase.items[i].entity;
-            let component_output_uniform = world
-                .entity(render_entity)
-                .get::<ComposeOutputUniform>()
-                .unwrap();
-            let dynamic_index = world
-                .entity(render_entity)
-                .get::<DynamicUniformIndex<ComposeOutputUniform>>()
-                .unwrap()
-                .index();
-
-            flood_init_pass(
-                world,
-                view_entity,
-                flood_phase,
-                i,
-                camera,
-                render_context,
-                flood_textures.output(),
-            );
-
+            flood_init_pass.execute(render_context, index, flood_textures.output());
             flood_textures.flip();
 
-            let mut size = if component_output_uniform.volume_offset > 0.0 {
-                (component_output_uniform.volume_offset as u32).next_power_of_two()
+            let passes = if item.volume_offset > 0.0 {
+                (item.volume_offset.ceil() as u32 / 2 + 1)
+                    .next_power_of_two()
+                    .trailing_zeros()
+                    + 1
             } else {
                 0
             };
-            while size != 0 {
-                jump_flood_pass(
-                    jump_flood_pipeline,
-                    render_queue,
-                    jump_flood_render,
+            for size in (0..passes).rev() {
+                jump_flood_pass.execute(
                     render_context,
                     flood_textures.input(),
                     flood_textures.output(),
                     size,
                 );
-
-                size >>= 1;
                 flood_textures.flip();
             }
 
-            compose_output_pass(
-                compose_output_pipeline,
-                compose_output_render,
-                render_context,
-                compose_output_uniforms,
-                dynamic_index,
-                flood_textures.input(),
-                target,
-                depth,
-            );
+            compose_output_pass.execute(render_context, item.entity, flood_textures.input());
         }
 
         Ok(())

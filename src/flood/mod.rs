@@ -18,11 +18,11 @@ use bevy::{
     },
 };
 use compose_output::{
-    compose_output_pass, prepare_compose_output_pass, prepare_compose_output_uniform,
-    ComposeOutputPipeline, ComposeOutputUniform,
+    prepare_compose_output_pass, prepare_compose_output_uniform, ComposeOutputPipeline,
+    ComposeOutputUniform,
 };
-use flood_init::{flood_init_pass, prepare_flood_phases, queue_flood_meshes};
-use jump_flood::{jump_flood_pass, JumpFloodPipeline};
+use flood_init::{prepare_flood_phases, queue_flood_meshes};
+use jump_flood::JumpFloodPipeline;
 use node::{FloodNode, FloodOutline};
 
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
@@ -132,15 +132,15 @@ impl Plugin for FloodPlugin {
         .add_render_command::<FloodOutline, DrawOutline>()
         .add_systems(
             Render,
-            prepare_compose_output_uniform
-                .after(RenderSet::ExtractCommands)
-                .before(RenderSet::PrepareResources),
-        )
-        .add_systems(
-            Render,
             prepare_flood_phases
                 .after(RenderSet::ExtractCommands)
                 .before(RenderSet::QueueMeshes),
+        )
+        .add_systems(
+            Render,
+            prepare_compose_output_uniform
+                .after(RenderSet::ExtractCommands)
+                .before(RenderSet::PrepareResources),
         )
         .add_systems(
             Render,
