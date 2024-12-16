@@ -100,22 +100,19 @@ impl FromWorld for JumpFloodPipeline {
 
 pub(crate) struct JumpFloodPass<'w> {
     pipeline: &'w JumpFloodPipeline,
-    render_pipeline: RenderPipeline,
+    render_pipeline: &'w RenderPipeline,
 }
 
 impl<'w> JumpFloodPass<'w> {
-    pub fn new(world: &'w World) -> Self {
+    pub fn new(world: &'w World) -> Option<Self> {
         let pipeline = world.resource::<JumpFloodPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
-        let render_pipeline = pipeline_cache
-            .get_render_pipeline(pipeline.pipeline_id)
-            .unwrap()
-            .clone();
+        let render_pipeline = pipeline_cache.get_render_pipeline(pipeline.pipeline_id)?;
 
-        Self {
+        Some(Self {
             pipeline,
             render_pipeline,
-        }
+        })
     }
 
     pub fn execute(
@@ -147,7 +144,7 @@ impl<'w> JumpFloodPass<'w> {
             occlusion_query_set: None,
         });
 
-        render_pass.set_render_pipeline(&self.render_pipeline);
+        render_pass.set_render_pipeline(self.render_pipeline);
         render_pass.set_bind_group(
             0,
             &bind_group,

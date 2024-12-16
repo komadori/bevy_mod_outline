@@ -189,7 +189,7 @@ pub(crate) fn prepare_compose_output_pass(
 pub(crate) struct ComposeOutputPass<'w> {
     world: &'w World,
     pipeline: &'w ComposeOutputPipeline,
-    render_pipeline: RenderPipeline,
+    render_pipeline: &'w RenderPipeline,
     compose_output_uniforms: &'w ComponentUniforms<ComposeOutputUniform>,
     view_target: &'w ViewTarget,
     view_depth: &'w ViewDepthTexture,
@@ -201,23 +201,21 @@ impl<'w> ComposeOutputPass<'w> {
         compose_output_view: &ComposeOutputView,
         view_target: &'w ViewTarget,
         view_depth: &'w ViewDepthTexture,
-    ) -> Self {
+    ) -> Option<Self> {
         let pipeline = world.resource::<ComposeOutputPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
-        let render_pipeline = pipeline_cache
-            .get_render_pipeline(compose_output_view.pipeline_id)
-            .unwrap()
-            .clone();
+        let render_pipeline =
+            pipeline_cache.get_render_pipeline(compose_output_view.pipeline_id)?;
         let compose_output_uniforms = world.resource::<ComponentUniforms<ComposeOutputUniform>>();
 
-        Self {
+        Some(Self {
             world,
             pipeline,
             render_pipeline,
             compose_output_uniforms,
             view_target,
             view_depth,
-        }
+        })
     }
 
     pub fn execute(
@@ -251,7 +249,7 @@ impl<'w> ComposeOutputPass<'w> {
             occlusion_query_set: None,
         });
 
-        render_pass.set_render_pipeline(&self.render_pipeline);
+        render_pass.set_render_pipeline(self.render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[dynamic_index]);
         render_pass.draw(0..3, 0..1);
     }

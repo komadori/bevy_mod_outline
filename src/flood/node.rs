@@ -124,8 +124,14 @@ impl ViewNode for FloodNode {
         let mut flood_textures = flood_textures.clone();
 
         let mut flood_init_pass = FloodInitPass::new(world, view_entity, flood_phase, camera);
-        let mut jump_flood_pass = JumpFloodPass::new(world);
-        let compose_output_pass = ComposeOutputPass::new(world, compose_output_view, target, depth);
+        let Some(mut jump_flood_pass) = JumpFloodPass::new(world) else {
+            return Ok(());
+        };
+        let Some(compose_output_pass) =
+            ComposeOutputPass::new(world, compose_output_view, target, depth)
+        else {
+            return Ok(());
+        };
 
         for index in 0..flood_phase.items.len() {
             let item = &flood_phase.items[index];
