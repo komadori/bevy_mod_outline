@@ -44,7 +44,7 @@ pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
     Handle::weak_from_u128(330091643565174537467176491706815552661);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PassType {
     Stencil = 1,
     Opaque = 2,
@@ -68,6 +68,7 @@ impl PipelineKey {
         pub hdr_format, set_hdr_format: 16;
         pub morph_targets, set_morph_targets: 17;
         pub motion_vector_prepass, set_motion_vector_prepass: 18;
+        pub double_sided, set_double_sided: 19;
     }
 
     pub(crate) fn new() -> Self {
@@ -155,6 +156,11 @@ impl PipelineKey {
 
     pub(crate) fn with_motion_vector_prepass(mut self, motion_vector_prepass: bool) -> Self {
         self.set_motion_vector_prepass(motion_vector_prepass);
+        self
+    }
+
+    pub(crate) fn with_double_sided(mut self, double_sided: bool) -> Self {
+        self.set_double_sided(double_sided);
         self
     }
 }
@@ -247,7 +253,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             let val = ShaderDefVal::from("FLAT_DEPTH");
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
-            cull_mode = Some(Face::Back);
+            if key.double_sided() {
+                cull_mode = None;
+            } else {
+                cull_mode = Some(Face::Back);
+            }
         } else if key.pass_type() == PassType::Stencil {
             cull_mode = Some(Face::Back);
         } else {

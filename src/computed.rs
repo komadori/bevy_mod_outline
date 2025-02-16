@@ -23,6 +23,7 @@ pub(crate) struct ComputedStencil {
 pub(crate) struct ComputedMode {
     pub(crate) depth_mode: DepthMode,
     pub(crate) draw_mode: DrawMode,
+    pub(crate) double_sided: bool,
 }
 
 #[derive(Clone)]
@@ -248,15 +249,29 @@ fn update_computed_outline(
                     OutlineMode::ExtrudeFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::Extrude,
+                        double_sided: false,
+                    },
+                    OutlineMode::ExtrudeFlatDoubleSided => ComputedMode {
+                        depth_mode: DepthMode::Flat,
+                        draw_mode: DrawMode::Extrude,
+                        double_sided: true,
                     },
                     OutlineMode::ExtrudeReal => ComputedMode {
                         depth_mode: DepthMode::Real,
                         draw_mode: DrawMode::Extrude,
+                        double_sided: false,
                     },
                     #[cfg(feature = "flood")]
                     OutlineMode::FloodFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::JumpFlood,
+                        double_sided: false,
+                    },
+                    #[cfg(feature = "flood")]
+                    OutlineMode::FloodFlatDoubleSided => ComputedMode {
+                        depth_mode: DepthMode::Flat,
+                        draw_mode: DrawMode::JumpFlood,
+                        double_sided: true,
                     },
                 },
             ),

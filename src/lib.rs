@@ -207,11 +207,16 @@ pub enum OutlineMode {
     /// Vertex extrusion flattened into a billboard. (default)
     #[default]
     ExtrudeFlat,
+    /// Vertex extrusion flattened into a double-sided billboard.
+    ExtrudeFlatDoubleSided,
     /// Vertex extrusion in real model-space.
     ExtrudeReal,
     // Jump-flood into a billboard.
     #[cfg(feature = "flood")]
     FloodFlat,
+    // Jump-flood into a double-sided billboard.
+    #[cfg(feature = "flood")]
+    FloodFlatDoubleSided,
 }
 
 /// A component which controls the depth sorting of flat outlines and stencils.

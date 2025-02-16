@@ -72,7 +72,8 @@ pub(crate) fn queue_flood_meshes(
                 .with_morph_targets(mesh.morph_targets.is_some())
                 .with_vertex_offset_zero(true)
                 .with_plane_offset_zero(true)
-                .with_pass_type(PassType::FloodInit);
+                .with_pass_type(PassType::FloodInit)
+                .with_double_sided(outline.double_sided);
 
             queue_status.has_volume = true;
 

@@ -18,6 +18,7 @@ pub struct ExtractedOutline {
     pub(crate) volume: bool,
     pub(crate) depth_mode: DepthMode,
     pub(crate) draw_mode: DrawMode,
+    pub(crate) double_sided: bool,
     pub(crate) mesh_id: AssetId<Mesh>,
     pub(crate) automatic_batching: bool,
     pub(crate) instance_data: OutlineInstanceUniform,
@@ -87,6 +88,7 @@ impl ExtractComponent for ComputedOutline {
             volume: computed.volume.value.enabled,
             depth_mode: computed.mode.value.depth_mode,
             draw_mode: computed.mode.value.draw_mode,
+            double_sided: computed.mode.value.double_sided,
             layers: computed.layers.value.clone(),
             mesh_id: mesh.id(),
             automatic_batching: !no_automatic_batching

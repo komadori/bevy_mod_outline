@@ -76,7 +76,8 @@ pub(crate) fn queue_outline_mesh(
                 .with_primitive_topology(mesh.primitive_topology())
                 .with_depth_mode(outline.depth_mode)
                 .with_morph_targets(mesh.morph_targets.is_some())
-                .with_motion_vector_prepass(motion_vector_prepass);
+                .with_motion_vector_prepass(motion_vector_prepass)
+                .with_double_sided(outline.double_sided);
             if outline.stencil {
                 let stencil_key = instance_base_key
                     .with_vertex_offset_zero(outline.instance_data.stencil_offset == 0.0)
