@@ -82,7 +82,9 @@ pub(crate) fn queue_outline_mesh(
                 let stencil_key = instance_base_key
                     .with_vertex_offset_zero(outline.instance_data.stencil_offset == 0.0)
                     .with_plane_offset_zero(outline.instance_data.world_plane_offset == Vec3::ZERO)
-                    .with_pass_type(PassType::Stencil);
+                    .with_pass_type(PassType::Stencil)
+                    .with_alpha_mask_texture(outline.alpha_mask_id.is_some())
+                    .with_alpha_mask_channel(outline.alpha_mask_channel);
                 if let Ok(pipeline) = pipelines.specialize(
                     &pipeline_cache,
                     &outline_pipeline,

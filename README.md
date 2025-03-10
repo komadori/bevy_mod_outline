@@ -80,6 +80,12 @@ An emissive sphere orbits another sphere, with outlines and HDR bloom post-proce
 cargo run --example bloom
 ```
 
+A flat square with a pulsing jump-flood outline masked by a checkerboard alpha pattern.
+
+```shell
+cargo run --example alpha_mask
+```
+
 ## Versions
 
 | This Version | Bevy version |

@@ -7,9 +7,22 @@ struct FragmentOutput {
 #endif
 };
 
+#ifdef ALPHA_MASK_TEXTURE
+@group(3) @binding(0) var alpha_mask_texture: texture_2d<f32>;
+@group(3) @binding(1) var alpha_mask_sampler: sampler;
+#endif
+
 @fragment
 fn fragment(vertex: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
+
+#ifdef ALPHA_MASK_TEXTURE
+    let alpha_mask = textureSample(alpha_mask_texture, alpha_mask_sampler, vertex.uv)[#{ALPHA_MASK_CHANNEL}];
+    if (alpha_mask < vertex.alpha_mask_threshold) {
+        discard;
+    }
+#endif
+
 #ifdef FLAT_DEPTH
     out.frag_depth = vertex.flat_depth; 
 #endif

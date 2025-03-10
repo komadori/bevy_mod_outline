@@ -78,3 +78,7 @@ path = "examples/morph_targets.rs"
 [[example]]
 name = "ui_aa"
 path = "examples/ui_aa.rs"
+
+[[example]]
+name = "alpha_mask"
+path = "examples/alpha_mask.rs"

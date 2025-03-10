@@ -2,8 +2,8 @@ use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
 
 use crate::{
     uniforms::{DepthMode, DrawMode},
-    InheritOutline, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil,
-    OutlineVolume,
+    InheritOutline, OutlineAlphaMask, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
+    OutlineStencil, OutlineVolume, TextureChannel,
 };
 
 #[derive(Clone)]
@@ -108,6 +108,13 @@ impl<T: Clone> Sourced<T> {
 }
 
 #[derive(Clone)]
+pub(crate) struct ComputedAlphaMask {
+    pub(crate) texture: Option<Handle<Image>>,
+    pub(crate) channel: TextureChannel,
+    pub(crate) threshold: f32,
+}
+
+#[derive(Clone)]
 pub(crate) struct ComputedInternal {
     pub(crate) inherited_from: Option<Entity>,
     pub(crate) volume: Sourced<ComputedVolume>,
@@ -115,6 +122,7 @@ pub(crate) struct ComputedInternal {
     pub(crate) mode: Sourced<ComputedMode>,
     pub(crate) depth: Sourced<ComputedDepth>,
     pub(crate) layers: Sourced<RenderLayers>,
+    pub(crate) alpha_mask: Sourced<ComputedAlphaMask>,
 }
 
 /// A component for storing the computed depth at which the outline lies.
@@ -130,6 +138,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlinePlaneDepth>>,
     Option<Ref<'a, OutlineRenderLayers>>,
     Option<Ref<'a, RenderLayers>>,
+    Option<Ref<'a, OutlineAlphaMask>>,
 );
 
 #[allow(clippy::type_complexity)]
@@ -198,7 +207,7 @@ fn propagate_computed_outline(
 
 fn update_computed_outline(
     computed: &mut Mut<'_, ComputedOutline>,
-    (visibility, transform, volume, stencil, mode, depth, layers, fallback_layers): QueryItem<
+    (visibility, transform, volume, stencil, mode, depth, layers, fallback_layers, alpha_mask): QueryItem<
         '_,
         OutlineComponents,
     >,
@@ -219,6 +228,7 @@ fn update_computed_outline(
                 || computed
                     .layers
                     .is_changed_with_fallback(&layers, &fallback_layers, has_parent)
+                || computed.alpha_mask.is_changed(&alpha_mask, has_parent)
         } else {
             true
         };
@@ -296,6 +306,15 @@ fn update_computed_outline(
                 fallback_layers,
                 parent_computed.map(|p| p.layers.value.clone()),
                 |layers| layers.0.clone(),
+            ),
+            alpha_mask: Sourced::set(
+                alpha_mask,
+                parent_computed.map(|p| p.alpha_mask.value.clone()),
+                |mask| ComputedAlphaMask {
+                    texture: Some(mask.texture.clone()),
+                    channel: mask.channel,
+                    threshold: mask.threshold,
+                },
             ),
         });
     }

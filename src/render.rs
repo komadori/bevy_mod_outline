@@ -16,7 +16,7 @@ use bevy::{
 };
 
 use crate::{
-    uniforms::OutlineInstanceBindGroup,
+    uniforms::{AlphaMaskBindGroups, ExtractedOutline, OutlineInstanceBindGroup},
     view_uniforms::{OutlineViewBindGroup, OutlineViewUniform},
 };
 
@@ -61,10 +61,41 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<
     }
 }
 
+pub(crate) struct SetOutlineAlphaMaskBindGroup<const I: usize>();
+
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineAlphaMaskBindGroup<I> {
+    type ViewQuery = ();
+    type ItemQuery = &'static ExtractedOutline;
+    type Param = SRes<AlphaMaskBindGroups>;
+    fn render<'w>(
+        _item: &P,
+        _view_data: (),
+        entity_data: Option<ROQueryItem<'w, Self::ItemQuery>>,
+        bind_groups: SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let bind_groups = bind_groups.into_inner();
+
+        let bind_group =
+            if let Some(texture_handle) = entity_data.and_then(|e| e.alpha_mask_id.as_ref()) {
+                bind_groups
+                    .bind_groups
+                    .get(texture_handle)
+                    .unwrap_or(&bind_groups.default_bind_group)
+            } else {
+                &bind_groups.default_bind_group
+            };
+
+        pass.set_bind_group(I, bind_group, &[]);
+        RenderCommandResult::Success
+    }
+}
+
 pub(crate) type DrawOutline = (
     SetItemPipeline,
     SetOutlineViewBindGroup<0>,
     SetMeshBindGroup<1>,
     SetOutlineInstanceBindGroup<2>,
+    SetOutlineAlphaMaskBindGroup<3>,
     DrawMesh,
 );

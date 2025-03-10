@@ -6,7 +6,7 @@ use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
 use bevy::render::batching::{GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
-use bevy::render::render_resource::binding_types::uniform_buffer_sized;
+use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
@@ -28,11 +28,11 @@ use bevy::{
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
-use wgpu_types::{Backends, PushConstantRange};
+use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
 use crate::uniforms::{DepthMode, ExtractedOutline, OutlineInstanceUniform};
 use crate::view_uniforms::OutlineViewUniform;
-use crate::ATTRIBUTE_OUTLINE_NORMAL;
+use crate::{TextureChannel, ATTRIBUTE_OUTLINE_NORMAL};
 
 pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
     Handle::weak_from_u128(158939267822951776165272591102639985656);
@@ -68,6 +68,8 @@ impl PipelineKey {
         pub morph_targets, set_morph_targets: 17;
         pub motion_vector_prepass, set_motion_vector_prepass: 18;
         pub double_sided, set_double_sided: 19;
+        pub alpha_mask_texture, set_alpha_mask_texture: 20;
+        pub alpha_mask_channel_int, set_alpha_mask_channel_int: 22, 21;
     }
 
     pub(crate) fn new() -> Self {
@@ -162,6 +164,22 @@ impl PipelineKey {
         self.set_double_sided(double_sided);
         self
     }
+
+    pub(crate) fn with_alpha_mask_texture(mut self, alpha_mask_texture: bool) -> Self {
+        self.set_alpha_mask_texture(alpha_mask_texture);
+        self
+    }
+
+    pub(crate) fn with_alpha_mask_channel(mut self, channel: TextureChannel) -> Self {
+        let channel_int = match channel {
+            TextureChannel::R => 0,
+            TextureChannel::G => 1,
+            TextureChannel::B => 2,
+            TextureChannel::A => 3,
+        };
+        self.set_alpha_mask_channel_int(channel_int);
+        self
+    }
 }
 
 impl From<PipelineKey> for MeshPipelineKey {
@@ -182,6 +200,7 @@ pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
     pub outline_view_bind_group_layout: BindGroupLayout,
     pub outline_instance_bind_group_layout: BindGroupLayout,
+    pub alpha_mask_bind_group_layout: BindGroupLayout,
     pub instance_batch_size: Option<u32>,
 }
 
@@ -203,12 +222,24 @@ impl FromWorld for OutlinePipeline {
                 GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(render_device),
             ),
         );
+        let alpha_mask_bind_group_layout = render_device.create_bind_group_layout(
+            "alpha_mask_bind_group_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                ),
+            ),
+        );
+
         let instance_batch_size =
             GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,
             outline_instance_bind_group_layout,
+            alpha_mask_bind_group_layout,
             instance_batch_size,
         }
     }
@@ -238,7 +269,22 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &mut buffer_attrs,
             ),
             self.outline_instance_bind_group_layout.clone(),
+            self.alpha_mask_bind_group_layout.clone(),
         ];
+
+        if key.alpha_mask_texture() {
+            let val = ShaderDefVal::from("ALPHA_MASK_TEXTURE");
+            vertex_defs.push(val.clone());
+            fragment_defs.push(val);
+
+            let channel_def = ShaderDefVal::UInt(
+                "ALPHA_MASK_CHANNEL".to_string(),
+                key.alpha_mask_channel_int(),
+            );
+            fragment_defs.push(channel_def);
+
+            buffer_attrs.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
+        }
 
         if let Some(sz) = self.instance_batch_size {
             vertex_defs.push(ShaderDefVal::Int(
@@ -366,7 +412,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 
 impl GetBatchData for OutlinePipeline {
     type Param = (SQuery<&'static ExtractedOutline>, SRes<MeshAllocator>);
-    type CompareData = AssetId<Mesh>;
+    type CompareData = (AssetId<Mesh>, Option<AssetId<Image>>);
     type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
@@ -379,10 +425,15 @@ impl GetBatchData for OutlinePipeline {
             .mesh_vertex_slice(&outline.mesh_id)
             .map(|x| x.range.start)
             .unwrap_or(0);
-        Some((
-            instance_data,
-            outline.automatic_batching.then_some(outline.mesh_id),
-        ))
+
+        // Only batch entities with the same mesh and alpha mask texture
+        let batch_data = if outline.automatic_batching {
+            Some((outline.mesh_id, outline.alpha_mask_id))
+        } else {
+            None
+        };
+
+        Some((instance_data, batch_data))
     }
 }
 

@@ -10,6 +10,7 @@ struct Instance {
     volume_offset: f32,
     volume_colour: vec4<f32>,
     stencil_offset: f32,
+    alpha_mask_threshold: f32,
     first_vertex_index: u32,
 };
 
@@ -18,6 +19,9 @@ struct Vertex {
     @builtin(instance_index) instance_index: u32,
 #ifndef VERTEX_OFFSET_ZERO
     @location(1) outline_normal: vec3<f32>,
+#endif
+#ifdef ALPHA_MASK_TEXTURE
+    @location(2) uv: vec2<f32>,
 #endif
 #ifdef SKINNED
     @location(5) joint_indices: vec4<u32>,
@@ -122,6 +126,10 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #endif
 #ifdef VOLUME
     out.volume_colour = mesh[iid].volume_colour;
+#endif
+#ifdef ALPHA_MASK_TEXTURE
+    out.alpha_mask_threshold = mesh[iid].alpha_mask_threshold;
+    out.uv = vertex.uv;
 #endif
     return out;
 }

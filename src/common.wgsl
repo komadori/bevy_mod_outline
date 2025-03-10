@@ -8,4 +8,8 @@ struct VertexOutput {
 #ifdef VOLUME
     @location(1) @interpolate(flat) volume_colour: vec4<f32>,
 #endif
+#ifdef ALPHA_MASK_TEXTURE
+    @location(2) @interpolate(flat) alpha_mask_threshold: f32,
+    @location(3) uv: vec2<f32>,
+#endif
 };

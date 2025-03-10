@@ -46,6 +46,7 @@ use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
+use uniforms::AlphaMaskBindGroups;
 
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -55,7 +56,9 @@ use crate::pipeline::{
 use crate::queue::queue_outline_mesh;
 use crate::render::DrawOutline;
 use crate::uniforms::set_outline_visibility;
-use crate::uniforms::{prepare_outline_instance_bind_group, OutlineInstanceUniform};
+use crate::uniforms::{
+    prepare_alpha_mask_bind_groups, prepare_outline_instance_bind_group, OutlineInstanceUniform,
+};
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
@@ -254,6 +257,31 @@ pub struct OutlinePlaneDepth {
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct InheritOutline;
 
+/// The channel of a texture.
+#[derive(Copy, Clone, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Default))]
+pub enum TextureChannel {
+    R,
+    G,
+    B,
+    #[default]
+    A,
+}
+
+/// A component for specifying an alpha mask texture.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct OutlineAlphaMask {
+    /// The texture to use as a mask.
+    pub texture: Handle<Image>,
+    /// The channel of the texture to use as a mask.
+    pub channel: TextureChannel,
+    /// The alpha threshold (0.0 - 1.0) above which pixels will be included.
+    pub threshold: f32,
+}
+
 /// Adds support for rendering outlines.
 pub struct OutlinePlugin;
 
@@ -310,6 +338,7 @@ impl Plugin for OutlinePlugin {
             (
                 prepare_outline_view_bind_group,
                 prepare_outline_instance_bind_group,
+                prepare_alpha_mask_bind_groups,
             )
                 .in_set(RenderSet::PrepareBindGroups),
         )
@@ -355,6 +384,7 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineVolume>()
             .register_type::<OutlineRenderLayers>()
             .register_type::<OutlineMode>()
+            .register_type::<OutlineAlphaMask>()
             .register_type::<InheritOutline>();
 
         #[cfg(feature = "scene")]
@@ -370,6 +400,7 @@ impl Plugin for OutlinePlugin {
         let instance_buffer = BatchedInstanceBuffer::<OutlineInstanceUniform>::new(render_device);
         render_app
             .init_resource::<OutlinePipeline>()
+            .init_resource::<AlphaMaskBindGroups>()
             .insert_resource(instance_buffer);
     }
 }
