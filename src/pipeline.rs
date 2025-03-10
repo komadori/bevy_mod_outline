@@ -26,7 +26,6 @@ use bevy::{
         },
     },
 };
-use bevy_image::BevyDefault;
 use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange};

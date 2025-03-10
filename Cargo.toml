@@ -11,11 +11,10 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.15.0", default-features = false, features = [
-    #"bevy_image",
+bevy = { version = "0.15.3", default-features = false, features = [
+    "bevy_image",
     "bevy_pbr",
 ] }
-bevy_image = { version = "0.15.0", default-features = false }
 bitfield = "0.15"
 interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
@@ -29,7 +28,7 @@ reflect = []
 scene = ["bevy/bevy_scene"]
 
 [dev-dependencies]
-bevy = { version = "0.15.0", default-features = false, features = [
+bevy = { version = "0.15.3", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",

@@ -15,7 +15,6 @@ use bevy::{
     },
     utils::HashMap,
 };
-use bevy_image::BevyDefault;
 use bitfield::{bitfield_bitrange, bitfield_fields};
 use wgpu_types::{
     BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
