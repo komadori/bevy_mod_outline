@@ -54,6 +54,10 @@ pub(crate) fn queue_flood_meshes(
         };
 
         for (entity, main_entity, outline) in material_meshes.iter() {
+            if !outline.volume {
+                continue;
+            }
+
             if !view_mask.intersects(&outline.layers) {
                 continue;
             }
