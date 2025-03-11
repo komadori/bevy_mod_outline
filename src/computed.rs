@@ -311,7 +311,7 @@ fn update_computed_outline(
                 alpha_mask,
                 parent_computed.map(|p| p.alpha_mask.value.clone()),
                 |mask| ComputedAlphaMask {
-                    texture: Some(mask.texture.clone()),
+                    texture: mask.texture.clone(),
                     channel: mask.channel,
                     threshold: mask.threshold,
                 },

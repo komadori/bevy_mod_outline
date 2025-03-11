@@ -65,7 +65,7 @@ fn setup(
         },
         OutlineMode::FloodFlat,
         OutlineAlphaMask {
-            texture: alpha_mask_handle,
+            texture: Some(alpha_mask_handle),
             channel: TextureChannel::R,
             threshold: 0.5,
         },

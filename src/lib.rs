@@ -289,7 +289,7 @@ pub enum TextureChannel {
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineAlphaMask {
     /// The texture to use as a mask.
-    pub texture: Handle<Image>,
+    pub texture: Option<Handle<Image>>,
     /// The channel of the texture to use as a mask.
     pub channel: TextureChannel,
     /// The threshold value above which pixels will be included.
