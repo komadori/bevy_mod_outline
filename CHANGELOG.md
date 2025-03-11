@@ -1,5 +1,20 @@
 # Changelog
 
+## bevy_mod_outline 0.9.1 (2025-03-11)
+
+### Added
+- Added double-sided outline modes for non-manifold meshes.
+- Added OutlineAlphaMask for outlining using a texture.
+- Added alpha_mask example.
+
+### Fixed
+- Fixed panic if jump flood pipelines were not immediately ready.
+- Fixed regression that NoAutomaticBatching was not respected.
+- Fixed jump-flood outlines being visible when visible flag was false.
+
+### Changed
+- Removed bevy_image workaround and raised Bevy dependency to 0.15.3.
+
 ## bevy_mod_outline 0.9.0 (2024-12-12)
 
 ### Added
