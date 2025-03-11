@@ -270,6 +270,20 @@ pub enum TextureChannel {
 }
 
 /// A component for specifying an alpha mask texture.
+///
+/// The alpha mask is a UV-mapped texture that can be used to determine
+/// whether a pixel is part of the shape of the object for outlining
+/// purposes. If the value read from the texture is less than the threshold
+/// value, the pixel is considered outside the shape and not part of the
+/// stencil used to generate the outline.
+///
+/// The visual effect of this depends on the outline mode being used:
+///
+/// - For extrusion modes, any masked-off part of the stencil will be filled
+///   entirely with the outline colour.
+///
+/// - For jump-flood modes, any masked-off part of the stencil will be
+///   outlined identically to a boundary created with geometry.
 #[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
@@ -278,7 +292,7 @@ pub struct OutlineAlphaMask {
     pub texture: Handle<Image>,
     /// The channel of the texture to use as a mask.
     pub channel: TextureChannel,
-    /// The alpha threshold (0.0 - 1.0) above which pixels will be included.
+    /// The threshold value above which pixels will be included.
     pub threshold: f32,
 }
 
