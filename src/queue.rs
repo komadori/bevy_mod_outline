@@ -98,7 +98,7 @@ pub(crate) fn queue_outline_mesh(
                             asset_id: outline.mesh_id.untyped(),
                         },
                         (entity, *main_entity),
-                        BinnedRenderPhaseType::BatchableMesh,
+                        BinnedRenderPhaseType::mesh(outline.automatic_batching),
                     );
                 }
             }
@@ -139,7 +139,7 @@ pub(crate) fn queue_outline_mesh(
                                 asset_id: outline.mesh_id.untyped(),
                             },
                             (entity, *main_entity),
-                            BinnedRenderPhaseType::BatchableMesh,
+                            BinnedRenderPhaseType::mesh(outline.automatic_batching),
                         );
                     }
                 }
