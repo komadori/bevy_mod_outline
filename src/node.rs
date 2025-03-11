@@ -1,7 +1,6 @@
 use std::cmp::Reverse;
 use std::ops::Range;
 
-use bevy::asset::UntypedAssetId;
 use bevy::ecs::query::QueryItem;
 use bevy::math::FloatOrd;
 use bevy::prelude::*;
@@ -26,7 +25,8 @@ use crate::view_uniforms::OutlineQueueStatus;
 pub(crate) struct OutlineBinKey {
     pub pipeline: CachedRenderPipelineId,
     pub draw_function: DrawFunctionId,
-    pub asset_id: UntypedAssetId,
+    pub asset_id: AssetId<Mesh>,
+    pub texture_id: Option<AssetId<Image>>,
 }
 
 pub(crate) struct StencilOutline {

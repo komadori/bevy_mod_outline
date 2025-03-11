@@ -95,7 +95,8 @@ pub(crate) fn queue_outline_mesh(
                         OutlineBinKey {
                             pipeline,
                             draw_function: draw_stencil,
-                            asset_id: outline.mesh_id.untyped(),
+                            asset_id: outline.mesh_id,
+                            texture_id: outline.alpha_mask_id,
                         },
                         (entity, *main_entity),
                         BinnedRenderPhaseType::mesh(outline.automatic_batching),
@@ -136,7 +137,8 @@ pub(crate) fn queue_outline_mesh(
                             OutlineBinKey {
                                 pipeline,
                                 draw_function: draw_opaque_outline,
-                                asset_id: outline.mesh_id.untyped(),
+                                asset_id: outline.mesh_id,
+                                texture_id: outline.alpha_mask_id,
                             },
                             (entity, *main_entity),
                             BinnedRenderPhaseType::mesh(outline.automatic_batching),
