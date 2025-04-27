@@ -7,17 +7,20 @@ use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::render_graph::{NodeRunError, ViewNode};
 use bevy::render::render_phase::{
-    BinnedPhaseItem, CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, PhaseItemExtraIndex,
-    SortedPhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases,
+    BinnedPhaseItem, CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem,
+    PhaseItemBatchSetKey, PhaseItemExtraIndex, SortedPhaseItem, ViewBinnedRenderPhases,
+    ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{
     CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     StoreOp,
 };
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::{ViewDepthTexture, ViewTarget};
+use bevy::render::view::{RetainedViewEntity, ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
 use wgpu_types::ImageSubresourceRange;
+
+use tracing::error;
 
 use crate::view_uniforms::OutlineQueueStatus;
 
@@ -60,7 +63,7 @@ impl PhaseItem for StencilOutline {
     }
 
     fn extra_index(&self) -> bevy::render::render_phase::PhaseItemExtraIndex {
-        self.extra_index
+        self.extra_index.clone()
     }
 
     fn batch_range_and_extra_index_mut(
@@ -73,10 +76,20 @@ impl PhaseItem for StencilOutline {
     }
 }
 
+#[derive(Hash, Clone, PartialEq, PartialOrd, Ord, Eq)]
+pub struct NoPhaseItemBatchSetKey;
+impl PhaseItemBatchSetKey for NoPhaseItemBatchSetKey {
+    fn indexed(&self) -> bool {
+        false
+    }
+}
+
 impl BinnedPhaseItem for StencilOutline {
     type BinKey = OutlineBinKey;
+    type BatchSetKey = NoPhaseItemBatchSetKey;
 
     fn new(
+        _batch_set_key: Self::BatchSetKey,
         key: Self::BinKey,
         representative_entity: (Entity, MainEntity),
         batch_range: Range<u32>,
@@ -130,7 +143,7 @@ impl PhaseItem for OpaqueOutline {
     }
 
     fn extra_index(&self) -> bevy::render::render_phase::PhaseItemExtraIndex {
-        self.extra_index
+        self.extra_index.clone()
     }
 
     fn batch_range_and_extra_index_mut(
@@ -145,8 +158,10 @@ impl PhaseItem for OpaqueOutline {
 
 impl BinnedPhaseItem for OpaqueOutline {
     type BinKey = OutlineBinKey;
+    type BatchSetKey = NoPhaseItemBatchSetKey;
 
     fn new(
+        _: Self::BatchSetKey,
         key: Self::BinKey,
         representative_entity: (Entity, MainEntity),
         batch_range: Range<u32>,
@@ -202,7 +217,7 @@ impl PhaseItem for TransparentOutline {
     }
 
     fn extra_index(&self) -> PhaseItemExtraIndex {
-        self.extra_index
+        self.extra_index.clone()
     }
 
     fn batch_range_and_extra_index_mut(&mut self) -> (&mut Range<u32>, &mut PhaseItemExtraIndex) {
@@ -215,6 +230,9 @@ impl SortedPhaseItem for TransparentOutline {
 
     fn sort_key(&self) -> Self::SortKey {
         Reverse(FloatOrd(self.distance))
+    }
+    fn indexed(&self) -> bool {
+        false
     }
 }
 
@@ -253,13 +271,13 @@ impl ViewNode for OutlineNode {
         let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
             world
                 .get_resource::<ViewBinnedRenderPhases<StencilOutline>>()
-                .and_then(|ps| ps.get(&view_entity)),
+                .and_then(|ps| ps.get(&RetainedViewEntity::new(view_entity.into(), None, 0))),
             world
                 .get_resource::<ViewBinnedRenderPhases<OpaqueOutline>>()
-                .and_then(|ps| ps.get(&view_entity)),
+                .and_then(|ps| ps.get(&RetainedViewEntity::new(view_entity.into(), None, 0))),
             world
                 .get_resource::<ViewSortedRenderPhases<TransparentOutline>>()
-                .and_then(|ps| ps.get(&view_entity)),
+                .and_then(|ps| ps.get(&RetainedViewEntity::new(view_entity.into(), None, 0))),
         ) else {
             return Ok(());
         };

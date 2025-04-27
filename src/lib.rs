@@ -44,6 +44,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
+use bevy::render::RenderDebugFlags;
 use bevy::render::{Render, RenderApp, RenderSet};
 use bevy::transform::TransformSystem;
 use uniforms::AlphaMaskBindGroups;
@@ -318,9 +319,15 @@ impl Plugin for OutlinePlugin {
         app.add_plugins((
             ExtractComponentPlugin::<ComputedOutline>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
-            BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
-            BinnedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
-            SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::default(),
+            BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
+                RenderDebugFlags::default(),
+            ),
+            BinnedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::new(
+                RenderDebugFlags::default(),
+            ),
+            SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::new(
+                RenderDebugFlags::default(),
+            ),
         ))
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()

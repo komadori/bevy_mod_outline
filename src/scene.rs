@@ -1,7 +1,11 @@
 use std::mem;
 
 use bevy::{
-    ecs::{component::ComponentId, system::SystemId, world::DeferredWorld},
+    ecs::{
+        component::{ComponentId, HookContext},
+        system::SystemId,
+        world::DeferredWorld,
+    },
     prelude::*,
     scene::{InstanceId, SceneInstance, SceneInstanceReady},
 };
@@ -27,11 +31,13 @@ pub struct AsyncSceneInheritOutline {
     state: InternalState,
 }
 
-fn add_hook(mut world: DeferredWorld<'_>, entity: Entity, _component: ComponentId) {
+fn add_hook(mut world: DeferredWorld<'_>, hook_context: HookContext) {
     let add_outline = world
         .resource::<AsyncSceneInheritOutlineSystems>()
         .add_outline;
-    world.commands().run_system_with_input(add_outline, entity);
+    world
+        .commands()
+        .run_system_with(add_outline, hook_context.entity);
 }
 
 fn add_outline(
@@ -49,12 +55,12 @@ fn add_outline(
         let iid = **scene_instance;
         if scene_spawner.instance_is_ready(iid) {
             for child in scene_spawner.iter_instance_entities(iid) {
-                if let Some(mut ecmds) = commands.get_entity(child) {
+                if let Ok(mut ecmds) = commands.get_entity(child) {
                     ecmds.insert(InheritOutline);
                 }
             }
             if let InternalState::WaitingForSceneReady(observer) = scene_outline.state {
-                if let Some(mut ecmds) = commands.get_entity(observer) {
+                if let Ok(mut ecmds) = commands.get_entity(observer) {
                     ecmds.despawn();
                 }
             }
@@ -68,7 +74,7 @@ fn add_outline(
             .spawn(
                 Observer::new(
                     move |trigger: Trigger<SceneInstanceReady>, mut commands: Commands| {
-                        commands.run_system_with_input(add_outline, trigger.entity());
+                        commands.run_system_with(add_outline, trigger.target());
                     },
                 )
                 .with_entity(*entity_input),
@@ -78,20 +84,18 @@ fn add_outline(
     }
 }
 
-fn remove_hook(mut world: DeferredWorld<'_>, entity: Entity, _component: ComponentId) {
+fn remove_hook(mut world: DeferredWorld<'_>, hook_context: HookContext) {
     let remove_outline = world
         .resource::<AsyncSceneInheritOutlineSystems>()
         .remove_outline;
-    let mut entity_ref = world.entity_mut(entity);
+    let mut entity_ref = world.entity_mut(hook_context.entity);
     let outline = mem::take(
         entity_ref
             .get_mut::<AsyncSceneInheritOutline>()
             .unwrap()
             .into_inner(),
     );
-    world
-        .commands()
-        .run_system_with_input(remove_outline, outline);
+    world.commands().run_system_with(remove_outline, outline);
 }
 
 fn remove_outline(
@@ -101,13 +105,13 @@ fn remove_outline(
 ) {
     match input.state {
         InternalState::WaitingForSceneReady(observer) => {
-            if let Some(mut ecmds) = commands.get_entity(observer) {
+            if let Ok(mut ecmds) = commands.get_entity(observer) {
                 ecmds.despawn();
             }
         }
         InternalState::SceneProcessed(iid) => {
             for child in scene_spawner.iter_instance_entities(iid) {
-                if let Some(mut ecmds) = commands.get_entity(child) {
+                if let Ok(mut ecmds) = commands.get_entity(child) {
                     ecmds.remove::<(InheritOutline, ComputedOutline)>();
                 }
             }

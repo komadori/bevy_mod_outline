@@ -1,5 +1,6 @@
 use bevy::{
     core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    platform::collections::HashMap,
     prelude::*,
     render::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
@@ -13,7 +14,6 @@ use bevy::{
         texture::CachedTexture,
         view::{ExtractedView, ViewDepthTexture, ViewTarget},
     },
-    utils::HashMap,
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
 use wgpu_types::{

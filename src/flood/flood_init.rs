@@ -5,7 +5,7 @@ use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::RenderLayers;
+use bevy::render::view::{RenderLayers, RetainedViewEntity};
 use bevy::render::{
     render_phase::SortedRenderPhase,
     render_resource::{
@@ -14,6 +14,7 @@ use bevy::render::{
     renderer::RenderContext,
     texture::CachedTexture,
 };
+use tracing::error;
 use wgpu_types::ImageSubresourceRange;
 
 use crate::uniforms::ExtractedOutline;
@@ -29,7 +30,7 @@ pub(crate) fn prepare_flood_phases(
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
 ) {
     for entity in query.iter() {
-        flood_phases.insert_or_clear(entity);
+        flood_phases.insert_or_clear(RetainedViewEntity::new(entity.into(), None, 0));
     }
 }
 
@@ -49,7 +50,9 @@ pub(crate) fn queue_flood_meshes(
     for (view_entity, view_mask, mut queue_status) in views.iter_mut() {
         let view_mask = view_mask.cloned().unwrap_or_default();
 
-        let Some(flood_phase) = flood_phases.get_mut(&view_entity) else {
+        let Some(flood_phase) =
+            flood_phases.get_mut(&RetainedViewEntity::new(view_entity.into(), None, 0))
+        else {
             continue;
         };
 
@@ -93,7 +96,7 @@ pub(crate) fn queue_flood_meshes(
                     pipeline,
                     draw_function: draw_flood,
                     batch_range: 0..0,
-                    extra_index: PhaseItemExtraIndex::NONE,
+                    extra_index: PhaseItemExtraIndex::None,
                     volume_offset: outline.instance_data.volume_offset,
                 });
             }

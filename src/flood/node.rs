@@ -13,6 +13,7 @@ use bevy::{
         render_resource::CachedRenderPipelineId,
         renderer::RenderContext,
         sync_world::MainEntity,
+        view::RetainedViewEntity,
         view::ViewTarget,
     },
 };
@@ -63,7 +64,7 @@ impl PhaseItem for FloodOutline {
 
     #[inline]
     fn extra_index(&self) -> PhaseItemExtraIndex {
-        self.extra_index
+        self.extra_index.clone()
     }
 
     #[inline]
@@ -83,6 +84,10 @@ impl SortedPhaseItem for FloodOutline {
 
     fn sort_key(&self) -> Self::SortKey {
         FloatOrd(self.distance)
+    }
+
+    fn indexed(&self) -> bool {
+        false
     }
 }
 
@@ -116,7 +121,7 @@ impl ViewNode for FloodNode {
         let view_entity = graph.view_entity();
         let Some(flood_phase) = world
             .get_resource::<ViewSortedRenderPhases<FloodOutline>>()
-            .and_then(|ps| ps.get(&view_entity))
+            .and_then(|ps| ps.get(&RetainedViewEntity::new(view_entity.into(), None, 0)))
         else {
             return Ok(());
         };

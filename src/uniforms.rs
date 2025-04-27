@@ -1,5 +1,6 @@
 use bevy::{
     math::Affine3,
+    platform::collections::HashMap,
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
@@ -10,7 +11,6 @@ use bevy::{
         texture::{FallbackImage, GpuImage},
         view::RenderLayers,
     },
-    utils::HashMap,
 };
 
 use crate::{pipeline::OutlinePipeline, ComputedOutline, TextureChannel};
