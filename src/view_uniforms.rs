@@ -6,6 +6,7 @@ use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::sync_world::RenderEntity;
+use bevy::render::view::RetainedViewEntity;
 use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
@@ -68,9 +69,13 @@ pub(crate) fn extract_outline_view_uniforms(
                 })
                 .insert(OutlineQueueStatus::default());
 
-            stencil_phases.insert_or_clear(entity.id());
-            opaque_phases.insert_or_clear(entity.id());
-            transparent_phases.insert_or_clear(entity.id());
+            /*             stencil_phases.insert_or_clear(entity.id()); // I don't know what to do with these
+            opaque_phases.insert_or_clear(entity.id()); */
+            transparent_phases.insert_or_clear(RetainedViewEntity::new(
+                entity.id().into(),
+                None,
+                0,
+            ));
         }
     }
 }

@@ -14,7 +14,7 @@ use bevy::{
         },
         renderer::RenderDevice,
         texture::{CachedTexture, TextureCache},
-        Render, RenderApp, RenderSet,
+        Render, RenderApp, RenderDebugFlags, RenderSet,
     },
 };
 use compose_output::{
@@ -125,7 +125,9 @@ impl Plugin for FloodPlugin {
         );
         app.add_plugins((
             UniformComponentPlugin::<ComposeOutputUniform>::default(),
-            SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::default(),
+            SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(
+                RenderDebugFlags::default(),
+            ),
         ))
         .sub_app_mut(RenderApp)
         .init_resource::<DrawFunctions<FloodOutline>>()

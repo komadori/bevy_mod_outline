@@ -1,16 +1,20 @@
 use bevy::core_pipeline::prepass::MotionVectorPrepass;
+use bevy::ecs::component::Tick;
 use bevy::prelude::*;
+use bevy::render::batching::gpu_preprocessing::GpuPreprocessingSupport;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{
-    BinnedRenderPhaseType, DrawFunctions, PhaseItemExtraIndex, ViewBinnedRenderPhases,
-    ViewSortedRenderPhases,
+    BinnedRenderPhaseType, DrawFunctions, InputUniformIndex, PhaseItemExtraIndex,
+    ViewBinnedRenderPhases, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::{ExtractedView, RenderLayers};
+use bevy::render::view::{ExtractedView, RenderLayers, RetainedViewEntity};
 
-use crate::node::{OpaqueOutline, OutlineBinKey, StencilOutline, TransparentOutline};
+use crate::node::{
+    NoPhaseItemBatchSetKey, OpaqueOutline, OutlineBinKey, StencilOutline, TransparentOutline,
+};
 use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::render::DrawOutline;
 use crate::uniforms::{DrawMode, ExtractedOutline};
@@ -59,9 +63,9 @@ pub(crate) fn queue_outline_mesh(
         let world_from_view = view.world_from_view.affine().matrix3;
         let rangefinder = view.rangefinder3d();
         let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
-            stencil_phases.get_mut(&view_entity),
-            opaque_phases.get_mut(&view_entity),
-            transparent_phases.get_mut(&view_entity),
+            stencil_phases.get_mut(&RetainedViewEntity::new(view_entity.into(), None, 0)),
+            opaque_phases.get_mut(&RetainedViewEntity::new(view_entity.into(), None, 0)),
+            transparent_phases.get_mut(&RetainedViewEntity::new(view_entity.into(), None, 0)),
         ) else {
             continue; // No render phase
         };
@@ -92,6 +96,7 @@ pub(crate) fn queue_outline_mesh(
                     &mesh.layout,
                 ) {
                     stencil_phase.add(
+                        NoPhaseItemBatchSetKey,
                         OutlineBinKey {
                             pipeline,
                             draw_function: draw_stencil,
@@ -99,7 +104,9 @@ pub(crate) fn queue_outline_mesh(
                             texture_id: outline.alpha_mask_id,
                         },
                         (entity, *main_entity),
-                        BinnedRenderPhaseType::mesh(outline.automatic_batching),
+                        InputUniformIndex(0),
+                        BinnedRenderPhaseType::mesh(outline.automatic_batching, &GpuPreprocessingSupport { max_supported_mode: bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode::Culling }),
+                        Tick::new(0),
                     );
                 }
             }
@@ -130,10 +137,11 @@ pub(crate) fn queue_outline_mesh(
                             draw_function: draw_transparent_outline,
                             distance,
                             batch_range: 0..0,
-                            extra_index: PhaseItemExtraIndex::NONE,
+                            extra_index: PhaseItemExtraIndex::None,
                         });
                     } else {
                         opaque_phase.add(
+                            NoPhaseItemBatchSetKey,
                             OutlineBinKey {
                                 pipeline,
                                 draw_function: draw_opaque_outline,
@@ -141,7 +149,9 @@ pub(crate) fn queue_outline_mesh(
                                 texture_id: outline.alpha_mask_id,
                             },
                             (entity, *main_entity),
-                            BinnedRenderPhaseType::mesh(outline.automatic_batching),
+                        InputUniformIndex(0),
+                        BinnedRenderPhaseType::mesh(outline.automatic_batching, &GpuPreprocessingSupport { max_supported_mode: bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode::Culling }),
+                        Tick::new(0),
                         );
                     }
                 }

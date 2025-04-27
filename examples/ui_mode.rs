@@ -12,7 +12,7 @@ use bevy_mod_outline::*;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
-        .add_plugins((DefaultPlugins, OutlinePlugin, WireframePlugin))
+        .add_plugins((DefaultPlugins, OutlinePlugin, WireframePlugin::default()))
         .insert_state(DrawMethod::Extrude)
         .insert_state(DrawShape::Cone)
         .insert_state(DrawOrientation::Front)
@@ -187,7 +187,7 @@ fn setup(
     ));
 }
 
-fn create_buttons<T: Component + States>(builder: &mut ChildBuilder, values: &[T]) {
+fn create_buttons<T: Component + States>(builder: &mut ChildSpawnerCommands, values: &[T]) {
     builder
         .spawn(Node {
             flex_direction: FlexDirection::Row,

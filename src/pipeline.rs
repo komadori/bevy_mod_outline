@@ -4,6 +4,7 @@ use bevy::ecs::system::lifetimeless::{SQuery, SRes};
 use bevy::ecs::system::SystemParamItem;
 use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
 use bevy::prelude::*;
+use bevy::render::batching::gpu_preprocessing::UntypedPhaseIndirectParametersBuffers;
 use bevy::render::batching::{GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
@@ -267,6 +268,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &key.into(),
                 &mut vertex_defs,
                 &mut buffer_attrs,
+                false,
             ),
             self.outline_instance_bind_group_layout.clone(),
             self.alpha_mask_bind_group_layout.clone(),
@@ -442,9 +444,9 @@ impl GetFullBatchData for OutlinePipeline {
 
     fn get_binned_batch_data(
         (outline_query, mesh_allocator): &SystemParamItem<Self::Param>,
-        (entity, _main_entity): (Entity, MainEntity),
+        main_entity: MainEntity,
     ) -> Option<Self::BufferData> {
-        let outline = outline_query.get(entity).ok()?;
+        let outline = outline_query.get(main_entity.id()).ok()?;
         let mut instance_data = outline.instance_data.clone();
         instance_data.first_vertex_index = mesh_allocator
             .mesh_vertex_slice(&outline.mesh_id)
@@ -455,24 +457,24 @@ impl GetFullBatchData for OutlinePipeline {
 
     fn get_index_and_compare_data(
         _param: &SystemParamItem<Self::Param>,
-        (_entity, _main_entity): (Entity, MainEntity),
+        _main_entity: MainEntity,
     ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
         unimplemented!("GPU batching is not used.");
     }
 
     fn get_binned_index(
         _param: &SystemParamItem<Self::Param>,
-        (_entity, _main_entity): (Entity, MainEntity),
+        _main_entity: MainEntity,
     ) -> Option<NonMaxU32> {
         unimplemented!("GPU batching is not used.");
     }
 
-    fn get_batch_indirect_parameters_index(
-        _param: &SystemParamItem<Self::Param>,
-        _indirect_parameters_buffer: &mut bevy::render::batching::gpu_preprocessing::IndirectParametersBuffer,
-        (_entity, _main_entity): (Entity, MainEntity),
-        _instance_index: u32,
-    ) -> Option<NonMaxU32> {
-        unimplemented!("GPU batching is not used.");
+    fn write_batch_indirect_parameters_metadata(
+        _indexed: bool,
+        _base_output_index: u32,
+        _batch_set_index: Option<NonMaxU32>,
+        _indirect_parameters_buffers: &mut UntypedPhaseIndirectParametersBuffers,
+        _indirect_parameters_offset: u32,
+    ) {
     }
 }
