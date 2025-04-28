@@ -3,6 +3,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::{
     pbr::wireframe::{Wireframe, WireframePlugin},
     prelude::*,
+    render::RenderDebugFlags,
     state::state::FreelyMutableState,
 };
 
@@ -12,7 +13,13 @@ use bevy_mod_outline::*;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
-        .add_plugins((DefaultPlugins, OutlinePlugin, WireframePlugin))
+        .add_plugins((
+            DefaultPlugins,
+            OutlinePlugin,
+            WireframePlugin {
+                debug_flags: RenderDebugFlags::empty(),
+            },
+        ))
         .insert_state(DrawMethod::Extrude)
         .insert_state(DrawShape::Cone)
         .insert_state(DrawOrientation::Front)
@@ -187,7 +194,7 @@ fn setup(
     ));
 }
 
-fn create_buttons<T: Component + States>(builder: &mut ChildBuilder, values: &[T]) {
+fn create_buttons<T: Component + States>(builder: &mut ChildSpawnerCommands, values: &[T]) {
     builder
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -256,7 +263,7 @@ fn change_mode(
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {
-        if let Ok(entity) = query.get_single() {
+        if let Ok(entity) = query.single() {
             commands
                 .entity(entity)
                 .insert(match event.entered.unwrap() {
@@ -276,7 +283,7 @@ fn change_shape(
     shapes: Res<Shapes>,
 ) {
     for event in reader.read() {
-        if let Ok(entity) = query.get_single() {
+        if let Ok(entity) = query.single() {
             commands
                 .entity(entity)
                 .insert(Mesh3d(shapes.get(event.entered.unwrap())));
@@ -290,7 +297,7 @@ fn change_orientation(
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {
-        if let Ok(entity) = query.get_single() {
+        if let Ok(entity) = query.single() {
             commands
                 .entity(entity)
                 .insert(RotateY(match event.entered.unwrap() {

@@ -1,5 +1,6 @@
 use bevy::{
     math::Affine3,
+    platform::collections::HashMap,
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
@@ -7,15 +8,26 @@ use bevy::{
         render_asset::RenderAssets,
         render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
+        sync_world::{MainEntity, MainEntityHashMap},
         texture::{FallbackImage, GpuImage},
         view::RenderLayers,
     },
-    utils::HashMap,
 };
 
 use crate::{pipeline::OutlinePipeline, ComputedOutline, TextureChannel};
 
-#[derive(Component)]
+#[derive(Resource, Default)]
+pub struct RenderOutlines {
+    entity_map: MainEntityHashMap<ExtractedOutline>,
+}
+
+impl RenderOutlines {
+    pub fn get(&self, main_entity: MainEntity) -> Option<&ExtractedOutline> {
+        self.entity_map.get(&main_entity)
+    }
+}
+
+#[derive(Clone, Component)]
 pub struct ExtractedOutline {
     pub(crate) stencil: bool,
     pub(crate) volume: bool,
@@ -35,8 +47,8 @@ pub(crate) struct OutlineInstanceUniform {
     pub world_from_local: [Vec4; 3],
     pub world_plane_origin: Vec3,
     pub world_plane_offset: Vec3,
-    pub volume_offset: f32,
     pub volume_colour: Vec4,
+    pub volume_offset: f32,
     pub stencil_offset: f32,
     pub alpha_mask_threshold: f32,
     pub first_vertex_index: u32,
@@ -117,6 +129,17 @@ impl ExtractComponent for ComputedOutline {
                 first_vertex_index: 0,
             },
         })
+    }
+}
+
+pub(crate) fn prepare_render_outlines(
+    extracted_outlines: Query<(&MainEntity, &ExtractedOutline)>,
+    mut render_outlines: ResMut<RenderOutlines>,
+) {
+    render_outlines.entity_map.clear();
+
+    for (entity, outline) in extracted_outlines.iter() {
+        render_outlines.entity_map.insert(*entity, outline.clone());
     }
 }
 

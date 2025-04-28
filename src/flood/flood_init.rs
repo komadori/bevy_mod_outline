@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
+use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::RenderLayers;
+use bevy::render::view::{ExtractedView, RenderLayers};
 use bevy::render::{
     render_phase::SortedRenderPhase,
     render_resource::{
@@ -25,11 +26,11 @@ use super::{
 };
 
 pub(crate) fn prepare_flood_phases(
-    query: Query<Entity, With<OutlineViewUniform>>,
+    query: Query<&ExtractedView, With<OutlineViewUniform>>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
 ) {
-    for entity in query.iter() {
-        flood_phases.insert_or_clear(entity);
+    for view in query.iter() {
+        flood_phases.insert_or_clear(view.retained_view_entity);
     }
 }
 
@@ -40,16 +41,21 @@ pub(crate) fn queue_flood_meshes(
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
+    mesh_allocator: Res<MeshAllocator>,
     material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline)>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
-    mut views: Query<(Entity, Option<&RenderLayers>, &mut OutlineQueueStatus)>,
+    mut views: Query<(
+        &ExtractedView,
+        Option<&RenderLayers>,
+        &mut OutlineQueueStatus,
+    )>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
-    for (view_entity, view_mask, mut queue_status) in views.iter_mut() {
+    for (view, view_mask, mut queue_status) in views.iter_mut() {
         let view_mask = view_mask.cloned().unwrap_or_default();
 
-        let Some(flood_phase) = flood_phases.get_mut(&view_entity) else {
+        let Some(flood_phase) = flood_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
@@ -69,6 +75,8 @@ pub(crate) fn queue_flood_meshes(
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
                 continue;
             };
+
+            let (_vertex_slab, index_slab) = mesh_allocator.mesh_slabs(&outline.mesh_id);
 
             let flood_key = PipelineKey::new()
                 .with_primitive_topology(mesh.primitive_topology())
@@ -93,7 +101,8 @@ pub(crate) fn queue_flood_meshes(
                     pipeline,
                     draw_function: draw_flood,
                     batch_range: 0..0,
-                    extra_index: PhaseItemExtraIndex::NONE,
+                    extra_index: PhaseItemExtraIndex::None,
+                    indexed: index_slab.is_some(),
                     volume_offset: outline.instance_data.volume_offset,
                 });
             }

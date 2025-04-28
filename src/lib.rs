@@ -28,9 +28,13 @@
 //! Jump flood support is currently experimental and can be enabled by
 //! adding the [`OutlineMode::FloodFlat`] component.
 
+use std::any::TypeId;
+
 use bevy::asset::load_internal_asset;
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
+use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::prelude::*;
+use bevy::render::batching::gpu_preprocessing::{self, GpuPreprocessingSupport};
 use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
@@ -38,15 +42,15 @@ use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPl
 use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::{EmptyNode, RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
-    sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions,
+    sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions, PhaseItem,
     SortedRenderPhasePlugin,
 };
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
-use bevy::render::{Render, RenderApp, RenderSet};
+use bevy::render::{Render, RenderApp, RenderDebugFlags, RenderSet};
 use bevy::transform::TransformSystem;
-use uniforms::AlphaMaskBindGroups;
+use uniforms::{prepare_render_outlines, AlphaMaskBindGroups, RenderOutlines};
 
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
@@ -296,6 +300,28 @@ pub struct OutlineAlphaMask {
     pub threshold: f32,
 }
 
+// This makes `SetMeshBindGroup` work with CPU drawn outlines when GPU pre-processing is enabled
+pub(crate) fn add_dummy_phase_buffer<P: PhaseItem + 'static>(
+    bibs: &mut gpu_preprocessing::BatchedInstanceBuffers<MeshUniform, MeshInputUniform>,
+) {
+    let phase_buffer = bibs
+        .phase_instance_buffers
+        .entry(TypeId::of::<P>())
+        .or_default();
+    if phase_buffer.data_buffer.is_empty() {
+        // An empty buffer will not be bound
+        phase_buffer.data_buffer.add();
+    }
+}
+
+fn add_dummy_phase_buffers(
+    mut bibs: ResMut<gpu_preprocessing::BatchedInstanceBuffers<MeshUniform, MeshInputUniform>>,
+) {
+    add_dummy_phase_buffer::<StencilOutline>(&mut bibs);
+    add_dummy_phase_buffer::<OpaqueOutline>(&mut bibs);
+    add_dummy_phase_buffer::<TransparentOutline>(&mut bibs);
+}
+
 /// Adds support for rendering outlines.
 pub struct OutlinePlugin;
 
@@ -318,9 +344,15 @@ impl Plugin for OutlinePlugin {
         app.add_plugins((
             ExtractComponentPlugin::<ComputedOutline>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
-            BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::default(),
-            BinnedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::default(),
-            SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::default(),
+            BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
+                RenderDebugFlags::empty(),
+            ),
+            BinnedRenderPhasePlugin::<OpaqueOutline, OutlinePipeline>::new(
+                RenderDebugFlags::empty(),
+            ),
+            SortedRenderPhasePlugin::<TransparentOutline, OutlinePipeline>::new(
+                RenderDebugFlags::empty(),
+            ),
         ))
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
@@ -358,8 +390,7 @@ impl Plugin for OutlinePlugin {
         )
         .add_systems(
             Render,
-            write_batched_instance_buffer::<OutlinePipeline>
-                .in_set(RenderSet::PrepareResourcesFlush),
+            prepare_render_outlines.in_set(RenderSet::PrepareMeshes),
         )
         .add_systems(Render, queue_outline_mesh.in_set(RenderSet::QueueMeshes))
         .add_systems(
@@ -410,11 +441,25 @@ impl Plugin for OutlinePlugin {
 
     fn finish(&self, app: &mut App) {
         let render_app = app.sub_app_mut(RenderApp);
+        render_app
+            .init_resource::<RenderOutlines>()
+            .init_resource::<OutlinePipeline>()
+            .init_resource::<AlphaMaskBindGroups>();
+
         let render_device = render_app.world().resource::<RenderDevice>();
         let instance_buffer = BatchedInstanceBuffer::<OutlineInstanceUniform>::new(render_device);
-        render_app
-            .init_resource::<OutlinePipeline>()
-            .init_resource::<AlphaMaskBindGroups>()
-            .insert_resource(instance_buffer);
+        render_app.insert_resource(instance_buffer).add_systems(
+            Render,
+            write_batched_instance_buffer::<OutlinePipeline>
+                .in_set(RenderSet::PrepareResourcesFlush),
+        );
+
+        let gpu_preprocessing_support = render_app.world().resource::<GpuPreprocessingSupport>();
+        if gpu_preprocessing_support.is_available() {
+            render_app.add_systems(
+                Render,
+                add_dummy_phase_buffers.in_set(RenderSet::PrepareResourcesCollectPhaseBuffers),
+            );
+        }
     }
 }

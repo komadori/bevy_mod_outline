@@ -71,7 +71,7 @@ fn setup_outlines(
     if *has_setup {
         return;
     }
-    if let Ok(scene) = scene_query.get_single() {
+    if let Ok(scene) = scene_query.single() {
         if scene_manager.instance_is_ready(**scene) {
             for entity in scene_manager.iter_instance_entities(**scene) {
                 commands.entity(entity).insert(InheritOutline);

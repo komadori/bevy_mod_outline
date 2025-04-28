@@ -10,7 +10,8 @@ use bevy::{
     render::{
         extract_component::DynamicUniformIndex,
         render_phase::{
-            PhaseItem, RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
+            PhaseItem, PhaseItemExtraIndex, RenderCommand, RenderCommandResult, SetItemPipeline,
+            TrackedRenderPass,
         },
     },
 };
@@ -33,7 +34,10 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineInstanceBindGr
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let dynamic_uniform_index = item.extra_index().as_dynamic_offset().map(|x| x.get());
+        let dynamic_uniform_index = match item.extra_index() {
+            PhaseItemExtraIndex::DynamicOffset(index) => Some(index),
+            _ => None,
+        };
         pass.set_bind_group(
             I,
             &bind_group.into_inner().bind_group,

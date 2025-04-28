@@ -2,7 +2,7 @@ use bevy::ecs::query::QueryItem;
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, ViewSortedRenderPhases,
 };
-use bevy::render::view::ViewDepthTexture;
+use bevy::render::view::{ExtractedView, ViewDepthTexture};
 use bevy::{
     math::FloatOrd,
     prelude::*,
@@ -32,6 +32,7 @@ pub struct FloodOutline {
     pub draw_function: DrawFunctionId,
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
+    pub indexed: bool,
     pub volume_offset: f32,
 }
 
@@ -63,7 +64,7 @@ impl PhaseItem for FloodOutline {
 
     #[inline]
     fn extra_index(&self) -> PhaseItemExtraIndex {
-        self.extra_index
+        self.extra_index.clone()
     }
 
     #[inline]
@@ -84,6 +85,10 @@ impl SortedPhaseItem for FloodOutline {
     fn sort_key(&self) -> Self::SortKey {
         FloatOrd(self.distance)
     }
+
+    fn indexed(&self) -> bool {
+        self.indexed
+    }
 }
 
 pub(crate) struct FloodNode;
@@ -96,6 +101,7 @@ impl FromWorld for FloodNode {
 
 impl ViewNode for FloodNode {
     type ViewQuery = (
+        &'static ExtractedView,
         &'static ExtractedCamera,
         &'static ViewTarget,
         &'static ViewDepthTexture,
@@ -107,7 +113,7 @@ impl ViewNode for FloodNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (camera, target, depth, flood_textures, compose_output_view): QueryItem<
+        (view, camera, target, depth, flood_textures, compose_output_view): QueryItem<
             'w,
             Self::ViewQuery,
         >,
@@ -116,7 +122,7 @@ impl ViewNode for FloodNode {
         let view_entity = graph.view_entity();
         let Some(flood_phase) = world
             .get_resource::<ViewSortedRenderPhases<FloodOutline>>()
-            .and_then(|ps| ps.get(&view_entity))
+            .and_then(|ps| ps.get(&view.retained_view_entity))
         else {
             return Ok(());
         };

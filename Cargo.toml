@@ -1,6 +1,6 @@
 [package]
 name = "bevy_mod_outline"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A mesh outlining plugin for Bevy."
@@ -11,7 +11,11 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.15.3", default-features = false, features = [
+bevy = { version = "0.16.0", default-features = false, features = [
+    "std",
+    "async_executor",
+    "bevy_log",
+    "bevy_color",
     "bevy_image",
     "bevy_pbr",
 ] }
@@ -19,7 +23,7 @@ bitfield = "0.15"
 interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
 nonmax = "0.5"
-wgpu-types = "23"
+wgpu-types = "24"
 
 [features]
 default = ["flood", "interpolation", "reflect", "scene"]
@@ -28,7 +32,7 @@ reflect = []
 scene = ["bevy/bevy_scene"]
 
 [dev-dependencies]
-bevy = { version = "0.15.3", default-features = false, features = [
+bevy = { version = "0.16.0", default-features = false, features = [
     "animation",
     "bevy_gltf",
     "bevy_pbr",
@@ -82,3 +86,6 @@ path = "examples/ui_aa.rs"
 [[example]]
 name = "alpha_mask"
 path = "examples/alpha_mask.rs"
+
+#[patch.crates-io]
+#bevy = { path = "../bevy" }
