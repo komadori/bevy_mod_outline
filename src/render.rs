@@ -17,7 +17,7 @@ use bevy::{
 };
 
 use crate::{
-    uniforms::{AlphaMaskBindGroups, ExtractedOutline, OutlineInstanceBindGroup},
+    uniforms::{AlphaMaskBindGroups, OutlineInstanceBindGroup, RenderOutlineInstances},
     view_uniforms::{OutlineViewBindGroup, OutlineViewUniform},
 };
 
@@ -69,26 +69,27 @@ pub(crate) struct SetOutlineAlphaMaskBindGroup<const I: usize>();
 
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineAlphaMaskBindGroup<I> {
     type ViewQuery = ();
-    type ItemQuery = &'static ExtractedOutline;
-    type Param = SRes<AlphaMaskBindGroups>;
+    type ItemQuery = ();
+    type Param = (SRes<AlphaMaskBindGroups>, SRes<RenderOutlineInstances>);
     fn render<'w>(
-        _item: &P,
+        item: &P,
         _view_data: (),
-        entity_data: Option<ROQueryItem<'w, Self::ItemQuery>>,
-        bind_groups: SystemParamItem<'w, '_, Self::Param>,
+        _entity_data: Option<ROQueryItem<'w, Self::ItemQuery>>,
+        (bind_groups, render_outlines): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
+        let Some(outline) = render_outlines.get(&item.main_entity()) else {
+            return RenderCommandResult::Failure("No outline found for entity.");
+        };
         let bind_groups = bind_groups.into_inner();
-
-        let bind_group =
-            if let Some(texture_handle) = entity_data.and_then(|e| e.alpha_mask_id.as_ref()) {
-                bind_groups
-                    .bind_groups
-                    .get(texture_handle)
-                    .unwrap_or(&bind_groups.default_bind_group)
-            } else {
-                &bind_groups.default_bind_group
-            };
+        let bind_group = if let Some(texture_handle) = outline.alpha_mask_id {
+            bind_groups
+                .bind_groups
+                .get(&texture_handle)
+                .unwrap_or(&bind_groups.default_bind_group)
+        } else {
+            &bind_groups.default_bind_group
+        };
 
         pass.set_bind_group(I, bind_group, &[]);
         RenderCommandResult::Success

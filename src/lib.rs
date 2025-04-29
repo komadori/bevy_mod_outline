@@ -31,6 +31,7 @@
 use std::any::TypeId;
 
 use bevy::asset::load_internal_asset;
+use bevy::asset::AssetEvents;
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::prelude::*;
@@ -38,7 +39,7 @@ use bevy::render::batching::gpu_preprocessing::{self, GpuPreprocessingSupport};
 use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
-use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
+use bevy::render::extract_component::UniformComponentPlugin;
 use bevy::render::mesh::MeshVertexAttribute;
 use bevy::render::render_graph::{EmptyNode, RenderGraphApp, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
@@ -47,17 +48,24 @@ use bevy::render::render_phase::{
 };
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
+use bevy::render::sync_component::SyncComponentPlugin;
 use bevy::render::view::{RenderLayers, VisibilitySystems};
 use bevy::render::{Render, RenderApp, RenderDebugFlags, RenderSet};
 use bevy::transform::TransformSystem;
-use uniforms::{prepare_render_outlines, AlphaMaskBindGroups, RenderOutlines};
+use uniforms::extract_outlines;
+use uniforms::AlphaMaskBindGroups;
+use uniforms::RenderOutlineInstances;
 
 use crate::msaa::MsaaExtraWritebackNode;
 use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
 use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
 };
-use crate::queue::queue_outline_mesh;
+use crate::queue::{
+    check_outline_entities_needing_specialisation, extract_outline_entities_needing_specialisation,
+    queue_outline_mesh, specialise_outlines, OutlineEntitiesNeedingSpecialisation,
+    OutlineEntitySpecialisationTicks, OutlinePipelineCache,
+};
 use crate::render::DrawOutline;
 use crate::uniforms::set_outline_visibility;
 use crate::uniforms::{
@@ -342,7 +350,7 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugins((
-            ExtractComponentPlugin::<ComputedOutline>::default(),
+            SyncComponentPlugin::<ComputedOutline>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
                 RenderDebugFlags::empty(),
@@ -357,6 +365,11 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
+        .init_resource::<OutlineEntitiesNeedingSpecialisation>()
+        .add_systems(
+            PostUpdate,
+            check_outline_entities_needing_specialisation.after(AssetEvents),
+        )
         .add_systems(
             PostUpdate,
             (
@@ -374,7 +387,14 @@ impl Plugin for OutlinePlugin {
         .add_render_command::<StencilOutline, DrawOutline>()
         .add_render_command::<OpaqueOutline, DrawOutline>()
         .add_render_command::<TransparentOutline, DrawOutline>()
-        .add_systems(ExtractSchedule, extract_outline_view_uniforms)
+        .add_systems(
+            ExtractSchedule,
+            (
+                extract_outline_view_uniforms,
+                extract_outlines,
+                extract_outline_entities_needing_specialisation,
+            ),
+        )
         .add_systems(
             Render,
             msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSet::Prepare),
@@ -388,10 +408,7 @@ impl Plugin for OutlinePlugin {
             )
                 .in_set(RenderSet::PrepareBindGroups),
         )
-        .add_systems(
-            Render,
-            prepare_render_outlines.in_set(RenderSet::PrepareMeshes),
-        )
+        .add_systems(Render, specialise_outlines.in_set(RenderSet::PrepareMeshes))
         .add_systems(Render, queue_outline_mesh.in_set(RenderSet::QueueMeshes))
         .add_systems(
             Render,
@@ -442,7 +459,9 @@ impl Plugin for OutlinePlugin {
     fn finish(&self, app: &mut App) {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .init_resource::<RenderOutlines>()
+            .init_resource::<RenderOutlineInstances>()
+            .init_resource::<OutlineEntitySpecialisationTicks>()
+            .init_resource::<OutlinePipelineCache>()
             .init_resource::<OutlinePipeline>()
             .init_resource::<AlphaMaskBindGroups>();
 

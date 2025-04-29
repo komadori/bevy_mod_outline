@@ -31,7 +31,7 @@ use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
-use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlines};
+use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::{TextureChannel, ATTRIBUTE_OUTLINE_NORMAL};
 
@@ -416,7 +416,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = (SRes<RenderOutlines>, SRes<MeshAllocator>);
+    type Param = (SRes<RenderOutlineInstances>, SRes<MeshAllocator>);
     type CompareData = (AssetId<Mesh>, Option<AssetId<Image>>);
     type BufferData = OutlineInstanceUniform;
 
@@ -424,7 +424,7 @@ impl GetBatchData for OutlinePipeline {
         (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
         (_entity, main_entity): (Entity, MainEntity),
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
-        let outline = render_outlines.get(main_entity)?;
+        let outline = render_outlines.get(&main_entity)?;
         let mut instance_data = outline.instance_data.clone();
         instance_data.first_vertex_index = mesh_allocator
             .mesh_vertex_slice(&outline.mesh_id)
@@ -449,7 +449,7 @@ impl GetFullBatchData for OutlinePipeline {
         (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
         main_entity: MainEntity,
     ) -> Option<Self::BufferData> {
-        let outline = render_outlines.get(main_entity)?;
+        let outline = render_outlines.get(&main_entity)?;
         let mut instance_data = outline.instance_data.clone();
         instance_data.first_vertex_index = mesh_allocator
             .mesh_vertex_slice(&outline.mesh_id)

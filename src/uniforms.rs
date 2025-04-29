@@ -4,28 +4,17 @@ use bevy::{
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
-        extract_component::ExtractComponent,
         render_asset::RenderAssets,
         render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
-        sync_world::{MainEntity, MainEntityHashMap},
+        sync_world::{MainEntity, MainEntityHashMap, RenderEntity},
         texture::{FallbackImage, GpuImage},
         view::RenderLayers,
+        Extract,
     },
 };
 
 use crate::{pipeline::OutlinePipeline, ComputedOutline, TextureChannel};
-
-#[derive(Resource, Default)]
-pub struct RenderOutlines {
-    entity_map: MainEntityHashMap<ExtractedOutline>,
-}
-
-impl RenderOutlines {
-    pub fn get(&self, main_entity: MainEntity) -> Option<&ExtractedOutline> {
-        self.entity_map.get(&main_entity)
-    }
-}
 
 #[derive(Clone, Component)]
 pub struct ExtractedOutline {
@@ -40,6 +29,17 @@ pub struct ExtractedOutline {
     pub(crate) automatic_batching: bool,
     pub(crate) instance_data: OutlineInstanceUniform,
     pub(crate) layers: RenderLayers,
+}
+
+#[derive(Resource, Default)]
+pub struct RenderOutlineInstances {
+    entity_map: MainEntityHashMap<ExtractedOutline>,
+}
+
+impl RenderOutlineInstances {
+    pub fn get(&self, main_entity: &MainEntity) -> Option<&ExtractedOutline> {
+        self.entity_map.get(main_entity)
+    }
 }
 
 #[derive(Clone, ShaderType)]
@@ -82,26 +82,29 @@ pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &Com
     }
 }
 
-impl ExtractComponent for ComputedOutline {
-    type QueryData = (
-        &'static ComputedOutline,
-        &'static GlobalTransform,
-        &'static Mesh3d,
-        Has<NoAutomaticBatching>,
-    );
-    type QueryFilter = ();
-    type Out = ExtractedOutline;
+#[allow(clippy::type_complexity)]
+pub(crate) fn extract_outlines(
+    mut commands: Commands,
+    mut render_outlines: ResMut<RenderOutlineInstances>,
+    outlines: Extract<
+        Query<(
+            Entity,
+            RenderEntity,
+            &ComputedOutline,
+            &GlobalTransform,
+            &Mesh3d,
+            Has<NoAutomaticBatching>,
+        )>,
+    >,
+) {
+    render_outlines.entity_map.clear();
 
-    fn extract_component(
-        (computed, transform, mesh, no_automatic_batching): bevy::ecs::query::QueryItem<
-            '_,
-            Self::QueryData,
-        >,
-    ) -> Option<Self::Out> {
+    for (entity, render_entity, computed, transform, mesh, no_automatic_batching) in outlines.iter()
+    {
         let ComputedOutline(Some(computed)) = computed else {
-            return None;
+            continue;
         };
-        Some(ExtractedOutline {
+        let extracted_outline = ExtractedOutline {
             stencil: computed.stencil.value.enabled,
             volume: computed.volume.value.enabled,
             depth_mode: computed.mode.value.depth_mode,
@@ -128,18 +131,13 @@ impl ExtractComponent for ComputedOutline {
                 alpha_mask_threshold: computed.alpha_mask.value.threshold,
                 first_vertex_index: 0,
             },
-        })
-    }
-}
-
-pub(crate) fn prepare_render_outlines(
-    extracted_outlines: Query<(&MainEntity, &ExtractedOutline)>,
-    mut render_outlines: ResMut<RenderOutlines>,
-) {
-    render_outlines.entity_map.clear();
-
-    for (entity, outline) in extracted_outlines.iter() {
-        render_outlines.entity_map.insert(*entity, outline.clone());
+        };
+        commands
+            .entity(render_entity)
+            .insert(extracted_outline.clone());
+        render_outlines
+            .entity_map
+            .insert(entity.into(), extracted_outline);
     }
 }
 

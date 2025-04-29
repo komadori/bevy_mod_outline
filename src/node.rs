@@ -27,7 +27,6 @@ use crate::view_uniforms::OutlineQueueStatus;
 pub(crate) struct OutlineBatchSetKey {
     pub pipeline: CachedRenderPipelineId,
     pub draw_function: DrawFunctionId,
-    pub material_bind_group_id: Option<u32>,
     pub vertex_slab: SlabId,
     pub index_slab: Option<SlabId>,
 }
