@@ -18,20 +18,20 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut window: Query<Entity, With<Window>>,
 ) {
-    let shapes = vec![
+    let shapes = [
         meshes.add(Cuboid::default()),
         meshes.add(Torus::default()),
         meshes.add(Capsule3d::default()),
         meshes.add(Tetrahedron::default()),
     ];
-    let material = vec![
+    let material = [
         materials.add(StandardMaterial::from_color(Color::srgb_u8(255, 0, 0))),
         materials.add(StandardMaterial::from_color(Color::srgb_u8(255, 255, 0))),
         materials.add(StandardMaterial::from_color(Color::srgb_u8(0, 255, 0))),
         materials.add(StandardMaterial::from_color(Color::srgb_u8(0, 0, 255))),
     ];
     const DISTANCE: f32 = 1.5;
-    let positions = vec![
+    let positions = [
         Vec3::new(-DISTANCE, DISTANCE, DISTANCE),
         Vec3::new(DISTANCE, DISTANCE, DISTANCE),
         Vec3::new(-DISTANCE, -DISTANCE, DISTANCE),
@@ -110,7 +110,7 @@ fn on_click(
         }
     }
 
-    //Deselect everything if there is no target
+    // Deselect everything if there is no target
     if event.target == Entity::PLACEHOLDER {
         deselect_all(&mut commands, &mut query);
         return;
@@ -118,12 +118,12 @@ fn on_click(
 
     let multi_select = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
 
-    //Deselect everything if this is not a multi_select
+    // Deselect everything if this is not a multi_select
     if !multi_select {
         deselect_all(&mut commands, &mut query);
     }
 
-    //Act on the target mesh
+    // Act on the target mesh
     if let Ok((entity, mut outline, selected)) = query.get_mut(event.target) {
         if let Ok(mut entity) = commands.get_entity(entity) {
             if multi_select && selected.is_some() {
