@@ -1,10 +1,14 @@
 use bevy::prelude::*;
 use bevy_mod_outline::*;
 
+#[derive(Component)]
+struct Selected;
+
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, MeshPickingPlugin, OutlinePlugin))
         .add_systems(Startup, setup)
+        .add_systems(Update, rotate_selected)
         .run();
 }
 
@@ -14,66 +18,131 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut window: Query<Entity, With<Window>>,
 ) {
-    const X: f32 = -5.0;
-    const Z: f32 = 0.0;
+    let shapes = vec![
+        meshes.add(Cuboid::default()),
+        meshes.add(Torus::default()),
+        meshes.add(Capsule3d::default()),
+        meshes.add(Tetrahedron::default()),
+    ];
+    let material = vec![
+        materials.add(StandardMaterial::from_color(Color::srgb_u8(255, 0, 0))),
+        materials.add(StandardMaterial::from_color(Color::srgb_u8(255, 255, 0))),
+        materials.add(StandardMaterial::from_color(Color::srgb_u8(0, 255, 0))),
+        materials.add(StandardMaterial::from_color(Color::srgb_u8(0, 0, 255))),
+    ];
+    const DISTANCE: f32 = 1.5;
+    let positions = vec![
+        Vec3::new(-DISTANCE, DISTANCE, DISTANCE),
+        Vec3::new(DISTANCE, DISTANCE, DISTANCE),
+        Vec3::new(-DISTANCE, -DISTANCE, DISTANCE),
+        Vec3::new(DISTANCE, -DISTANCE, DISTANCE),
+    ];
 
-    let cube = meshes.add(Cuboid::default());
-    let material = materials.add(StandardMaterial::default());
-
-    for i in -5..5 {
-        let y = i as f32 * 1.1;
-        
-        //Spawn object with outline and observer
+    // Spawn shapes with outline and picking observer
+    for i in 0..shapes.len() {
         commands
             .spawn((
-                Mesh3d(cube.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform::from_xyz(X, y, Z),
-                OutlineVolume::default(),
+                Mesh3d(shapes[i].clone()),
+                MeshMaterial3d(material[i].clone()),
+                Transform::from_translation(positions[i]),
+                OutlineVolume {
+                    width: 5.0f32,
+                    ..default()
+                },
                 OutlineMode::FloodFlat,
                 Pickable::default(),
             ))
             .observe(on_click);
     }
 
-    //Add an observer to the window
+    // Add an observer to the window to respond to clicks that don't hit a mesh
     if let Ok(entity) = window.single_mut() {
         if let Ok(mut window) = commands.get_entity(entity) {
             window.observe(on_click);
         }
     }
 
-    //Camera
+    // Add ground
+    commands.spawn((
+        Mesh3d(shapes[0].clone()), // Reuse cuboid handle
+        MeshMaterial3d(materials.add(StandardMaterial::from_color(Color::WHITE))),
+        Transform::from_translation(Vec3::new(0.0, -5.0, 0.0))
+            .with_scale(Vec3::new(15.0, 1.0, 15.0)),
+    ));
+
+    // Add a light source
+    commands.spawn((
+        PointLight {
+            color: Color::srgb_u8(255, 255, 192),
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
+
+    // Add camera
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(-18.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
 
+/// Observer system that manages what pickable objects are selected
 fn on_click(
     event: Trigger<Pointer<Click>>,
-    mut query: Query<&mut OutlineVolume>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
-    fn deselect_all(query: &mut Query<&mut OutlineVolume>) {
-        for mut outline in query.iter_mut() {
-            outline.visible = false;
+    /// Remove every existing selection from every entity
+    /// useful for when the user wants to deselect everything
+    fn deselect_all(
+        commands: &mut Commands,
+        query: &mut Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
+    ) {
+        for (entity, mut outline, selected) in query.iter_mut() {
+            if selected.is_some() {
+                if let Ok(mut entity) = commands.get_entity(entity) {
+                    entity.remove::<Selected>();
+                    outline.visible = false;
+                }
+            }
         }
     }
 
     //Deselect everything if there is no target
     if event.target == Entity::PLACEHOLDER {
-        deselect_all(&mut query);
+        deselect_all(&mut commands, &mut query);
         return;
     };
 
-    //Deselect everything if the shift key is not held down
-    if !(keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight)) {
-        deselect_all(&mut query);
+    let multi_select = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+
+    //Deselect everything if this is not a multi_select
+    if !multi_select {
+        deselect_all(&mut commands, &mut query);
     }
 
-    //Select the target mesh
-    if let Ok(mut outline) = query.get_mut(event.target) {
-        outline.visible = true;
+    //Act on the target mesh
+    if let Ok((entity, mut outline, selected)) = query.get_mut(event.target) {
+        if let Ok(mut entity) = commands.get_entity(entity) {
+            if multi_select && selected.is_some() {
+                entity.remove::<Selected>();
+                outline.visible = false;
+            } else {
+                entity.insert(Selected);
+                outline.visible = true;
+            }
+        }
+    }
+}
+
+/// Rotate selected meshes
+fn rotate_selected(mut query: Query<&mut Transform, With<Selected>>) {
+    const SPEED: f32 = 0.1;
+    for mut transform in query.iter_mut() {
+        transform.rotate_x(SPEED);
+        transform.rotate_y(SPEED * 1.5);
+        transform.rotate_z(SPEED * 0.5);
     }
 }
