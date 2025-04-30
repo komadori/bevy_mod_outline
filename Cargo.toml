@@ -35,6 +35,7 @@ scene = ["bevy/bevy_scene"]
 bevy = { version = "0.16.0", default-features = false, features = [
     "animation",
     "bevy_gltf",
+    "bevy_mesh_picking_backend",
     "bevy_pbr",
     "bevy_sprite",
     "bevy_state",
@@ -86,6 +87,10 @@ path = "examples/ui_aa.rs"
 [[example]]
 name = "alpha_mask"
 path = "examples/alpha_mask.rs"
+
+[[example]]
+name = "picking"
+path = "examples/picking.rs"
 
 #[patch.crates-io]
 #bevy = { path = "../bevy" }
