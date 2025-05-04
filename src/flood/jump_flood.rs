@@ -121,6 +121,7 @@ impl<'w> JumpFloodPass<'w> {
         input: &CachedTexture,
         output: &CachedTexture,
         size: u32,
+        bounds: &URect,
     ) {
         let bind_group = render_context.render_device().create_bind_group(
             "outline_jump_flood_bind_group",
@@ -144,6 +145,7 @@ impl<'w> JumpFloodPass<'w> {
             occlusion_query_set: None,
         });
 
+        render_pass.set_scissor_rect(bounds.min.x, bounds.min.y, bounds.width(), bounds.height());
         render_pass.set_render_pipeline(self.render_pipeline);
         render_pass.set_bind_group(
             0,

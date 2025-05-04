@@ -222,6 +222,7 @@ impl<'w> ComposeOutputPass<'w> {
         render_context: &mut RenderContext<'_>,
         render_entity: Entity,
         input: &CachedTexture,
+        bounds: &URect,
     ) {
         let dynamic_index = self
             .world
@@ -248,6 +249,7 @@ impl<'w> ComposeOutputPass<'w> {
             occlusion_query_set: None,
         });
 
+        render_pass.set_scissor_rect(bounds.min.x, bounds.min.y, bounds.width(), bounds.height());
         render_pass.set_render_pipeline(self.render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[dynamic_index]);
         render_pass.draw(0..3, 0..1);
