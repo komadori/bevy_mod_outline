@@ -1,4 +1,3 @@
-use std::cmp::Reverse;
 use std::ops::Range;
 
 use bevy::ecs::query::QueryItem;
@@ -211,10 +210,10 @@ impl PhaseItem for TransparentOutline {
 }
 
 impl SortedPhaseItem for TransparentOutline {
-    type SortKey = Reverse<FloatOrd>;
+    type SortKey = FloatOrd;
 
     fn sort_key(&self) -> Self::SortKey {
-        Reverse(FloatOrd(self.distance))
+        FloatOrd(self.distance)
     }
 }
 
