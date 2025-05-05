@@ -1,10 +1,11 @@
 use bevy::core_pipeline::prepass::MotionVectorPrepass;
+use bevy::math::Mat3A;
 use bevy::prelude::*;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_phase::{
     BinnedRenderPhaseType, DrawFunctions, PhaseItemExtraIndex, ViewBinnedRenderPhases,
-    ViewSortedRenderPhases,
+    ViewRangefinder3d, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{PipelineCache, SpecializedMeshPipelines};
 use bevy::render::sync_world::MainEntity;
@@ -15,6 +16,25 @@ use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::render::DrawOutline;
 use crate::uniforms::{DrawMode, ExtractedOutline};
 use crate::view_uniforms::OutlineQueueStatus;
+pub(crate) struct OutlineRangefinder {
+    rangefinder: ViewRangefinder3d,
+    world_from_view: Mat3A,
+}
+
+impl OutlineRangefinder {
+    pub(crate) fn new(view: &ExtractedView) -> Self {
+        Self {
+            rangefinder: view.rangefinder3d(),
+            world_from_view: view.world_from_view.affine().matrix3,
+        }
+    }
+
+    pub(crate) fn distance_of(&self, outline: &ExtractedOutline) -> f32 {
+        let world_plane = outline.instance_data.world_plane_origin
+            + self.world_from_view.mul_vec3(-Vec3::Z) * outline.instance_data.world_plane_offset;
+        self.rangefinder.distance_translation(&world_plane)
+    }
+}
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn queue_outline_mesh(
@@ -56,8 +76,7 @@ pub(crate) fn queue_outline_mesh(
     {
         let base_key = PipelineKey::new().with_msaa(*msaa);
         let view_mask = view_mask.cloned().unwrap_or_default();
-        let world_from_view = view.world_from_view.affine().matrix3;
-        let rangefinder = view.rangefinder3d();
+        let rangefinder = OutlineRangefinder::new(view);
         let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
             stencil_phases.get_mut(&view_entity),
             opaque_phases.get_mut(&view_entity),
@@ -119,10 +138,7 @@ pub(crate) fn queue_outline_mesh(
                     pipelines.specialize(&pipeline_cache, &outline_pipeline, draw_key, &mesh.layout)
                 {
                     if transparent {
-                        let world_plane = outline.instance_data.world_plane_origin
-                            + world_from_view.mul_vec3(-Vec3::Z)
-                                * outline.instance_data.world_plane_offset;
-                        let distance = rangefinder.distance_translation(&world_plane);
+                        let distance = rangefinder.distance_of(outline);
                         transparent_phase.add(TransparentOutline {
                             entity,
                             main_entity: *main_entity,
