@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::render::camera::ExtractedCamera;
+use bevy::render::camera::{ExtractedCamera, Viewport};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
@@ -20,6 +20,7 @@ use wgpu_types::ImageSubresourceRange;
 use crate::uniforms::ExtractedOutline;
 use crate::view_uniforms::OutlineQueueStatus;
 
+use super::bounds::FloodMeshBounds;
 use super::node::FloodOutline;
 use super::{
     DepthMode, DrawMode, DrawOutline, OutlinePipeline, OutlineViewUniform, PassType, PipelineKey,
@@ -42,24 +43,36 @@ pub(crate) fn queue_flood_meshes(
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     mesh_allocator: Res<MeshAllocator>,
-    material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline)>,
+    material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline, &FloodMeshBounds)>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
     mut views: Query<(
         &ExtractedView,
+        &ExtractedCamera,
         Option<&RenderLayers>,
         &mut OutlineQueueStatus,
     )>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
-    for (view, view_mask, mut queue_status) in views.iter_mut() {
+    for (view, camera, view_mask, mut queue_status) in views.iter_mut() {
         let view_mask = view_mask.cloned().unwrap_or_default();
 
         let Some(flood_phase) = flood_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
-        for (entity, main_entity, outline) in material_meshes.iter() {
+        // Get the camera's physical target size for correct screen bounds calculation
+        let fallback_viewport = Viewport {
+            physical_size: camera.physical_target_size.unwrap_or_default(),
+            ..default()
+        };
+        let viewport = camera.viewport.as_ref().unwrap_or(&fallback_viewport);
+
+        let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
+            view.clip_from_view * view.world_from_view.compute_matrix().inverse()
+        });
+
+        for (entity, main_entity, outline, mesh_bounds) in material_meshes.iter() {
             if !outline.volume {
                 continue;
             }
@@ -73,6 +86,14 @@ pub(crate) fn queue_flood_meshes(
             }
 
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
+                continue;
+            };
+
+            // Calculate screen-space bounds of outline
+            let border = outline.instance_data.volume_offset.ceil() as u32;
+            let Some(screen_space_bounds) =
+                mesh_bounds.calculate_screen_space_bounds(&clip_from_world, viewport, border)
+            else {
                 continue;
             };
 
@@ -104,6 +125,7 @@ pub(crate) fn queue_flood_meshes(
                     extra_index: PhaseItemExtraIndex::None,
                     indexed: index_slab.is_some(),
                     volume_offset: outline.instance_data.volume_offset,
+                    screen_space_bounds,
                 });
             }
         }

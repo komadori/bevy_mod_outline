@@ -34,6 +34,7 @@ pub struct FloodOutline {
     pub extra_index: PhaseItemExtraIndex,
     pub indexed: bool,
     pub volume_offset: f32,
+    pub screen_space_bounds: URect,
 }
 
 impl PhaseItem for FloodOutline {
@@ -153,17 +154,24 @@ impl ViewNode for FloodNode {
             } else {
                 0
             };
+
             for size in (0..passes).rev() {
                 jump_flood_pass.execute(
                     render_context,
                     flood_textures.input(),
                     flood_textures.output(),
                     size,
+                    &item.screen_space_bounds,
                 );
                 flood_textures.flip();
             }
 
-            compose_output_pass.execute(render_context, item.entity, flood_textures.input());
+            compose_output_pass.execute(
+                render_context,
+                item.entity,
+                flood_textures.input(),
+                &item.screen_space_bounds,
+            );
         }
 
         Ok(())

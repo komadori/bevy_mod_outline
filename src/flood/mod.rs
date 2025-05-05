@@ -2,7 +2,7 @@ use bevy::asset::{load_internal_asset, weak_handle};
 use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::render::batching::gpu_preprocessing::{BatchedInstanceBuffers, GpuPreprocessingSupport};
-use bevy::render::extract_component::UniformComponentPlugin;
+use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
 };
@@ -34,6 +34,7 @@ use crate::uniforms::{DepthMode, DrawMode};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::{add_dummy_phase_buffer, NodeOutline};
 
+mod bounds;
 mod compose_output;
 mod flood_init;
 mod jump_flood;
@@ -135,6 +136,7 @@ impl Plugin for FloodPlugin {
         app.add_plugins((
             UniformComponentPlugin::<ComposeOutputUniform>::default(),
             SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(RenderDebugFlags::empty()),
+            ExtractComponentPlugin::<bounds::FloodMeshBounds>::default(),
         ))
         .sub_app_mut(RenderApp)
         .init_resource::<DrawFunctions<FloodOutline>>()
