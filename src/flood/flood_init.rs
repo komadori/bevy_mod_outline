@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use bevy::prelude::*;
 use bevy::render::camera::{ExtractedCamera, Viewport};
 use bevy::render::mesh::allocator::MeshAllocator;
@@ -17,6 +19,7 @@ use bevy::render::{
 };
 use wgpu_types::ImageSubresourceRange;
 
+use crate::queue::OutlineRangefinder;
 use crate::uniforms::ExtractedOutline;
 use crate::view_uniforms::OutlineQueueStatus;
 
@@ -72,6 +75,8 @@ pub(crate) fn queue_flood_meshes(
             view.clip_from_view * view.world_from_view.compute_matrix().inverse()
         });
 
+        let rangefinder = OutlineRangefinder::new(view);
+
         for (entity, main_entity, outline, mesh_bounds) in material_meshes.iter() {
             if !outline.volume {
                 continue;
@@ -116,7 +121,7 @@ pub(crate) fn queue_flood_meshes(
                 pipelines.specialize(&pipeline_cache, &outline_pipeline, flood_key, &mesh.layout)
             {
                 flood_phase.add(FloodOutline {
-                    distance: 0.0,
+                    distance: rangefinder.distance_of(outline),
                     entity,
                     main_entity: *main_entity,
                     pipeline,
@@ -125,6 +130,7 @@ pub(crate) fn queue_flood_meshes(
                     extra_index: PhaseItemExtraIndex::None,
                     indexed: index_slab.is_some(),
                     volume_offset: outline.instance_data.volume_offset,
+                    volume_colour: outline.instance_data.volume_colour,
                     screen_space_bounds,
                 });
             }
@@ -157,7 +163,7 @@ impl<'w> FloodInitPass<'w> {
     pub fn execute(
         &mut self,
         render_context: &mut RenderContext<'_>,
-        index: usize,
+        range: Range<usize>,
         output: &CachedTexture,
     ) {
         render_context
@@ -190,12 +196,10 @@ impl<'w> FloodInitPass<'w> {
             init_pass.set_camera_viewport(viewport);
         }
 
-        if let Err(err) = self.flood_phase.render_range(
-            &mut init_pass,
-            self.world,
-            self.view_entity,
-            index..=index,
-        ) {
+        if let Err(err) =
+            self.flood_phase
+                .render_range(&mut init_pass, self.world, self.view_entity, range)
+        {
             error!("Error encountered while rendering the outline flood init phase {err:?}");
         }
     }

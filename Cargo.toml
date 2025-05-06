@@ -24,10 +24,11 @@ interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
 nonmax = "0.5"
 wgpu-types = "24"
+itertools = { version = "0.14", optional = true }
 
 [features]
 default = ["flood", "interpolation", "reflect", "scene"]
-flood = []
+flood = ["dep:itertools"]
 reflect = []
 scene = ["bevy/bevy_scene"]
 
