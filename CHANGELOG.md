@@ -1,5 +1,14 @@
 # Changelog
 
+## bevy_mod_outline 0.9.2 (2025-05-06)
+
+### Fixed
+- Fixed Z ordering of transparent outlines.
+- Fixed jump-flood outlines causing a Metal shader error.
+
+### Changed
+- Improved performance of jump-flood outlines.
+
 ## bevy_mod_outline 0.9.1 (2025-03-11)
 
 ### Added
