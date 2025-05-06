@@ -46,7 +46,7 @@ fn setup(
 
     // Add satellite
     commands
-        .spawn(Transform::default())
+        .spawn((Transform::default(), InheritedVisibility::default()))
         .insert(Rotates)
         .with_children(|parent| {
             parent.spawn((

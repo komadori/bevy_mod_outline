@@ -164,7 +164,7 @@ pub(crate) fn compute_outline(
                     parent_computed,
                     changed,
                     entity,
-                    *child,
+                    child,
                     &mut child_query_mut,
                     &child_query,
                 );
@@ -196,7 +196,7 @@ fn propagate_computed_outline(
                     parent_computed,
                     changed,
                     entity,
-                    *child,
+                    child,
                     child_query_mut,
                     child_query,
                 );
@@ -360,12 +360,14 @@ mod tests {
         // Update the system again and check that nothing has changed
         let tick = app
             .world_mut()
-            .run_system_once(|query: Query<Ref<ComputedOutline>>| query.single().last_changed())
+            .run_system_once(|query: Query<Ref<ComputedOutline>>| {
+                query.single().unwrap().last_changed()
+            })
             .unwrap();
         app.update();
         app.world_mut()
             .run_system_once(move |query: Query<Ref<ComputedOutline>>| {
-                assert_eq!(query.single().last_changed(), tick);
+                assert_eq!(query.single().unwrap().last_changed(), tick);
             })
             .unwrap();
     }
@@ -383,7 +385,7 @@ mod tests {
                 InheritedVisibility::VISIBLE,
                 GlobalTransform::default(),
             ))
-            .set_parent(parent)
+            .insert(ChildOf(parent))
             .id();
 
         // Add an OutlineVolume to the parent

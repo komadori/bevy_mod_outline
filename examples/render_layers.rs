@@ -106,7 +106,7 @@ fn set_camera_viewports(
     win_query: Query<Ref<Window>, With<PrimaryWindow>>,
     mut query: Query<(&mut Camera, &CameraMode)>,
 ) {
-    let win = win_query.get_single().unwrap();
+    let win = win_query.single().unwrap();
     if win.is_changed() {
         // Divide window into quadrants
         let size = UVec2::new(win.physical_width() / 2, win.physical_height() / 2);

@@ -40,9 +40,11 @@ fn setup(
             let checker = (x / 32 + y / 32) % 2 == 0;
             let index = y * 256 + x;
 
-            if index < alpha_mask.data.len() {
-                let alpha = if checker { 255 } else { 0 };
-                alpha_mask.data[index] = alpha;
+            if let Some(data) = &mut alpha_mask.data {
+                if index < data.len() {
+                    let alpha = if checker { 255 } else { 0 };
+                    data[index] = alpha;
+                }
             }
         }
     }

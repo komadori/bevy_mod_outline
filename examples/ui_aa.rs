@@ -21,38 +21,34 @@ fn main() {
             OnEnter(AAMode::MSAAx4),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands
-                    .entity(query.get_single().unwrap())
+                    .entity(query.single().unwrap())
                     .insert(Msaa::Sample4);
             },
         )
         .add_systems(
             OnExit(AAMode::MSAAx4),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands
-                    .entity(query.get_single().unwrap())
-                    .insert(Msaa::Off);
+                commands.entity(query.single().unwrap()).insert(Msaa::Off);
             },
         )
         .add_systems(
             OnEnter(AAMode::FXAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands
-                    .entity(query.get_single().unwrap())
+                    .entity(query.single().unwrap())
                     .insert(Fxaa::default());
             },
         )
         .add_systems(
             OnExit(AAMode::FXAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands
-                    .entity(query.get_single().unwrap())
-                    .remove::<Fxaa>();
+                commands.entity(query.single().unwrap()).remove::<Fxaa>();
             },
         )
         .add_systems(
             OnEnter(AAMode::SMAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands.entity(query.get_single().unwrap()).insert(Smaa {
+                commands.entity(query.single().unwrap()).insert(Smaa {
                     preset: SmaaPreset::Ultra,
                 });
             },
@@ -60,16 +56,14 @@ fn main() {
         .add_systems(
             OnExit(AAMode::SMAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands
-                    .entity(query.get_single().unwrap())
-                    .remove::<Smaa>();
+                commands.entity(query.single().unwrap()).remove::<Smaa>();
             },
         )
         .add_systems(
             OnEnter(AAMode::TAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands
-                    .entity(query.get_single().unwrap())
+                    .entity(query.single().unwrap())
                     .insert(TemporalAntiAliasing::default());
             },
         )
@@ -77,7 +71,7 @@ fn main() {
             OnExit(AAMode::TAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands
-                    .entity(query.get_single().unwrap())
+                    .entity(query.single().unwrap())
                     .remove::<TemporalAntiAliasing>();
             },
         )

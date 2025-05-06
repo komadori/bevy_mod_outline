@@ -73,7 +73,7 @@ fn setup_scene_once_loaded(
     mut done: Local<bool>,
 ) {
     if !*done {
-        if let Ok(scene) = scene_query.get_single() {
+        if let Ok(scene) = scene_query.single() {
             if scene_manager.instance_is_ready(**scene) {
                 for entity in scene_manager.iter_instance_entities(**scene) {
                     if let Ok(name) = name_query.get(entity) {

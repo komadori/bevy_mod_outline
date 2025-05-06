@@ -83,7 +83,7 @@ fn setup_scene_once_loaded(
 ) {
     if !*done {
         if let (Ok(scene), Ok((entity, mut player))) =
-            (scene_query.get_single(), player_query.get_single_mut())
+            (scene_query.single(), player_query.single_mut())
         {
             if scene_manager.instance_is_ready(**scene) {
                 let (graph, animation) = AnimationGraph::from_clip(animation.0.clone());

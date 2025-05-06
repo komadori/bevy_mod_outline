@@ -1,10 +1,11 @@
 use std::borrow::Cow;
 
-use bevy::ecs::system::lifetimeless::{SQuery, SRes};
+use bevy::asset::weak_handle;
+use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
-use bevy::pbr::{setup_morph_and_skinning_defs, MeshPipelineKey};
+use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, MeshPipelineKey};
 use bevy::prelude::*;
-use bevy::render::batching::{GetBatchData, GetFullBatchData};
+use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
 use bevy::render::render_resource::{
@@ -30,18 +31,18 @@ use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
-use crate::uniforms::{DepthMode, ExtractedOutline, OutlineInstanceUniform};
+use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances};
 use crate::view_uniforms::OutlineViewUniform;
 use crate::{TextureChannel, ATTRIBUTE_OUTLINE_NORMAL};
 
 pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(158939267822951776165272591102639985656);
+    weak_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
 
 pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(223498151714529302374103749587714613067);
+    weak_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
 
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(330091643565174537467176491706815552661);
+    weak_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PassType {
@@ -202,6 +203,7 @@ pub(crate) struct OutlinePipeline {
     pub outline_instance_bind_group_layout: BindGroupLayout,
     pub alpha_mask_bind_group_layout: BindGroupLayout,
     pub instance_batch_size: Option<u32>,
+    pub skins_use_uniform_buffers: bool,
 }
 
 impl FromWorld for OutlinePipeline {
@@ -235,12 +237,14 @@ impl FromWorld for OutlinePipeline {
 
         let instance_batch_size =
             GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
+        let skins_use_uniform_buffers = skins_use_uniform_buffers(render_device);
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,
             outline_instance_bind_group_layout,
             alpha_mask_bind_group_layout,
             instance_batch_size,
+            skins_use_uniform_buffers,
         }
     }
 }
@@ -267,6 +271,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &key.into(),
                 &mut vertex_defs,
                 &mut buffer_attrs,
+                self.skins_use_uniform_buffers,
             ),
             self.outline_instance_bind_group_layout.clone(),
             self.alpha_mask_bind_group_layout.clone(),
@@ -411,15 +416,15 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = (SQuery<&'static ExtractedOutline>, SRes<MeshAllocator>);
+    type Param = (SRes<RenderOutlineInstances>, SRes<MeshAllocator>);
     type CompareData = (AssetId<Mesh>, Option<AssetId<Image>>);
     type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
-        (outline_query, mesh_allocator): &SystemParamItem<Self::Param>,
-        (entity, _main_entity): (Entity, MainEntity),
+        (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
+        (_entity, main_entity): (Entity, MainEntity),
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
-        let outline = outline_query.get(entity).ok()?;
+        let outline = render_outlines.get(&main_entity)?;
         let mut instance_data = outline.instance_data.clone();
         instance_data.first_vertex_index = mesh_allocator
             .mesh_vertex_slice(&outline.mesh_id)
@@ -441,10 +446,10 @@ impl GetFullBatchData for OutlinePipeline {
     type BufferInputData = ();
 
     fn get_binned_batch_data(
-        (outline_query, mesh_allocator): &SystemParamItem<Self::Param>,
-        (entity, _main_entity): (Entity, MainEntity),
+        (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
+        main_entity: MainEntity,
     ) -> Option<Self::BufferData> {
-        let outline = outline_query.get(entity).ok()?;
+        let outline = render_outlines.get(&main_entity)?;
         let mut instance_data = outline.instance_data.clone();
         instance_data.first_vertex_index = mesh_allocator
             .mesh_vertex_slice(&outline.mesh_id)
@@ -455,24 +460,25 @@ impl GetFullBatchData for OutlinePipeline {
 
     fn get_index_and_compare_data(
         _param: &SystemParamItem<Self::Param>,
-        (_entity, _main_entity): (Entity, MainEntity),
+        _main_entity: MainEntity,
     ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
         unimplemented!("GPU batching is not used.");
     }
 
     fn get_binned_index(
         _param: &SystemParamItem<Self::Param>,
-        (_entity, _main_entity): (Entity, MainEntity),
+        _main_entity: MainEntity,
     ) -> Option<NonMaxU32> {
         unimplemented!("GPU batching is not used.");
     }
 
-    fn get_batch_indirect_parameters_index(
-        _param: &SystemParamItem<Self::Param>,
-        _indirect_parameters_buffer: &mut bevy::render::batching::gpu_preprocessing::IndirectParametersBuffer,
-        (_entity, _main_entity): (Entity, MainEntity),
-        _instance_index: u32,
-    ) -> Option<NonMaxU32> {
+    fn write_batch_indirect_parameters_metadata(
+        _indexed: bool,
+        _base_output_index: u32,
+        _batch_set_index: Option<NonMaxU32>,
+        _phase_indirect_parameters_buffers: &mut gpu_preprocessing::UntypedPhaseIndirectParametersBuffers,
+        _indirect_parameters_offset: u32,
+    ) {
         unimplemented!("GPU batching is not used.");
     }
 }
