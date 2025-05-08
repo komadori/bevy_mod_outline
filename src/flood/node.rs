@@ -16,6 +16,7 @@ use bevy::{
         view::ViewTarget,
     },
 };
+use itertools::*;
 use std::ops::Range;
 
 use super::compose_output::{ComposeOutputPass, ComposeOutputView};
@@ -34,6 +35,8 @@ pub struct FloodOutline {
     pub extra_index: PhaseItemExtraIndex,
     pub indexed: bool,
     pub volume_offset: f32,
+    pub volume_colour: Vec4,
+    pub screen_space_bounds: URect,
 }
 
 impl PhaseItem for FloodOutline {
@@ -139,31 +142,58 @@ impl ViewNode for FloodNode {
             return Ok(());
         };
 
-        for index in 0..flood_phase.items.len() {
-            let item = &flood_phase.items[index];
+        for ((_, volume_offset, _), group) in &flood_phase
+            .items
+            .iter()
+            .enumerate()
+            .chunk_by(|(_, item)| (item.distance, item.volume_offset, item.volume_colour))
+        {
+            let mut group_iter = group.into_iter();
+            let Some((first_index, first_item)) = group_iter.next() else {
+                continue;
+            };
 
-            flood_init_pass.execute(render_context, index, flood_textures.output());
+            // Sum item range and screen-space bounds
+            let mut last_index = first_index;
+            let mut screen_space_bounds = first_item.screen_space_bounds;
+            for (index, item) in group_iter {
+                last_index = index;
+                screen_space_bounds = screen_space_bounds.union(item.screen_space_bounds);
+            }
+
+            flood_init_pass.execute(
+                render_context,
+                first_index..last_index + 1,
+                flood_textures.output(),
+            );
             flood_textures.flip();
 
-            let passes = if item.volume_offset > 0.0 {
-                (item.volume_offset.ceil() as u32 / 2 + 1)
+            let passes = if volume_offset > 0.0 {
+                (volume_offset.ceil() as u32 / 2 + 1)
                     .next_power_of_two()
                     .trailing_zeros()
                     + 1
             } else {
                 0
             };
+
             for size in (0..passes).rev() {
                 jump_flood_pass.execute(
                     render_context,
                     flood_textures.input(),
                     flood_textures.output(),
                     size,
+                    &screen_space_bounds,
                 );
                 flood_textures.flip();
             }
 
-            compose_output_pass.execute(render_context, item.entity, flood_textures.input());
+            compose_output_pass.execute(
+                render_context,
+                first_item.entity,
+                flood_textures.input(),
+                &screen_space_bounds,
+            );
         }
 
         Ok(())

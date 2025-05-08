@@ -1,5 +1,7 @@
+use std::ops::Range;
+
 use bevy::prelude::*;
-use bevy::render::camera::ExtractedCamera;
+use bevy::render::camera::{ExtractedCamera, Viewport};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::mesh::RenderMesh;
 use bevy::render::render_asset::RenderAssets;
@@ -17,9 +19,11 @@ use bevy::render::{
 };
 use wgpu_types::ImageSubresourceRange;
 
+use crate::queue::OutlineRangefinder;
 use crate::uniforms::ExtractedOutline;
 use crate::view_uniforms::OutlineQueueStatus;
 
+use super::bounds::FloodMeshBounds;
 use super::node::FloodOutline;
 use super::{
     DepthMode, DrawMode, DrawOutline, OutlinePipeline, OutlineViewUniform, PassType, PipelineKey,
@@ -42,24 +46,38 @@ pub(crate) fn queue_flood_meshes(
     pipeline_cache: Res<PipelineCache>,
     render_meshes: Res<RenderAssets<RenderMesh>>,
     mesh_allocator: Res<MeshAllocator>,
-    material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline)>,
+    material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline, &FloodMeshBounds)>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
     mut views: Query<(
         &ExtractedView,
+        &ExtractedCamera,
         Option<&RenderLayers>,
         &mut OutlineQueueStatus,
     )>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
-    for (view, view_mask, mut queue_status) in views.iter_mut() {
+    for (view, camera, view_mask, mut queue_status) in views.iter_mut() {
         let view_mask = view_mask.cloned().unwrap_or_default();
 
         let Some(flood_phase) = flood_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
-        for (entity, main_entity, outline) in material_meshes.iter() {
+        // Get the camera's physical target size for correct screen bounds calculation
+        let fallback_viewport = Viewport {
+            physical_size: camera.physical_target_size.unwrap_or_default(),
+            ..default()
+        };
+        let viewport = camera.viewport.as_ref().unwrap_or(&fallback_viewport);
+
+        let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
+            view.clip_from_view * view.world_from_view.compute_matrix().inverse()
+        });
+
+        let rangefinder = OutlineRangefinder::new(view);
+
+        for (entity, main_entity, outline, mesh_bounds) in material_meshes.iter() {
             if !outline.volume {
                 continue;
             }
@@ -73,6 +91,14 @@ pub(crate) fn queue_flood_meshes(
             }
 
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
+                continue;
+            };
+
+            // Calculate screen-space bounds of outline
+            let border = outline.instance_data.volume_offset.ceil() as u32;
+            let Some(screen_space_bounds) =
+                mesh_bounds.calculate_screen_space_bounds(&clip_from_world, viewport, border)
+            else {
                 continue;
             };
 
@@ -95,7 +121,7 @@ pub(crate) fn queue_flood_meshes(
                 pipelines.specialize(&pipeline_cache, &outline_pipeline, flood_key, &mesh.layout)
             {
                 flood_phase.add(FloodOutline {
-                    distance: 0.0,
+                    distance: rangefinder.distance_of(outline),
                     entity,
                     main_entity: *main_entity,
                     pipeline,
@@ -104,6 +130,8 @@ pub(crate) fn queue_flood_meshes(
                     extra_index: PhaseItemExtraIndex::None,
                     indexed: index_slab.is_some(),
                     volume_offset: outline.instance_data.volume_offset,
+                    volume_colour: outline.instance_data.volume_colour,
+                    screen_space_bounds,
                 });
             }
         }
@@ -135,7 +163,7 @@ impl<'w> FloodInitPass<'w> {
     pub fn execute(
         &mut self,
         render_context: &mut RenderContext<'_>,
-        index: usize,
+        range: Range<usize>,
         output: &CachedTexture,
     ) {
         render_context
@@ -168,12 +196,10 @@ impl<'w> FloodInitPass<'w> {
             init_pass.set_camera_viewport(viewport);
         }
 
-        if let Err(err) = self.flood_phase.render_range(
-            &mut init_pass,
-            self.world,
-            self.view_entity,
-            index..=index,
-        ) {
+        if let Err(err) =
+            self.flood_phase
+                .render_range(&mut init_pass, self.world, self.view_entity, range)
+        {
             error!("Error encountered while rendering the outline flood init phase {err:?}");
         }
     }
