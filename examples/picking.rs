@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_mod_outline::*;
 
+/// Tag to track if an object is selected or not
 #[derive(Component)]
 struct Selected;
 
@@ -97,8 +98,7 @@ fn on_click(
     // Disable propagation to prevent observers other than the first in the queue from responding
     event.propagate(false);
 
-    /// Remove every existing selection from every entity
-    /// useful for when the user wants to deselect everything
+    /// Helper function to deselect every selected entity
     fn deselect_all(
         commands: &mut Commands,
         query: &mut Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
@@ -113,16 +113,18 @@ fn on_click(
         }
     }
 
+    // Check if the user wants to select multiple objects
     let multi_select = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
 
-    // Deselect everything if this is not a multi_select
+    // Deselect everything if the user does not want to select multiple objects
     if !multi_select {
         deselect_all(&mut commands, &mut query);
     }
 
-    // Act on the target mesh
+    // Select a mesh
     if let Ok((entity, mut outline, selected)) = query.get_mut(event.target) {
         if let Ok(mut entity) = commands.get_entity(entity) {
+            // When selecting multiple objects, allow clicking a selected object to deselect it.
             if multi_select && selected.is_some() {
                 entity.remove::<Selected>();
                 outline.visible = false;
