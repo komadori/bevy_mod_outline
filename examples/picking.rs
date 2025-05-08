@@ -89,11 +89,14 @@ fn setup(
 
 /// Observer system that manages what pickable objects are selected
 fn on_click(
-    event: Trigger<Pointer<Click>>,
+    mut event: Trigger<Pointer<Click>>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
+    // Disable propagation to prevent observers other than the first in the queue from responding
+    event.propagate(false);
+
     /// Remove every existing selection from every entity
     /// useful for when the user wants to deselect everything
     fn deselect_all(
