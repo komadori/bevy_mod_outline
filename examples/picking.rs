@@ -113,12 +113,6 @@ fn on_click(
         }
     }
 
-    // Deselect everything if there is no target
-    if event.target == Entity::PLACEHOLDER {
-        deselect_all(&mut commands, &mut query);
-        return;
-    };
-
     let multi_select = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
 
     // Deselect everything if this is not a multi_select
