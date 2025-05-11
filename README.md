@@ -90,7 +90,7 @@ A couple of shapes that are selected when you click on them.
 Holding down the shift key while clicking allows you to select multiple.
 
 ```shell
-cargo run --example picking
+cargo run --example picking --features="bevy/bevy_mesh_picking_backend"
 ```
 
 ## Versions
