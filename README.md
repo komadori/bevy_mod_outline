@@ -12,7 +12,7 @@ vertex extrusion and jump flood methods.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.9"
+bevy_mod_outline = "0.10"
 ```
 
 ## Examples
