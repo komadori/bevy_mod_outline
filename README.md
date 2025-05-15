@@ -86,11 +86,10 @@ A flat square with a pulsing jump-flood outline masked by a checkerboard alpha p
 cargo run --example alpha_mask
 ```
 
-A couple of shapes that are selected when you click on them. 
-Holding down the shift key while clicking allows you to select multiple.
+A set of shapes which can be selected by (shift-)clicking on them.
 
 ```shell
-cargo run --example picking --features="bevy/bevy_mesh_picking_backend"
+cargo run --example picking
 ```
 
 ## Versions
