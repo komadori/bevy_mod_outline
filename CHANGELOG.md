@@ -1,5 +1,13 @@
 # Changelog
 
+## bevy_mod_outline 0.10.0 (2025-05-15)
+
+### Added
+- Added picking example. (@Lethja)
+
+### Changed
+- Updated Bevy dependency to 0.16.
+
 ## bevy_mod_outline 0.9.2 (2025-05-06)
 
 ### Fixed
