@@ -2,8 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::{prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, AutoGenerateOutlineNormalsPlugin, OutlineMode, OutlinePlugin,
-    OutlineVolume,
+    AsyncSceneInheritOutline, AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -66,7 +65,6 @@ fn setup(
             width: 3.0,
             colour: Color::srgb(1.0, 0.0, 0.0),
         },
-        OutlineMode::FloodFlat,
         AsyncSceneInheritOutline::default(),
     ));
 }
