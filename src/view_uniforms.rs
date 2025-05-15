@@ -1,11 +1,13 @@
 use bevy::math::Affine3A;
 use bevy::prelude::*;
+use bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode;
 use bevy::render::extract_component::ComponentUniforms;
 use bevy::render::render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases};
 use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::sync_world::RenderEntity;
+use bevy::render::view::RetainedViewEntity;
 use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
@@ -37,7 +39,7 @@ pub(crate) fn extract_outline_view_uniforms(
     mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
-    query: Extract<Query<(&RenderEntity, &Camera, &GlobalTransform), With<Camera3d>>>,
+    query: Extract<Query<(Entity, &RenderEntity, &Camera, &GlobalTransform), With<Camera3d>>>,
 ) {
     fn transpose_3x3(m: &Affine3A) -> ([Vec4; 2], f32) {
         let transpose_3x3 = m.matrix3.transpose();
@@ -50,7 +52,7 @@ pub(crate) fn extract_outline_view_uniforms(
         )
     }
 
-    for (entity, camera, transform) in query.iter() {
+    for (main_entity, entity, camera, transform) in query.iter() {
         if !camera.is_active {
             continue;
         }
@@ -68,9 +70,10 @@ pub(crate) fn extract_outline_view_uniforms(
                 })
                 .insert(OutlineQueueStatus::default());
 
-            stencil_phases.insert_or_clear(entity.id());
-            opaque_phases.insert_or_clear(entity.id());
-            transparent_phases.insert_or_clear(entity.id());
+            let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
+            stencil_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
+            opaque_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
+            transparent_phases.insert_or_clear(retained_view_entity);
         }
     }
 }

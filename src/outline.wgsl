@@ -7,8 +7,8 @@ struct Instance {
     world_from_local: mat3x4<f32>,
     world_plane_origin: vec3<f32>,
     world_plane_offset: vec3<f32>,
-    volume_offset: f32,
     volume_colour: vec4<f32>,
+    volume_offset: f32,
     stencil_offset: f32,
     alpha_mask_threshold: f32,
     first_vertex_index: u32,
@@ -94,7 +94,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     var vertex = vertex_no_morph;
 #endif
 #ifdef SKINNED
-    let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights);
+    let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights, vertex_no_morph.instance_index);
 #else
     let model = bevy_render::maths::affine3_to_square(mesh[iid].world_from_local);
 #endif

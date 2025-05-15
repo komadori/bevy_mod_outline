@@ -1,9 +1,12 @@
-use bevy::asset::load_internal_asset;
+use bevy::asset::{load_internal_asset, weak_handle};
 use bevy::core_pipeline::core_3d::graph::Core3d;
+use bevy::pbr::{MeshInputUniform, MeshUniform};
+use bevy::render::batching::gpu_preprocessing::{BatchedInstanceBuffers, GpuPreprocessingSupport};
 use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
 };
+use bevy::render::RenderDebugFlags;
 use bevy::{
     prelude::*,
     render::{
@@ -29,7 +32,7 @@ use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
 use crate::render::DrawOutline;
 use crate::uniforms::{DepthMode, DrawMode};
 use crate::view_uniforms::OutlineViewUniform;
-use crate::NodeOutline;
+use crate::{add_dummy_phase_buffer, NodeOutline};
 
 mod bounds;
 mod compose_output;
@@ -38,9 +41,9 @@ mod jump_flood;
 mod node;
 
 const JUMP_FLOOD_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(195769259403206220662202295475630400955);
+    weak_handle!("66f5981f-0cc2-4e62-8221-cd495062f3ac");
 const COMPOSE_OUTPUT_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(264213480312212708534425965374302965944);
+    weak_handle!("3c0c1990-4202-48ef-8aa4-bbbb3a334471");
 
 #[derive(Clone, Component)]
 pub(crate) struct FloodTextures {
@@ -107,6 +110,12 @@ pub fn prepare_flood_textures(
     }
 }
 
+fn add_dummy_phase_buffers(
+    mut bibs: ResMut<BatchedInstanceBuffers<MeshUniform, MeshInputUniform>>,
+) {
+    add_dummy_phase_buffer::<FloodOutline>(&mut bibs);
+}
+
 #[derive(Debug)]
 pub struct FloodPlugin;
 
@@ -126,7 +135,7 @@ impl Plugin for FloodPlugin {
         );
         app.add_plugins((
             UniformComponentPlugin::<ComposeOutputUniform>::default(),
-            SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::default(),
+            SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(RenderDebugFlags::empty()),
             ExtractComponentPlugin::<bounds::FloodMeshBounds>::default(),
         ))
         .sub_app_mut(RenderApp)
@@ -169,5 +178,13 @@ impl Plugin for FloodPlugin {
         render_app
             .init_resource::<JumpFloodPipeline>()
             .init_resource::<ComposeOutputPipeline>();
+
+        let gpu_preprocessing_support = render_app.world().resource::<GpuPreprocessingSupport>();
+        if gpu_preprocessing_support.is_available() {
+            render_app.add_systems(
+                Render,
+                add_dummy_phase_buffers.in_set(RenderSet::PrepareResourcesCollectPhaseBuffers),
+            );
+        }
     }
 }
