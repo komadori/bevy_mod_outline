@@ -12,7 +12,7 @@ vertex extrusion and jump flood methods.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.9"
+bevy_mod_outline = "0.10"
 ```
 
 ## Examples
@@ -86,10 +86,17 @@ A flat square with a pulsing jump-flood outline masked by a checkerboard alpha p
 cargo run --example alpha_mask
 ```
 
+A set of shapes which can be selected by (shift-)clicking on them.
+
+```shell
+cargo run --example picking
+```
+
 ## Versions
 
 | This Version | Bevy version |
 |--------------|--------------|
+| 0.10.x       | 0.16.x       |
 | 0.9.x        | 0.15.x       |
 | 0.8.x        | 0.14.x       |
 | 0.7.x        | 0.13.x       |
