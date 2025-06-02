@@ -3,7 +3,9 @@ use std::borrow::Cow;
 use bevy::asset::weak_handle;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
-use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, MeshPipelineKey};
+use bevy::pbr::{
+    setup_morph_and_skinning_defs, skins_use_uniform_buffers, MeshPipelineKey, SkinUniforms,
+};
 use bevy::prelude::*;
 use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
@@ -416,20 +418,25 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 }
 
 impl GetBatchData for OutlinePipeline {
-    type Param = (SRes<RenderOutlineInstances>, SRes<MeshAllocator>);
+    type Param = (
+        SRes<RenderOutlineInstances>,
+        SRes<MeshAllocator>,
+        SRes<SkinUniforms>,
+    );
     type CompareData = (AssetId<Mesh>, Option<AssetId<Image>>);
     type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
-        (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
+        (render_outlines, mesh_allocator, skin_uniforms): &SystemParamItem<Self::Param>,
         (_entity, main_entity): (Entity, MainEntity),
     ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
         let outline = render_outlines.get(&main_entity)?;
-        let mut instance_data = outline.instance_data.clone();
-        instance_data.first_vertex_index = mesh_allocator
-            .mesh_vertex_slice(&outline.mesh_id)
-            .map(|x| x.range.start)
-            .unwrap_or(0);
+        let instance_data = outline.instance_data.prepare_instance(
+            &outline.mesh_id,
+            main_entity,
+            mesh_allocator,
+            skin_uniforms,
+        );
 
         // Only batch entities with the same mesh and alpha mask texture
         let batch_data = if outline.automatic_batching {
@@ -446,16 +453,16 @@ impl GetFullBatchData for OutlinePipeline {
     type BufferInputData = ();
 
     fn get_binned_batch_data(
-        (render_outlines, mesh_allocator): &SystemParamItem<Self::Param>,
+        (render_outlines, mesh_allocator, skin_uniforms): &SystemParamItem<Self::Param>,
         main_entity: MainEntity,
     ) -> Option<Self::BufferData> {
         let outline = render_outlines.get(&main_entity)?;
-        let mut instance_data = outline.instance_data.clone();
-        instance_data.first_vertex_index = mesh_allocator
-            .mesh_vertex_slice(&outline.mesh_id)
-            .map(|x| x.range.start)
-            .unwrap_or(0);
-        Some(instance_data)
+        Some(outline.instance_data.prepare_instance(
+            &outline.mesh_id,
+            main_entity,
+            mesh_allocator,
+            skin_uniforms,
+        ))
     }
 
     fn get_index_and_compare_data(

@@ -1,6 +1,7 @@
 #import bevy_render::view::View
 #import bevy_render::maths
 #import bevy_pbr::mesh_types::SkinnedMesh
+#import bevy_pbr::skinning::joint_matrices
 #import bevy_mod_outline::common::VertexOutput
 
 struct Instance {
@@ -12,6 +13,7 @@ struct Instance {
     stencil_offset: f32,
     alpha_mask_threshold: f32,
     first_vertex_index: u32,
+    current_skin_index: u32,
 };
 
 struct Vertex {
@@ -71,6 +73,27 @@ fn morph_vertex(vertex_in: Vertex) -> Vertex {
 }
 #endif
 
+#ifdef SKINNED
+fn skin_model(
+    indexes: vec4<u32>,
+    weights: vec4<f32>,
+    instance_index: u32,
+) -> mat4x4<f32> {
+#ifdef SKINS_USE_UNIFORM_BUFFERS
+    return weights.x * joint_matrices.data[indexes.x]
+        + weights.y * joint_matrices.data[indexes.y]
+        + weights.z * joint_matrices.data[indexes.z]
+        + weights.w * joint_matrices.data[indexes.w];
+#else
+    var skin_index = mesh[instance_index].current_skin_index;
+    return weights.x * joint_matrices[skin_index + indexes.x]
+        + weights.y * joint_matrices[skin_index + indexes.y]
+        + weights.z * joint_matrices[skin_index + indexes.z]
+        + weights.w * joint_matrices[skin_index + indexes.w];
+#endif
+}
+#endif
+
 fn mat4to3(m: mat4x4<f32>) -> mat3x3<f32> {
     return mat3x3<f32>(
         m[0].xyz, m[1].xyz, m[2].xyz
@@ -94,7 +117,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     var vertex = vertex_no_morph;
 #endif
 #ifdef SKINNED
-    let model = bevy_pbr::skinning::skin_model(vertex.joint_indices, vertex.joint_weights, vertex_no_morph.instance_index);
+    let model = skin_model(vertex.joint_indices, vertex.joint_weights, iid);
 #else
     let model = bevy_render::maths::affine3_to_square(mesh[iid].world_from_local);
 #endif

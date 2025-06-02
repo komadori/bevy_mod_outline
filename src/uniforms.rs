@@ -1,9 +1,11 @@
 use bevy::{
     math::Affine3,
+    pbr::SkinUniforms,
     platform::collections::HashMap,
     prelude::*,
     render::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
+        mesh::allocator::MeshAllocator,
         render_asset::RenderAssets,
         render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, ShaderType},
         renderer::RenderDevice,
@@ -52,6 +54,25 @@ pub(crate) struct OutlineInstanceUniform {
     pub stencil_offset: f32,
     pub alpha_mask_threshold: f32,
     pub first_vertex_index: u32,
+    pub current_skin_index: u32,
+}
+
+impl OutlineInstanceUniform {
+    pub(crate) fn prepare_instance(
+        &self,
+        mesh_id: &AssetId<Mesh>,
+        main_entity: MainEntity,
+        mesh_allocator: &MeshAllocator,
+        skin_uniforms: &SkinUniforms,
+    ) -> Self {
+        let mut instance_data = self.clone();
+        instance_data.first_vertex_index = mesh_allocator
+            .mesh_vertex_slice(mesh_id)
+            .map(|x| x.range.start)
+            .unwrap_or(0);
+        instance_data.current_skin_index = skin_uniforms.skin_index(main_entity).unwrap_or(0);
+        instance_data
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -130,6 +151,7 @@ pub(crate) fn extract_outlines(
                 volume_colour: computed.volume.value.colour.to_vec4(),
                 alpha_mask_threshold: computed.alpha_mask.value.threshold,
                 first_vertex_index: 0,
+                current_skin_index: 0,
             },
         };
         commands
