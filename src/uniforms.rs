@@ -11,7 +11,7 @@ use bevy::{
         renderer::RenderDevice,
         sync_world::{MainEntity, MainEntityHashMap, RenderEntity},
         texture::{FallbackImage, GpuImage},
-        view::RenderLayers,
+        view::{PreviousVisibleEntities, RenderLayers},
         Extract,
     },
 };
@@ -93,11 +93,15 @@ pub(crate) struct OutlineInstanceBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
-    for (mut visibility, computed) in query.iter_mut() {
+pub(crate) fn set_outline_visibility(
+    mut query: Query<(Entity, &mut ViewVisibility, &ComputedOutline)>,
+    mut previous_visible: ResMut<PreviousVisibleEntities>,
+) {
+    for (entity, mut visibility, computed) in query.iter_mut() {
         if let ComputedOutline(Some(computed)) = computed {
             if computed.volume.value.enabled || computed.stencil.value.enabled {
                 visibility.set();
+                previous_visible.remove(&entity);
             }
         }
     }
