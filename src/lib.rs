@@ -9,8 +9,9 @@
 //! An outline consists of two parts, a volume and a stencil. The volume
 //! will, by itself, cover the original object entirely with the outline
 //! colour. The stencil prevents the body of an object from being filled in.
-//! These parts are controlled by the [`OutlineVolume`] and [`OutlineStencil`]
-//! components respectively.
+//! Stencils also allows other entities to occlude outlines, otherwise the
+//! outline will be drawn on top of them. These parts are controlled by the
+//! [`OutlineVolume`] and [`OutlineStencil`] components respectively.
 //!
 //! The [`OutlineMode`] component specifies the rendering method. Outlines may
 //! be flattened into a plane in order to further avoid clipping, or left in
@@ -121,6 +122,10 @@ pub enum NodeOutline {
 }
 
 /// A component for stenciling meshes during outline rendering.
+///
+/// Stencils are used both to prevent the normal volume of an entity from
+/// being covered by the outline colour and to allow entities to occlude
+/// outlines behind them.
 #[derive(Clone, Component)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
