@@ -1,5 +1,11 @@
 # Changelog
 
+## bevy_mod_outline 0.10.1 (2025-06-05)
+
+### Fixed
+- Fixed outlining skinned meshes when storage buffers enabled.
+- Fixed flickering outlines when mesh not rendered with a material.
+
 ## bevy_mod_outline 0.10.0 (2025-05-15)
 
 ### Added
