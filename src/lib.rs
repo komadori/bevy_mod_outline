@@ -123,9 +123,9 @@ pub enum NodeOutline {
 
 /// A component for stenciling meshes during outline rendering.
 ///
-/// Stencils are used both to prevent the normal volume of an entity from
-/// being covered by the outline colour and to allow entities to occlude
-/// outlines behind them.
+/// Stencils are used both to prevent entities with outlines from being
+/// covered by their own outline volumes and to allow entities to occlude
+/// any outlines behind them.
 #[derive(Clone, Component)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
