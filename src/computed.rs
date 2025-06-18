@@ -294,7 +294,7 @@ fn update_computed_outline(
                     ComputedDepth {
                         world_plane_origin: (affine
                             .matrix3
-                            .mul_vec3a(dep.model_plane_offset.into())
+                            .mul_vec3a(dep.model_plane_origin.into())
                             + affine.translation)
                             .into(),
                         world_plane_offset: inverse.mul_vec3(dep.model_plane_offset),
