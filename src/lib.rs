@@ -373,14 +373,13 @@ impl Plugin for OutlinePlugin {
         .init_resource::<OutlineEntitiesNeedingSpecialisation>()
         .add_systems(
             PostUpdate,
-            check_outline_entities_needing_specialisation.after(AssetEvents),
-        )
-        .add_systems(
-            PostUpdate,
             (
                 compute_outline
                     .after(TransformSystem::TransformPropagate)
                     .after(VisibilitySystems::VisibilityPropagate),
+                check_outline_entities_needing_specialisation
+                    .after(AssetEvents)
+                    .after(compute_outline),
                 set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
             ),
         )
