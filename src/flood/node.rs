@@ -19,6 +19,8 @@ use bevy::{
 use itertools::*;
 use std::ops::Range;
 
+use crate::OutlineViewUniform;
+
 use super::compose_output::{ComposeOutputPass, ComposeOutputView};
 use super::flood_init::FloodInitPass;
 use super::jump_flood::JumpFloodPass;
@@ -108,6 +110,7 @@ impl ViewNode for FloodNode {
         &'static ExtractedCamera,
         &'static ViewTarget,
         &'static ViewDepthTexture,
+        &'static OutlineViewUniform,
         &'static FloodTextures,
         &'static ComposeOutputView,
     );
@@ -116,7 +119,7 @@ impl ViewNode for FloodNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, camera, target, depth, flood_textures, compose_output_view): QueryItem<
+        (view, camera, target, depth, view_uniform, flood_textures, compose_output_view): QueryItem<
             'w,
             Self::ViewQuery,
         >,
@@ -168,8 +171,9 @@ impl ViewNode for FloodNode {
             );
             flood_textures.flip();
 
-            let passes = if volume_offset > 0.0 {
-                (volume_offset.ceil() as u32 / 2 + 1)
+            let scaled_offset = view_uniform.scale_physical_from_logical * volume_offset;
+            let passes = if scaled_offset > 0.0 {
+                (scaled_offset.ceil() as u32 / 2 + 1)
                     .next_power_of_two()
                     .trailing_zeros()
                     + 1
@@ -190,6 +194,7 @@ impl ViewNode for FloodNode {
 
             compose_output_pass.execute(
                 render_context,
+                view_entity,
                 first_item.entity,
                 flood_textures.input(),
                 &screen_space_bounds,

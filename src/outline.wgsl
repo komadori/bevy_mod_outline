@@ -2,7 +2,7 @@
 #import bevy_render::maths
 #import bevy_pbr::mesh_types::SkinnedMesh
 #import bevy_pbr::skinning::joint_matrices
-#import bevy_mod_outline::common::VertexOutput
+#import bevy_mod_outline::common::{OutlineViewUniform, VertexOutput}
 
 struct Instance {
     world_from_local: mat3x4<f32>,
@@ -32,15 +32,6 @@ struct Vertex {
 #ifdef MORPH_TARGETS
     @builtin(vertex_index) index: u32,
 #endif
-};
-
-struct OutlineViewUniform {
-    @align(16)
-    clip_from_world: mat4x4<f32>,
-    world_from_view_a: mat2x4<f32>,
-    world_from_view_b: f32,
-    aspect: f32,
-    scale: vec2<f32>,
 };
 
 @group(0) @binding(0)
@@ -132,7 +123,7 @@ fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
 #else
     let clip_norm = mat4to3(view_uniform.clip_from_world) * (mat4to3(model) * vertex.outline_normal);
     let corrected_norm = normalize(clip_norm.xy * vec2<f32>(view_uniform.aspect, 1.0));
-    let ndc_delta = offset * corrected_norm * view_uniform.scale * clip_pos.w;
+    let ndc_delta = offset * corrected_norm * view_uniform.scale_clip_from_logical * clip_pos.w;
     let out_xy = clip_pos.xy + ndc_delta;
 #endif
     var out: VertexOutput;

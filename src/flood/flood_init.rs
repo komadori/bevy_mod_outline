@@ -52,12 +52,13 @@ pub(crate) fn queue_flood_meshes(
         &ExtractedView,
         &ExtractedCamera,
         Option<&RenderLayers>,
+        &OutlineViewUniform,
         &mut OutlineQueueStatus,
     )>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
-    for (view, camera, view_mask, mut queue_status) in views.iter_mut() {
+    for (view, camera, view_mask, view_uniform, mut queue_status) in views.iter_mut() {
         let view_mask = view_mask.cloned().unwrap_or_default();
 
         let Some(flood_phase) = flood_phases.get_mut(&view.retained_view_entity) else {
@@ -95,7 +96,9 @@ pub(crate) fn queue_flood_meshes(
             };
 
             // Calculate screen-space bounds of outline
-            let border = outline.instance_data.volume_offset.ceil() as u32;
+            let border = (view_uniform.scale_physical_from_logical
+                * outline.instance_data.volume_offset)
+                .ceil() as u32;
             let Some(screen_space_bounds) =
                 mesh_bounds.calculate_screen_space_bounds(&clip_from_world, viewport, border)
             else {

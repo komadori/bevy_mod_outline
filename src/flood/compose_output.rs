@@ -101,6 +101,7 @@ impl FromWorld for ComposeOutputPipeline {
                 (
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<OutlineViewUniform>(true),
                     uniform_buffer::<ComposeOutputUniform>(true),
                 ),
             ),
@@ -189,6 +190,7 @@ pub(crate) struct ComposeOutputPass<'w> {
     world: &'w World,
     pipeline: &'w ComposeOutputPipeline,
     render_pipeline: &'w RenderPipeline,
+    outline_view_uniforms: &'w ComponentUniforms<OutlineViewUniform>,
     compose_output_uniforms: &'w ComponentUniforms<ComposeOutputUniform>,
     view_target: &'w ViewTarget,
     view_depth: &'w ViewDepthTexture,
@@ -205,12 +207,14 @@ impl<'w> ComposeOutputPass<'w> {
         let pipeline_cache = world.resource::<PipelineCache>();
         let render_pipeline =
             pipeline_cache.get_render_pipeline(compose_output_view.pipeline_id)?;
+        let outline_view_uniforms = world.resource::<ComponentUniforms<OutlineViewUniform>>();
         let compose_output_uniforms = world.resource::<ComponentUniforms<ComposeOutputUniform>>();
 
         Some(Self {
             world,
             pipeline,
             render_pipeline,
+            outline_view_uniforms,
             compose_output_uniforms,
             view_target,
             view_depth,
@@ -220,10 +224,17 @@ impl<'w> ComposeOutputPass<'w> {
     pub fn execute(
         &self,
         render_context: &mut RenderContext<'_>,
+        view_entity: Entity,
         render_entity: Entity,
         input: &CachedTexture,
         bounds: &URect,
     ) {
+        let view_dynamic_index = self
+            .world
+            .entity(view_entity)
+            .get::<DynamicUniformIndex<OutlineViewUniform>>()
+            .unwrap()
+            .index();
         let dynamic_index = self
             .world
             .entity(render_entity)
@@ -237,6 +248,7 @@ impl<'w> ComposeOutputPass<'w> {
             &BindGroupEntries::sequential((
                 &input.default_view,
                 &self.pipeline.sampler,
+                self.outline_view_uniforms.binding().unwrap(),
                 self.compose_output_uniforms.binding().unwrap(),
             )),
         );
@@ -251,7 +263,7 @@ impl<'w> ComposeOutputPass<'w> {
 
         render_pass.set_scissor_rect(bounds.min.x, bounds.min.y, bounds.width(), bounds.height());
         render_pass.set_render_pipeline(self.render_pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[dynamic_index]);
+        render_pass.set_bind_group(0, &bind_group, &[view_dynamic_index, dynamic_index]);
         render_pass.draw(0..3, 0..1);
     }
 }

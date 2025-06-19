@@ -16,11 +16,12 @@ use crate::pipeline::OutlinePipeline;
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineViewUniform {
     #[align(16)]
-    clip_from_world: Mat4,
-    world_from_view_a: [Vec4; 2],
-    world_from_view_b: f32,
-    aspect: f32,
-    scale: Vec2,
+    pub clip_from_world: Mat4,
+    pub world_from_view_a: [Vec4; 2],
+    pub world_from_view_b: f32,
+    pub aspect: f32,
+    pub scale_clip_from_logical: Vec2,
+    pub scale_physical_from_logical: f32,
 }
 
 #[derive(Resource)]
@@ -66,7 +67,8 @@ pub(crate) fn extract_outline_view_uniforms(
                     world_from_view_a,
                     world_from_view_b,
                     aspect: size.x / size.y,
-                    scale: 2.0 / size,
+                    scale_clip_from_logical: 2.0 / size,
+                    scale_physical_from_logical: camera.target_scaling_factor().unwrap_or(1.0),
                 })
                 .insert(OutlineQueueStatus::default());
 
