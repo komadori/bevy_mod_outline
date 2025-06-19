@@ -1,5 +1,12 @@
 # Changelog
 
+## bevy_mod_outline 0.10.2 (2025-06-19)
+
+### Fixed
+- Fixed origin of depth plane incorrectly calculated from eye vector offset.
+- Fixed jump-flood outlines interpreting logical as physical pixels.
+- Fixed one frame delay when first rendering an extruded outline.
+
 ## bevy_mod_outline 0.10.1 (2025-06-05)
 
 ### Fixed
