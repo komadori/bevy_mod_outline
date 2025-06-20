@@ -121,37 +121,69 @@ pub enum NodeOutline {
     EndOutlinePasses,
 }
 
+/// Specifies when a stencil should be rendered.
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Default))]
+pub enum OutlineStencilEnabled {
+    /// Always render a stencil
+    #[default]
+    Always,
+    /// Only render a stencil if the volume is visible
+    IfVolume,
+    /// Never render a stencil
+    Never,
+}
+
+impl OutlineStencilEnabled {
+    pub(crate) fn is_enabled(&self, volume_enabled: bool) -> bool {
+        match self {
+            OutlineStencilEnabled::Always => true,
+            OutlineStencilEnabled::IfVolume => volume_enabled,
+            OutlineStencilEnabled::Never => false,
+        }
+    }
+}
+
 /// A component for stenciling meshes during outline rendering.
 ///
 /// Stencils are used both to prevent entities with outlines from being
 /// covered by their own outline volumes and to allow entities to occlude
 /// any outlines behind them.
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineStencil {
-    /// Enable rendering of the stencil
-    pub enabled: bool,
+    /// Controls when the stencil should be rendered
+    pub enabled: OutlineStencilEnabled,
     /// Offset of the stencil in logical pixels
     pub offset: f32,
 }
 
-impl Default for OutlineStencil {
-    fn default() -> Self {
-        OutlineStencil {
-            enabled: true,
-            offset: 0.0,
-        }
-    }
+impl OutlineStencil {
+    pub(crate) const INHERIT_DEFAULT: OutlineStencil = OutlineStencil {
+        enabled: OutlineStencilEnabled::IfVolume,
+        offset: 0.0,
+    };
 }
 
-fn lerp_bool(this: bool, other: bool, scalar: f32) -> bool {
+fn lerp_stencil_enabled(
+    this: OutlineStencilEnabled,
+    other: OutlineStencilEnabled,
+    scalar: f32,
+) -> OutlineStencilEnabled {
     if scalar <= 0.0 {
         this
     } else if scalar >= 1.0 {
         other
     } else {
-        this | other
+        match (this, other) {
+            (OutlineStencilEnabled::Always, _) => OutlineStencilEnabled::Always,
+            (_, OutlineStencilEnabled::Always) => OutlineStencilEnabled::Always,
+            (OutlineStencilEnabled::IfVolume, _) => OutlineStencilEnabled::IfVolume,
+            (_, OutlineStencilEnabled::IfVolume) => OutlineStencilEnabled::Never,
+            _ => OutlineStencilEnabled::Never,
+        }
     }
 }
 
@@ -176,7 +208,7 @@ macro_rules! impl_lerp {
 
 fn lerp_stencil(start: &OutlineStencil, end: &OutlineStencil, t: f32) -> OutlineStencil {
     OutlineStencil {
-        enabled: lerp_bool(start.enabled, end.enabled, t),
+        enabled: lerp_stencil_enabled(start.enabled, end.enabled, t),
         offset: start.offset.lerp(end.offset, t),
     }
 }
@@ -194,6 +226,16 @@ pub struct OutlineVolume {
     pub width: f32,
     /// Colour of the outline
     pub colour: Color,
+}
+
+fn lerp_bool(this: bool, other: bool, t: f32) -> bool {
+    if t <= 0.0 {
+        this
+    } else if t >= 1.0 {
+        other
+    } else {
+        this || other
+    }
 }
 
 fn lerp_volume(start: &OutlineVolume, end: &OutlineVolume, t: f32) -> OutlineVolume {
