@@ -19,15 +19,14 @@ use bevy::render::{
 };
 use wgpu_types::ImageSubresourceRange;
 
+use crate::pipeline_key::{DerivedPipelineKey, PassType, ViewPipelineKey};
 use crate::queue::OutlineRangefinder;
 use crate::uniforms::ExtractedOutline;
 use crate::view_uniforms::OutlineQueueStatus;
 
 use super::bounds::FloodMeshBounds;
 use super::node::FloodOutline;
-use super::{
-    DepthMode, DrawMode, DrawOutline, OutlinePipeline, OutlineViewUniform, PassType, PipelineKey,
-};
+use super::{DrawMode, DrawOutline, OutlinePipeline, OutlineViewUniform};
 
 pub(crate) fn prepare_flood_phases(
     query: Query<&ExtractedView, With<OutlineViewUniform>>,
@@ -107,17 +106,11 @@ pub(crate) fn queue_flood_meshes(
 
             let (_vertex_slab, index_slab) = mesh_allocator.mesh_slabs(&outline.mesh_id);
 
-            let flood_key = PipelineKey::new()
-                .with_primitive_topology(mesh.primitive_topology())
-                .with_depth_mode(DepthMode::Flat)
-                .with_morph_targets(mesh.morph_targets.is_some())
-                .with_vertex_offset_zero(true)
-                .with_plane_offset_zero(true)
-                .with_pass_type(PassType::FloodInit)
-                .with_double_sided(outline.double_sided)
-                .with_alpha_mask_texture(outline.alpha_mask_id.is_some())
-                .with_alpha_mask_channel(outline.alpha_mask_channel);
-
+            let flood_key = DerivedPipelineKey::new(
+                ViewPipelineKey::new(),
+                outline.pipeline_key,
+                PassType::FloodInit,
+            );
             queue_status.has_volume = true;
 
             if let Ok(pipeline) =

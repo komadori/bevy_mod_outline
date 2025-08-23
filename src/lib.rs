@@ -31,8 +31,7 @@
 
 use std::any::TypeId;
 
-use bevy::asset::load_internal_asset;
-use bevy::asset::AssetEvents;
+use bevy::asset::{load_internal_asset, AssetEvents};
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::prelude::*;
@@ -62,10 +61,10 @@ use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline
 use crate::pipeline::{
     OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
 };
+use crate::pipeline_key::{compute_outline_key, ComputedOutlineKey};
 use crate::queue::{
-    check_outline_entities_needing_specialisation, extract_outline_entities_needing_specialisation,
-    queue_outline_mesh, specialise_outlines, OutlineEntitiesNeedingSpecialisation,
-    OutlineEntitySpecialisationTicks, OutlinePipelineCache,
+    check_outline_entities_changed, extract_outline_entities_changed, queue_outline_mesh,
+    specialise_outlines, OutlineCache, OutlineEntitiesChanged,
 };
 use crate::render::DrawOutline;
 use crate::uniforms::set_outline_visibility;
@@ -81,6 +80,7 @@ mod generate;
 mod msaa;
 mod node;
 mod pipeline;
+mod pipeline_key;
 mod queue;
 mod render;
 mod uniforms;
@@ -313,6 +313,60 @@ pub struct OutlineAlphaMask {
     pub threshold: f32,
 }
 
+/// A component for warming up different specialisations of the outline pipeline.
+///
+/// When animating a property which causes the required pipeline specialisation
+/// to change, failure to warm up the required specialisaton in advance may
+/// cause the outline to briefly disappear.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct OutlineWarmUp {
+    layers: RenderLayers,
+    disabled_stencil: bool,
+    disabled_volume: bool,
+    transparency: bool,
+    vertex_offsets: bool,
+}
+
+impl OutlineWarmUp {
+    /// Warms up the shaders for the given render layers.
+    pub fn with_layers(self, layers: RenderLayers) -> Self {
+        let mut s = self.clone();
+        s.layers = layers;
+        s
+    }
+
+    /// Warms up the stencil shader even if the outline stencil is disabled.
+    pub fn with_disabled_stencil(self, disabled_stencil: bool) -> Self {
+        let mut s = self.clone();
+        s.disabled_stencil = disabled_stencil;
+        s
+    }
+
+    /// Warms up the volume shader even if the outline volume is disabled.
+    pub fn with_disabled_volume(self, disabled_volume: bool) -> Self {
+        let mut s = self.clone();
+        s.disabled_volume = disabled_volume;
+        s
+    }
+
+    /// Warms up both the opaque and transparent versions of the volume shader.
+    pub fn with_transparency(self, transparency: bool) -> Self {
+        let mut s = self.clone();
+        s.transparency = transparency;
+        s
+    }
+
+    /// Warms up both the zero and non-zero vertex offset versions of the volume and stencil
+    /// shaders.
+    pub fn with_vertex_offsets(self, vertex_offset_zero: bool) -> Self {
+        let mut s = self.clone();
+        s.vertex_offsets = vertex_offset_zero;
+        self
+    }
+}
+
 // This makes `SetMeshBindGroup` work with CPU drawn outlines when GPU pre-processing is enabled
 pub(crate) fn add_dummy_phase_buffer<P: PhaseItem + 'static>(
     bibs: &mut gpu_preprocessing::BatchedInstanceBuffers<MeshUniform, MeshInputUniform>,
@@ -356,6 +410,7 @@ impl Plugin for OutlinePlugin {
 
         app.add_plugins((
             SyncComponentPlugin::<ComputedOutline>::default(),
+            SyncComponentPlugin::<ComputedOutlineKey>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
                 RenderDebugFlags::empty(),
@@ -370,16 +425,17 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
-        .init_resource::<OutlineEntitiesNeedingSpecialisation>()
+        .init_resource::<OutlineEntitiesChanged>()
         .add_systems(
             PostUpdate,
             (
                 compute_outline
                     .after(TransformSystem::TransformPropagate)
                     .after(VisibilitySystems::VisibilityPropagate),
-                check_outline_entities_needing_specialisation
-                    .after(AssetEvents)
-                    .after(compute_outline),
+                compute_outline_key
+                    .after(compute_outline)
+                    .after(AssetEvents),
+                check_outline_entities_changed.after(compute_outline_key),
                 set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
             ),
         )
@@ -396,7 +452,7 @@ impl Plugin for OutlinePlugin {
             (
                 extract_outline_view_uniforms,
                 extract_outlines,
-                extract_outline_entities_needing_specialisation,
+                extract_outline_entities_changed,
             ),
         )
         .add_systems(
@@ -464,8 +520,7 @@ impl Plugin for OutlinePlugin {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<RenderOutlineInstances>()
-            .init_resource::<OutlineEntitySpecialisationTicks>()
-            .init_resource::<OutlinePipelineCache>()
+            .init_resource::<OutlineCache>()
             .init_resource::<OutlinePipeline>()
             .init_resource::<AlphaMaskBindGroups>();
 

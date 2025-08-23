@@ -1,9 +1,10 @@
 use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
 
 use crate::{
+    pipeline_key::ComputedOutlineKey,
     uniforms::{DepthMode, DrawMode},
     InheritOutline, OutlineAlphaMask, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
-    OutlineStencil, OutlineVolume, TextureChannel,
+    OutlineStencil, OutlineVolume, OutlineWarmUp,
 };
 
 #[derive(Clone)]
@@ -108,13 +109,6 @@ impl<T: Clone> Sourced<T> {
 }
 
 #[derive(Clone)]
-pub(crate) struct ComputedAlphaMask {
-    pub(crate) texture: Option<Handle<Image>>,
-    pub(crate) channel: TextureChannel,
-    pub(crate) threshold: f32,
-}
-
-#[derive(Clone)]
 pub(crate) struct ComputedInternal {
     pub(crate) inherited_from: Option<Entity>,
     pub(crate) volume: Sourced<ComputedVolume>,
@@ -122,11 +116,13 @@ pub(crate) struct ComputedInternal {
     pub(crate) mode: Sourced<ComputedMode>,
     pub(crate) depth: Sourced<ComputedDepth>,
     pub(crate) layers: Sourced<RenderLayers>,
-    pub(crate) alpha_mask: Sourced<ComputedAlphaMask>,
+    pub(crate) alpha_mask: Sourced<OutlineAlphaMask>,
+    pub(crate) warm_up: Sourced<OutlineWarmUp>,
 }
 
 /// A component for storing the computed depth at which the outline lies.
 #[derive(Clone, Component, Default)]
+#[require(ComputedOutlineKey)]
 pub struct ComputedOutline(pub(crate) Option<ComputedInternal>);
 
 type OutlineComponents<'a> = (
@@ -139,6 +135,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlineRenderLayers>>,
     Option<Ref<'a, RenderLayers>>,
     Option<Ref<'a, OutlineAlphaMask>>,
+    Option<Ref<'a, OutlineWarmUp>>,
 );
 
 #[allow(clippy::type_complexity)]
@@ -207,10 +204,18 @@ fn propagate_computed_outline(
 
 fn update_computed_outline(
     computed: &mut Mut<'_, ComputedOutline>,
-    (visibility, transform, volume, stencil, mode, depth, layers, fallback_layers, alpha_mask): QueryItem<
-        '_,
-        OutlineComponents,
-    >,
+    (
+        visibility,
+        transform,
+        volume,
+        stencil,
+        mode,
+        depth,
+        layers,
+        fallback_layers,
+        alpha_mask,
+        warm_up,
+    ): QueryItem<'_, OutlineComponents>,
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,
@@ -310,11 +315,12 @@ fn update_computed_outline(
             alpha_mask: Sourced::set(
                 alpha_mask,
                 parent_computed.map(|p| p.alpha_mask.value.clone()),
-                |mask| ComputedAlphaMask {
-                    texture: mask.texture.clone(),
-                    channel: mask.channel,
-                    threshold: mask.threshold,
-                },
+                |mask| mask.clone(),
+            ),
+            warm_up: Sourced::set(
+                warm_up,
+                parent_computed.map(|p| p.warm_up.value.clone()),
+                |warm_up| warm_up.clone(),
             ),
         });
     }

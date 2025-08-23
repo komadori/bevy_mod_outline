@@ -28,9 +28,9 @@ use flood_init::{prepare_flood_phases, queue_flood_meshes};
 use jump_flood::JumpFloodPipeline;
 use node::{FloodNode, FloodOutline};
 
-use crate::pipeline::{OutlinePipeline, PassType, PipelineKey};
+use crate::pipeline::OutlinePipeline;
 use crate::render::DrawOutline;
-use crate::uniforms::{DepthMode, DrawMode};
+use crate::uniforms::DrawMode;
 use crate::view_uniforms::OutlineViewUniform;
 use crate::{add_dummy_phase_buffer, NodeOutline};
 

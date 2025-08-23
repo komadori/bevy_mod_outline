@@ -3,9 +3,7 @@ use std::borrow::Cow;
 use bevy::asset::weak_handle;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
-use bevy::pbr::{
-    setup_morph_and_skinning_defs, skins_use_uniform_buffers, MeshPipelineKey, SkinUniforms,
-};
+use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, SkinUniforms};
 use bevy::prelude::*;
 use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
@@ -13,8 +11,8 @@ use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
-    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, PrimitiveTopology, ShaderDefVal,
-    ShaderStages, ShaderType, StencilState, TextureFormat, VertexState,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, ShaderDefVal, ShaderStages,
+    ShaderType, StencilState, TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
@@ -29,13 +27,13 @@ use bevy::{
         },
     },
 };
-use bitfield::{bitfield_bitrange, bitfield_fields};
 use nonmax::NonMaxU32;
 use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
+use crate::pipeline_key::{DerivedPipelineKey, PassType};
 use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances};
 use crate::view_uniforms::OutlineViewUniform;
-use crate::{TextureChannel, ATTRIBUTE_OUTLINE_NORMAL};
+use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
 pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
     weak_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
@@ -45,158 +43,6 @@ pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
 
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
     weak_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum PassType {
-    Stencil = 1,
-    Opaque = 2,
-    Transparent = 3,
-    FloodInit = 4,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct PipelineKey(u32);
-bitfield_bitrange! {struct PipelineKey(u32)}
-
-impl PipelineKey {
-    bitfield_fields! {
-        u32;
-        msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
-        primitive_topology_int, set_primitive_topology_int: 8, 6;
-        pass_type_int, set_pass_type_int: 11, 9;
-        depth_mode_int, set_depth_mode_int: 13, 12;
-        pub vertex_offset_zero, set_vertex_offset_zero: 14;
-        pub plane_offset_zero, set_plane_offset_zero: 15;
-        pub hdr_format, set_hdr_format: 16;
-        pub morph_targets, set_morph_targets: 17;
-        pub motion_vector_prepass, set_motion_vector_prepass: 18;
-        pub double_sided, set_double_sided: 19;
-        pub alpha_mask_texture, set_alpha_mask_texture: 20;
-        pub alpha_mask_channel_int, set_alpha_mask_channel_int: 22, 21;
-    }
-
-    pub(crate) fn new() -> Self {
-        PipelineKey(0)
-    }
-
-    pub(crate) fn with_msaa(mut self, msaa: Msaa) -> Self {
-        self.set_msaa_samples_minus_one(msaa as u32 - 1);
-        self
-    }
-
-    pub(crate) fn msaa(&self) -> Msaa {
-        match self.msaa_samples_minus_one() + 1 {
-            x if x == Msaa::Off as u32 => Msaa::Off,
-            x if x == Msaa::Sample2 as u32 => Msaa::Sample2,
-            x if x == Msaa::Sample4 as u32 => Msaa::Sample4,
-            x if x == Msaa::Sample8 as u32 => Msaa::Sample8,
-            x => panic!("Invalid value for Msaa: {}", x),
-        }
-    }
-
-    pub(crate) fn with_primitive_topology(mut self, primitive_topology: PrimitiveTopology) -> Self {
-        self.set_primitive_topology_int(primitive_topology as u32);
-        self
-    }
-
-    pub(crate) fn primitive_topology(&self) -> PrimitiveTopology {
-        match self.primitive_topology_int() {
-            x if x == PrimitiveTopology::PointList as u32 => PrimitiveTopology::PointList,
-            x if x == PrimitiveTopology::LineList as u32 => PrimitiveTopology::LineList,
-            x if x == PrimitiveTopology::LineStrip as u32 => PrimitiveTopology::LineStrip,
-            x if x == PrimitiveTopology::TriangleList as u32 => PrimitiveTopology::TriangleList,
-            x if x == PrimitiveTopology::TriangleStrip as u32 => PrimitiveTopology::TriangleStrip,
-            x => panic!("Invalid value for PrimitiveTopology: {}", x),
-        }
-    }
-
-    pub(crate) fn with_pass_type(mut self, pass_type: PassType) -> Self {
-        self.set_pass_type_int(pass_type as u32);
-        self
-    }
-
-    pub(crate) fn pass_type(&self) -> PassType {
-        match self.pass_type_int() {
-            x if x == PassType::Stencil as u32 => PassType::Stencil,
-            x if x == PassType::Opaque as u32 => PassType::Opaque,
-            x if x == PassType::Transparent as u32 => PassType::Transparent,
-            x if x == PassType::FloodInit as u32 => PassType::FloodInit,
-            x => panic!("Invalid value for PassType: {}", x),
-        }
-    }
-
-    pub(crate) fn with_depth_mode(mut self, depth_mode: DepthMode) -> Self {
-        self.set_depth_mode_int(depth_mode as u32);
-        self
-    }
-
-    pub(crate) fn depth_mode(&self) -> DepthMode {
-        match self.depth_mode_int() {
-            x if x == DepthMode::Flat as u32 => DepthMode::Flat,
-            x if x == DepthMode::Real as u32 => DepthMode::Real,
-            x => panic!("Invalid value for DepthMode: {}", x),
-        }
-    }
-
-    pub(crate) fn with_vertex_offset_zero(mut self, vertex_offset_zero: bool) -> Self {
-        self.set_vertex_offset_zero(vertex_offset_zero);
-        self
-    }
-
-    pub(crate) fn with_plane_offset_zero(mut self, plane_offset_zero: bool) -> Self {
-        self.set_plane_offset_zero(plane_offset_zero);
-        self
-    }
-
-    pub(crate) fn with_hdr_format(mut self, hdr_format: bool) -> Self {
-        self.set_hdr_format(hdr_format);
-        self
-    }
-
-    pub(crate) fn with_morph_targets(mut self, morph_targets: bool) -> Self {
-        self.set_morph_targets(morph_targets);
-        self
-    }
-
-    pub(crate) fn with_motion_vector_prepass(mut self, motion_vector_prepass: bool) -> Self {
-        self.set_motion_vector_prepass(motion_vector_prepass);
-        self
-    }
-
-    pub(crate) fn with_double_sided(mut self, double_sided: bool) -> Self {
-        self.set_double_sided(double_sided);
-        self
-    }
-
-    pub(crate) fn with_alpha_mask_texture(mut self, alpha_mask_texture: bool) -> Self {
-        self.set_alpha_mask_texture(alpha_mask_texture);
-        self
-    }
-
-    pub(crate) fn with_alpha_mask_channel(mut self, channel: TextureChannel) -> Self {
-        let channel_int = match channel {
-            TextureChannel::R => 0,
-            TextureChannel::G => 1,
-            TextureChannel::B => 2,
-            TextureChannel::A => 3,
-        };
-        self.set_alpha_mask_channel_int(channel_int);
-        self
-    }
-}
-
-impl From<PipelineKey> for MeshPipelineKey {
-    fn from(key: PipelineKey) -> Self {
-        let mut mesh_key = MeshPipelineKey::empty();
-        if key.morph_targets() {
-            mesh_key |= MeshPipelineKey::MORPH_TARGETS;
-        }
-        if key.motion_vector_prepass() {
-            mesh_key |= MeshPipelineKey::MOTION_VECTOR_PREPASS;
-        }
-        mesh_key
-    }
-}
 
 #[derive(Resource)]
 pub(crate) struct OutlinePipeline {
@@ -252,7 +98,7 @@ impl FromWorld for OutlinePipeline {
 }
 
 impl SpecializedMeshPipeline for OutlinePipeline {
-    type Key = PipelineKey;
+    type Key = DerivedPipelineKey;
 
     fn specialize(
         &self,
@@ -332,7 +178,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         }
         match key.pass_type() {
             PassType::Stencil => {}
-            PassType::Opaque | PassType::Transparent => {
+            PassType::Volume => {
                 let val = ShaderDefVal::from("VOLUME");
                 vertex_defs.push(val.clone());
                 fragment_defs.push(val);
@@ -342,7 +188,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                     } else {
                         TextureFormat::bevy_default()
                     },
-                    blend: Some(if key.pass_type() == PassType::Transparent {
+                    blend: Some(if key.transparent() {
                         BlendState::ALPHA_BLENDING
                     } else {
                         BlendState::REPLACE

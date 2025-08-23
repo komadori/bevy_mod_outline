@@ -73,7 +73,7 @@ impl ComposeOutputPipelineKey {
             x if x == Msaa::Sample2 as u32 => Msaa::Sample2,
             x if x == Msaa::Sample4 as u32 => Msaa::Sample4,
             x if x == Msaa::Sample8 as u32 => Msaa::Sample8,
-            x => panic!("Invalid value for Msaa: {}", x),
+            x => panic!("Invalid value for Msaa: {x}"),
         }
     }
 

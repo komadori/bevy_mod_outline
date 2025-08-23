@@ -22,39 +22,37 @@ use bevy::render::Extract;
 use crate::node::{
     OpaqueOutline, OutlineBatchSetKey, OutlineBinKey, StencilOutline, TransparentOutline,
 };
+use crate::pipeline_key::ComputedOutlineKey;
+use crate::pipeline_key::{DerivedPipelineKey, EntityPipelineKey, PassType, ViewPipelineKey};
+use crate::ComputedOutline;
 use crate::{
-    pipeline::{OutlinePipeline, PassType, PipelineKey},
+    pipeline::OutlinePipeline,
     render::DrawOutline,
     uniforms::{DrawMode, ExtractedOutline},
     view_uniforms::OutlineQueueStatus,
-    ComputedOutline,
 };
 
-#[derive(Clone, Resource, Debug, Default)]
-pub struct OutlineEntitiesNeedingSpecialisation {
-    entities: Vec<Entity>,
-}
-
-#[derive(Resource, Deref, DerefMut, Clone, Debug, Default)]
-pub struct OutlineEntitySpecialisationTicks {
-    entity_map: MainEntityHashMap<Tick>,
+#[derive(Resource, Default)]
+pub struct OutlineEntitiesChanged {
+    entities: Vec<MainEntity>,
 }
 
 #[derive(Resource, Default)]
-pub struct OutlinePipelineCache {
-    view_map: HashMap<RetainedViewEntity, OutlineViewPipelineCache>,
+pub struct OutlineCache {
+    view_map: HashMap<RetainedViewEntity, OutlineViewCache>,
 }
 
 #[derive(Default)]
-pub struct OutlineViewPipelineCache {
-    entity_map: MainEntityHashMap<OutlinePipelineCacheEntry>,
+pub struct OutlineViewCache {
+    changed_tick: Tick,
+    entity_map: MainEntityHashMap<OutlineCacheEntry>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct OutlinePipelineCacheEntry {
-    pub tick: Tick,
-    pub stencil_pipeline_id: CachedRenderPipelineId,
-    pub volume_pipeline_id: CachedRenderPipelineId,
+pub struct OutlineCacheEntry {
+    changed_tick: Tick,
+    stencil_pipeline_id: CachedRenderPipelineId,
+    volume_pipeline_id: CachedRenderPipelineId,
 }
 
 pub(crate) struct OutlineRangefinder {
@@ -78,46 +76,29 @@ impl OutlineRangefinder {
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn check_outline_entities_needing_specialisation(
-    needs_specialisation: Query<
-        Entity,
-        Or<(
-            Changed<ComputedOutline>,
-            Changed<Mesh3d>,
-            AssetChanged<Mesh3d>,
-        )>,
-    >,
-    mut entities_needing_specialisation: ResMut<OutlineEntitiesNeedingSpecialisation>,
+pub(crate) fn check_outline_entities_changed(
+    changed_entities: Query<Entity, Or<(Changed<ComputedOutline>, Changed<ComputedOutlineKey>)>>,
+    mut entities_changed: ResMut<OutlineEntitiesChanged>,
 ) {
-    entities_needing_specialisation.entities.clear();
-    for entity in &needs_specialisation {
-        entities_needing_specialisation.entities.push(entity);
+    entities_changed.entities.clear();
+    for entity in changed_entities.iter() {
+        entities_changed.entities.push(entity.into());
     }
 }
 
-pub(crate) fn extract_outline_entities_needing_specialisation(
-    entities_needing_specialisation: Extract<Res<OutlineEntitiesNeedingSpecialisation>>,
-    mut entity_specialisation_ticks: ResMut<OutlineEntitySpecialisationTicks>,
-    views: Query<&ExtractedView>,
-    mut outline_pipeline_cache: ResMut<OutlinePipelineCache>,
-    mut removed_outlines_query: Extract<RemovedComponents<ComputedOutline>>,
-    ticks: SystemChangeTick,
+pub(crate) fn extract_outline_entities_changed(
+    entities_changed: Extract<Res<OutlineEntitiesChanged>>,
+    mut entities_removed: Extract<RemovedComponents<ComputedOutline>>,
+    mut outline_cache: ResMut<OutlineCache>,
 ) {
-    for entity in entities_needing_specialisation.entities.iter() {
-        // Update the entity's specialisation tick with this run's tick
-        entity_specialisation_ticks.insert((*entity).into(), ticks.this_run());
-    }
-
-    for entity in removed_outlines_query.read() {
-        for view in &views {
-            if let Some(outline_view_pipeline_cache) = outline_pipeline_cache
-                .view_map
-                .get_mut(&view.retained_view_entity)
-            {
-                outline_view_pipeline_cache
-                    .entity_map
-                    .remove(&MainEntity::from(entity));
-            }
+    for outline_view_cache in outline_cache.view_map.values_mut() {
+        for entity in entities_changed.entities.iter() {
+            outline_view_cache.entity_map.remove(entity);
+        }
+        for entity in entities_removed.read() {
+            outline_view_cache
+                .entity_map
+                .remove(&MainEntity::from(entity));
         }
     }
 }
@@ -125,130 +106,150 @@ pub(crate) fn extract_outline_entities_needing_specialisation(
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn specialise_outlines(
     render_meshes: Res<RenderAssets<RenderMesh>>,
-    entity_specialisation_ticks: Res<OutlineEntitySpecialisationTicks>,
     view_specialisation_ticks: Res<ViewSpecializationTicks>,
-    mut outline_pipeline_cache: ResMut<OutlinePipelineCache>,
+    mut outline_cache: ResMut<OutlineCache>,
     mut pipelines: ResMut<SpecializedMeshPipelines<OutlinePipeline>>,
     mut all_views: Local<HashSet<RetainedViewEntity>>,
+    mut warm_up_keys: Local<Vec<EntityPipelineKey>>,
     outline_pipeline: Res<OutlinePipeline>,
     pipeline_cache: Res<PipelineCache>,
     ticks: SystemChangeTick,
-    views: Query<(&ExtractedView, Has<MotionVectorPrepass>, &Msaa)>,
+    views: Query<(
+        &ExtractedView,
+        Has<MotionVectorPrepass>,
+        &Msaa,
+        Option<&RenderLayers>,
+    )>,
     outlines: Query<(&MainEntity, &ExtractedOutline)>,
 ) {
     all_views.clear();
 
-    for (view, motion_vector_prepass, msaa) in &views {
+    for (view, motion_vector_prepass, msaa, view_mask) in &views {
         all_views.insert(view.retained_view_entity);
 
-        let base_key = PipelineKey::new().with_msaa(*msaa);
+        let view_key = ViewPipelineKey::new()
+            .with_msaa(*msaa)
+            .with_hdr_format(view.hdr)
+            .with_motion_vector_prepass(motion_vector_prepass);
 
         let view_tick = view_specialisation_ticks
             .get(&view.retained_view_entity)
             .unwrap();
-        let outline_view_pipeline_cache = outline_pipeline_cache
+        let outline_view_cache = outline_cache
             .view_map
             .entry(view.retained_view_entity)
             .or_default();
+        if view_tick.is_newer_than(outline_view_cache.changed_tick, ticks.this_run()) {
+            outline_view_cache.changed_tick = *view_tick;
+            outline_view_cache.entity_map.clear();
+        }
+        let view_layers = view_mask.unwrap_or_default();
 
         for (main_entity, outline) in outlines.iter() {
-            let entity_tick = entity_specialisation_ticks
-                .get(main_entity)
-                .copied()
-                .unwrap_or_default();
+            if outline_view_cache.entity_map.contains_key(main_entity) {
+                continue; // Already in entity cache
+            };
 
-            let last_specialised_tick = outline_view_pipeline_cache
-                .entity_map
-                .get(main_entity)
-                .map(|entry| entry.tick);
+            let enable_stencil = outline.stencil || outline.warm_up.disabled_stencil;
+            let enable_volume = outline.volume || outline.warm_up.disabled_volume;
+            if !enable_stencil && !enable_volume {
+                continue; // Neither stencil nor volume enabled
+            }
 
-            let needs_specialisation = last_specialised_tick.is_none_or(|tick| {
-                entity_tick.is_newer_than(tick, ticks.this_run())
-                    || view_tick.is_newer_than(tick, ticks.this_run())
-            });
-
-            if !needs_specialisation {
-                continue;
+            if !outline.layers.intersects(view_layers)
+                && !outline.warm_up.layers.intersects(view_layers)
+            {
+                continue; // Layer not enabled
             }
 
             let Some(mesh) = render_meshes.get(outline.mesh_id) else {
-                continue;
+                continue; // Mesh not found
             };
 
-            let base_instance_key = base_key
-                .with_primitive_topology(mesh.primitive_topology())
-                .with_depth_mode(outline.depth_mode)
-                .with_morph_targets(mesh.morph_targets.is_some())
-                .with_motion_vector_prepass(motion_vector_prepass)
-                .with_double_sided(outline.double_sided);
+            warm_up_keys.clear();
+            warm_up_keys.push(outline.pipeline_key);
 
-            // Specialise stencil pipeline
-            let stencil_pipeline_id = if outline.stencil {
-                let stencil_key = base_instance_key
-                    .with_vertex_offset_zero(outline.instance_data.stencil_offset == 0.0)
-                    .with_plane_offset_zero(outline.instance_data.world_plane_offset == Vec3::ZERO)
-                    .with_pass_type(PassType::Stencil)
-                    .with_alpha_mask_texture(outline.alpha_mask_id.is_some())
-                    .with_alpha_mask_channel(outline.alpha_mask_channel);
-
-                match pipelines.specialize(
-                    &pipeline_cache,
-                    &outline_pipeline,
-                    stencil_key,
-                    &mesh.layout,
-                ) {
-                    Ok(pipeline_id) => pipeline_id,
-                    Err(err) => {
-                        error!("Failed to specialise stencil pipeline: {}", err);
-                        CachedRenderPipelineId::INVALID
-                    }
+            if outline.warm_up.transparency {
+                let range = 0..warm_up_keys.len();
+                for i in range {
+                    let key = warm_up_keys[i];
+                    warm_up_keys.push(key.with_transparent(!key.transparent()));
                 }
-            } else {
-                CachedRenderPipelineId::INVALID
-            };
+            }
 
-            // Specialise volume pipeline if needed
-            let volume_pipeline_id = if outline.volume && outline.draw_mode == DrawMode::Extrude {
-                let transparent = outline.instance_data.volume_colour[3] < 1.0;
-                let draw_key = base_instance_key
-                    .with_vertex_offset_zero(outline.instance_data.volume_offset == 0.0)
-                    .with_plane_offset_zero(outline.instance_data.world_plane_offset == Vec3::ZERO)
-                    .with_pass_type(if transparent {
-                        PassType::Transparent
-                    } else {
-                        PassType::Opaque
-                    })
-                    .with_hdr_format(view.hdr);
-
-                match pipelines.specialize(
-                    &pipeline_cache,
-                    &outline_pipeline,
-                    draw_key,
-                    &mesh.layout,
-                ) {
-                    Ok(pipeline_id) => pipeline_id,
-                    Err(err) => {
-                        error!("Failed to specialise volume pipeline: {}", err);
-                        CachedRenderPipelineId::INVALID
-                    }
+            if outline.warm_up.vertex_offsets {
+                let range = 0..warm_up_keys.len();
+                for i in range {
+                    let key = warm_up_keys[i];
+                    warm_up_keys.push(
+                        key.with_vertex_offset_zero(!key.vertex_offset_zero())
+                            .with_stencil_vertex_offset_zero(!key.stencil_vertex_offset_zero()),
+                    );
                 }
-            } else {
-                CachedRenderPipelineId::INVALID
-            };
+            }
 
-            outline_view_pipeline_cache.entity_map.insert(
-                *main_entity,
-                OutlinePipelineCacheEntry {
-                    tick: ticks.this_run(),
-                    stencil_pipeline_id,
-                    volume_pipeline_id,
-                },
-            );
+            let mut first_key = true;
+            for warm_up_key in warm_up_keys.iter() {
+                // Specialise stencil pipeline
+                let stencil_pipeline_id = if enable_stencil {
+                    let stencil_key =
+                        DerivedPipelineKey::new(view_key, *warm_up_key, PassType::Stencil);
+
+                    match pipelines.specialize(
+                        &pipeline_cache,
+                        &outline_pipeline,
+                        stencil_key,
+                        &mesh.layout,
+                    ) {
+                        Ok(pipeline_id) => pipeline_id,
+                        Err(err) => {
+                            error!("Failed to specialise stencil pipeline: {}", err);
+                            CachedRenderPipelineId::INVALID
+                        }
+                    }
+                } else {
+                    CachedRenderPipelineId::INVALID
+                };
+
+                // Specialise volume pipeline
+                let volume_pipeline_id = if enable_volume && outline.draw_mode == DrawMode::Extrude
+                {
+                    let volume_key =
+                        DerivedPipelineKey::new(view_key, *warm_up_key, PassType::Volume);
+
+                    match pipelines.specialize(
+                        &pipeline_cache,
+                        &outline_pipeline,
+                        volume_key,
+                        &mesh.layout,
+                    ) {
+                        Ok(pipeline_id) => pipeline_id,
+                        Err(err) => {
+                            error!("Failed to specialise volume pipeline: {}", err);
+                            CachedRenderPipelineId::INVALID
+                        }
+                    }
+                } else {
+                    CachedRenderPipelineId::INVALID
+                };
+
+                if first_key {
+                    outline_view_cache.entity_map.insert(
+                        *main_entity,
+                        OutlineCacheEntry {
+                            changed_tick: ticks.this_run(),
+                            stencil_pipeline_id,
+                            volume_pipeline_id,
+                        },
+                    );
+                    first_key = false;
+                }
+            }
         }
     }
 
     // Delete specialized pipelines belonging to views that have expired.
-    outline_pipeline_cache
+    outline_cache
         .view_map
         .retain(|retained_view_entity, _| all_views.contains(retained_view_entity));
 }
@@ -259,7 +260,7 @@ pub(crate) fn queue_outline_mesh(
     opaque_draw_functions: Res<DrawFunctions<OpaqueOutline>>,
     transparent_draw_functions: Res<DrawFunctions<TransparentOutline>>,
     mesh_allocator: Res<MeshAllocator>,
-    outline_pipeline_cache: Res<OutlinePipelineCache>,
+    outline_cache: Res<OutlineCache>,
     mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
@@ -284,10 +285,10 @@ pub(crate) fn queue_outline_mesh(
         .unwrap();
 
     for (view, view_mask, mut queue_status) in views.iter_mut() {
-        let view_mask = view_mask.cloned().unwrap_or_default();
+        let view_mask = view_mask.unwrap_or_default();
         let rangefinder = OutlineRangefinder::new(view);
 
-        let outline_view_pipeline_cache = outline_pipeline_cache
+        let outline_view_cache = outline_cache
             .view_map
             .get(&view.retained_view_entity)
             .unwrap();
@@ -312,18 +313,17 @@ pub(crate) fn queue_outline_mesh(
                 BinnedRenderPhaseType::UnbatchableMesh
             };
 
-            let Some(OutlinePipelineCacheEntry {
-                tick: last_specialised_tick,
+            let Some(OutlineCacheEntry {
+                changed_tick,
                 stencil_pipeline_id,
                 volume_pipeline_id,
-            }) = outline_view_pipeline_cache.entity_map.get(main_entity)
+            }) = outline_view_cache.entity_map.get(main_entity)
             else {
                 continue;
             };
 
             // Queue stencil pass if needed
-            if outline.stencil
-                && !stencil_phase.validate_cached_entity(*main_entity, *last_specialised_tick)
+            if outline.stencil && !stencil_phase.validate_cached_entity(*main_entity, *changed_tick)
             {
                 stencil_phase.add(
                     OutlineBatchSetKey {
@@ -339,7 +339,7 @@ pub(crate) fn queue_outline_mesh(
                     (render_entity, *main_entity),
                     InputUniformIndex::default(),
                     phase_type,
-                    *last_specialised_tick,
+                    *changed_tick,
                 );
             }
 
@@ -360,8 +360,7 @@ pub(crate) fn queue_outline_mesh(
                         extra_index: PhaseItemExtraIndex::None,
                         indexed: index_slab.is_some(),
                     });
-                } else if !opaque_phase.validate_cached_entity(*main_entity, *last_specialised_tick)
-                {
+                } else if !opaque_phase.validate_cached_entity(*main_entity, *changed_tick) {
                     opaque_phase.add(
                         OutlineBatchSetKey {
                             pipeline: *volume_pipeline_id,
@@ -376,7 +375,7 @@ pub(crate) fn queue_outline_mesh(
                         (render_entity, *main_entity),
                         InputUniformIndex::default(),
                         phase_type,
-                        *last_specialised_tick,
+                        *changed_tick,
                     );
                 }
             }
