@@ -196,6 +196,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                     write_mask: ColorWrites::ALL,
                 }));
             }
+            #[cfg(feature = "flood")]
             PassType::FloodInit => {
                 let val = ShaderDefVal::from("FLOOD_INIT");
                 vertex_defs.push(val.clone());
@@ -207,16 +208,16 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 }));
             }
         }
-        let depth_stencil = if key.pass_type() == PassType::FloodInit {
-            None
-        } else {
-            Some(DepthStencilState {
+        let depth_stencil = match key.pass_type() {
+            PassType::Stencil | PassType::Volume => Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
                 depth_write_enabled: true,
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
-            })
+            }),
+            #[cfg(feature = "flood")]
+            PassType::FloodInit => None,
         };
         let buffers = vec![layout.0.get_layout(&buffer_attrs)?];
         let mut push_constant_ranges = Vec::with_capacity(1);

@@ -10,6 +10,7 @@ use crate::{uniforms::DepthMode, ComputedOutline, TextureChannel};
 pub(crate) enum PassType {
     Stencil = 1,
     Volume = 2,
+    #[cfg(feature = "flood")]
     FloodInit = 3,
 }
 
@@ -74,6 +75,7 @@ impl RawPipelineKey {
         match self.pass_type_int() {
             x if x == PassType::Stencil as u32 => PassType::Stencil,
             x if x == PassType::Volume as u32 => PassType::Volume,
+            #[cfg(feature = "flood")]
             x if x == PassType::FloodInit as u32 => PassType::FloodInit,
             x => panic!("Invalid value for PassType: {x}"),
         }
@@ -219,6 +221,7 @@ impl DerivedPipelineKey {
                             .with_stencil_vertex_offset_zero(false)
                             .0
                 }
+                #[cfg(feature = "flood")]
                 PassType::FloodInit => {
                     entity_key
                         .with_transparent(false)
