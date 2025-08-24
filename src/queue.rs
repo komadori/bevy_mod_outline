@@ -39,20 +39,20 @@ pub struct OutlineEntitiesChanged {
 
 #[derive(Resource, Default)]
 pub struct OutlineCache {
-    view_map: HashMap<RetainedViewEntity, OutlineViewCache>,
+    pub(crate) view_map: HashMap<RetainedViewEntity, OutlineViewCache>,
 }
 
 #[derive(Default)]
 pub struct OutlineViewCache {
-    changed_tick: Tick,
-    entity_map: MainEntityHashMap<OutlineCacheEntry>,
+    pub(crate) changed_tick: Tick,
+    pub(crate) entity_map: MainEntityHashMap<OutlineCacheEntry>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct OutlineCacheEntry {
-    changed_tick: Tick,
-    stencil_pipeline_id: CachedRenderPipelineId,
-    volume_pipeline_id: CachedRenderPipelineId,
+    pub(crate) changed_tick: Tick,
+    pub(crate) stencil_pipeline_id: CachedRenderPipelineId,
+    pub(crate) volume_pipeline_id: CachedRenderPipelineId,
 }
 
 pub(crate) struct OutlineRangefinder {
@@ -212,10 +212,13 @@ pub(crate) fn specialise_outlines(
                 };
 
                 // Specialise volume pipeline
-                let volume_pipeline_id = if enable_volume && outline.draw_mode == DrawMode::Extrude
-                {
-                    let volume_key =
-                        DerivedPipelineKey::new(view_key, *warm_up_key, PassType::Volume);
+                let volume_pipeline_id = if enable_volume {
+                    let pass_type = match outline.draw_mode {
+                        DrawMode::Extrude => PassType::Volume,
+                        #[cfg(feature = "flood")]
+                        DrawMode::JumpFlood => PassType::FloodInit,
+                    };
+                    let volume_key = DerivedPipelineKey::new(view_key, *warm_up_key, pass_type);
 
                     match pipelines.specialize(
                         &pipeline_cache,
