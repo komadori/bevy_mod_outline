@@ -1,11 +1,9 @@
 use bevy::{
     math::FloatOrd,
+    mesh::{Indices, VertexAttributeValues},
     platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::{
-        mesh::{Indices, VertexAttributeValues},
-        render_resource::{PrimitiveTopology, VertexFormat},
-    },
+    render::render_resource::{PrimitiveTopology, VertexFormat},
 };
 
 use crate::ATTRIBUTE_OUTLINE_NORMAL;

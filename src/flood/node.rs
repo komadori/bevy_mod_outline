@@ -121,6 +121,7 @@ impl ViewNode for FloodNode {
         render_context: &mut RenderContext<'w>,
         (view, camera, target, depth, view_uniform, flood_textures, compose_output_view): QueryItem<
             'w,
+            '_,
             Self::ViewQuery,
         >,
         world: &'w World,

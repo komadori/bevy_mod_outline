@@ -213,7 +213,7 @@ fn create_buttons<T: Component + States>(builder: &mut ChildSpawnerCommands, val
                             align_items: AlignItems::Center,
                             ..default()
                         },
-                        BorderColor(Color::BLACK),
+                        BorderColor::all(Color::BLACK),
                         BorderRadius::MAX,
                         BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
                         value.clone(),
@@ -233,9 +233,9 @@ fn highlight<T: Component + States>(
 ) {
     for (mut border, m) in query.iter_mut() {
         *border = if m == state.get() {
-            BorderColor(Color::srgb(0.0, 0.0, 1.0))
+            BorderColor::all(Color::srgb(0.0, 0.0, 1.0))
         } else {
-            BorderColor(Color::BLACK)
+            BorderColor::all(Color::BLACK)
         };
     }
 }

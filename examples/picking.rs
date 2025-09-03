@@ -90,7 +90,7 @@ fn setup(
 
 /// Observer system that manages what pickable objects are selected
 fn on_click(
-    mut event: Trigger<Pointer<Click>>,
+    mut event: On<Pointer<Click>>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -122,7 +122,7 @@ fn on_click(
     }
 
     // Select a mesh
-    if let Ok((entity, mut outline, selected)) = query.get_mut(event.target) {
+    if let Ok((entity, mut outline, selected)) = query.get_mut(event.entity()) {
         if let Ok(mut entity) = commands.get_entity(entity) {
             // When selecting multiple objects, allow clicking a selected object to deselect it.
             if multi_select && selected.is_some() {
