@@ -1,9 +1,9 @@
+use bevy::camera::primitives::Aabb;
+use bevy::camera::Viewport;
 use bevy::ecs::component::Component;
 use bevy::math::{Affine3A, Mat4, UVec2, Vec4Swizzles};
 use bevy::prelude::*;
-use bevy::render::camera::Viewport;
 use bevy::render::extract_component::ExtractComponent;
-use bevy::render::primitives::Aabb;
 
 use crate::computed::ComputedOutline;
 use crate::uniforms::DrawMode;

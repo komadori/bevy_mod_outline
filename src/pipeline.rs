@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
-use bevy::asset::weak_handle;
+use bevy::asset::uuid_handle;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
+use bevy::mesh::MeshVertexBufferLayoutRef;
 use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, SkinUniforms};
 use bevy::prelude::*;
 use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
@@ -11,20 +12,18 @@ use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_
 use bevy::render::render_resource::{
     BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
-    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, ShaderDefVal, ShaderStages,
-    ShaderType, StencilState, TextureFormat, VertexState,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, ShaderStages, ShaderType,
+    StencilState, TextureFormat, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::WgpuSettings;
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::ViewTarget;
+use bevy::shader::ShaderDefVal;
 use bevy::{
     pbr::MeshPipeline,
-    render::{
-        mesh::MeshVertexBufferLayoutRef,
-        render_resource::{
-            RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
-        },
+    render::render_resource::{
+        RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
     },
 };
 use nonmax::NonMaxU32;
@@ -36,13 +35,13 @@ use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
 pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
+    uuid_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
 
 pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
+    uuid_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
 
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
+    uuid_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
 
 #[derive(Resource)]
 pub(crate) struct OutlinePipeline {
@@ -112,6 +111,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
 
         let bind_layouts = vec![
             self.outline_view_bind_group_layout.clone(),
+            self.outline_instance_bind_group_layout.clone(),
             setup_morph_and_skinning_defs(
                 &self.mesh_pipeline.mesh_layouts,
                 layout,
@@ -121,7 +121,6 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &mut buffer_attrs,
                 self.skins_use_uniform_buffers,
             ),
-            self.outline_instance_bind_group_layout.clone(),
             self.alpha_mask_bind_group_layout.clone(),
         ];
 
@@ -231,14 +230,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE,
-                entry_point: "vertex".into(),
+                entry_point: None,
                 shader_defs: vertex_defs,
                 buffers,
             },
             fragment: Some(FragmentState {
                 shader: FRAGMENT_SHADER_HANDLE,
                 shader_defs: fragment_defs,
-                entry_point: "fragment".into(),
+                entry_point: None,
                 targets,
             }),
             layout: bind_layouts,

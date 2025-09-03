@@ -269,7 +269,7 @@ impl ViewNode for OutlineNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, camera, camera_3d, target, depth, queue_status): QueryItem<'w, Self::ViewQuery>,
+        (view, camera, camera_3d, target, depth, queue_status): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();

@@ -1,3 +1,4 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::core_pipeline::prepass::MotionVectorPrepass;
 use bevy::ecs::component::Tick;
 use bevy::ecs::system::SystemChangeTick;
@@ -16,7 +17,7 @@ use bevy::render::render_resource::{
     CachedRenderPipelineId, PipelineCache, SpecializedMeshPipelines,
 };
 use bevy::render::sync_world::{MainEntity, MainEntityHashMap};
-use bevy::render::view::{ExtractedView, RenderLayers, RetainedViewEntity};
+use bevy::render::view::{ExtractedView, RetainedViewEntity};
 use bevy::render::Extract;
 
 use crate::node::{

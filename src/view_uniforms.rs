@@ -58,7 +58,7 @@ pub(crate) fn extract_outline_view_uniforms(
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
-            let view_from_world = transform.compute_matrix().inverse();
+            let view_from_world = transform.to_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             commands
                 .entity(entity.id())

@@ -10,8 +10,8 @@ use bevy::{
     render::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
-            BindGroupEntries, CachedRenderPipelineId, LoadOp, Operations, PipelineCache,
-            RenderPassColorAttachment, RenderPassDescriptor, SpecializedRenderPipelines, StoreOp,
+            CachedRenderPipelineId, LoadOp, Operations, PipelineCache, RenderPassColorAttachment,
+            RenderPassDescriptor, SpecializedRenderPipelines, StoreOp,
         },
         renderer::RenderContext,
         view::{Msaa, ViewTarget},
@@ -36,7 +36,7 @@ impl ViewNode for MsaaExtraWritebackNode {
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (target, blit_pipeline_id): QueryItem<'w, Self::ViewQuery>,
+        (target, blit_pipeline_id): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let blit_pipeline = world.resource::<BlitPipeline>();
@@ -51,6 +51,7 @@ impl ViewNode for MsaaExtraWritebackNode {
             label: Some("msaa_extra_writeback"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: target.sampled_main_texture_view().unwrap(),
+                depth_slice: None,
                 resolve_target: Some(post_process.destination),
                 ops: Operations {
                     load: LoadOp::Clear(wgpu_types::Color::BLACK),
@@ -62,11 +63,8 @@ impl ViewNode for MsaaExtraWritebackNode {
             occlusion_query_set: None,
         };
 
-        let bind_group = render_context.render_device().create_bind_group(
-            None,
-            &blit_pipeline.texture_bind_group,
-            &BindGroupEntries::sequential((post_process.source, &blit_pipeline.sampler)),
-        );
+        let bind_group =
+            blit_pipeline.create_bind_group(render_context.render_device(), post_process.source);
 
         let mut render_pass = render_context
             .command_encoder()
