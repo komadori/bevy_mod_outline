@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.10.3 (2025-08-24)
+
+### Added
+- Added OutlineWarmUp for warming up pipelines.
+
 ## bevy_mod_outline 0.10.2 (2025-06-19)
 
 ### Fixed

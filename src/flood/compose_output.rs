@@ -15,14 +15,13 @@ use bevy::{
         view::{ExtractedView, ViewDepthTexture, ViewTarget},
     },
 };
-use bitfield::{bitfield_bitrange, bitfield_fields};
 use wgpu_types::{
     BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     MultisampleState, PrimitiveState, SamplerBindingType, ShaderStages, StencilState,
     TextureFormat, TextureSampleType,
 };
 
-use crate::uniforms::ExtractedOutline;
+use crate::{pipeline_key::ViewPipelineKey, uniforms::ExtractedOutline};
 
 use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
@@ -47,47 +46,11 @@ pub(crate) fn prepare_compose_output_uniform(
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct ComposeOutputPipelineKey(u32);
-bitfield_bitrange! {struct ComposeOutputPipelineKey(u32)}
-
-impl ComposeOutputPipelineKey {
-    bitfield_fields! {
-        u32;
-        msaa_samples_minus_one, set_msaa_samples_minus_one: 5, 0;
-        pub hdr_format, set_hdr_format: 6;
-    }
-
-    pub(crate) fn new() -> Self {
-        ComposeOutputPipelineKey(0)
-    }
-
-    pub(crate) fn with_msaa(mut self, msaa: Msaa) -> Self {
-        self.set_msaa_samples_minus_one(msaa as u32 - 1);
-        self
-    }
-
-    pub(crate) fn msaa(&self) -> Msaa {
-        match self.msaa_samples_minus_one() + 1 {
-            x if x == Msaa::Off as u32 => Msaa::Off,
-            x if x == Msaa::Sample2 as u32 => Msaa::Sample2,
-            x if x == Msaa::Sample4 as u32 => Msaa::Sample4,
-            x if x == Msaa::Sample8 as u32 => Msaa::Sample8,
-            x => panic!("Invalid value for Msaa: {}", x),
-        }
-    }
-
-    pub(crate) fn with_hdr_format(mut self, hdr_format: bool) -> Self {
-        self.set_hdr_format(hdr_format);
-        self
-    }
-}
-
 #[derive(Clone, Resource)]
 pub(crate) struct ComposeOutputPipeline {
     pub(crate) layout: BindGroupLayout,
     pub(crate) sampler: Sampler,
-    pub(crate) pipeline_cache: HashMap<ComposeOutputPipelineKey, CachedRenderPipelineId>,
+    pub(crate) pipeline_cache: HashMap<ViewPipelineKey, CachedRenderPipelineId>,
 }
 
 impl FromWorld for ComposeOutputPipeline {
@@ -121,7 +84,7 @@ impl ComposeOutputPipeline {
     pub(crate) fn get_pipeline(
         &mut self,
         pipeline_cache: &PipelineCache,
-        key: ComposeOutputPipelineKey,
+        key: ViewPipelineKey,
     ) -> CachedRenderPipelineId {
         *self.pipeline_cache.entry(key).or_insert_with(|| {
             pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
@@ -176,7 +139,7 @@ pub(crate) fn prepare_compose_output_pass(
     for (entity, view, msaa) in query.iter() {
         let pipeline_id = compose_output_pipeline.get_pipeline(
             &pipeline_cache,
-            ComposeOutputPipelineKey::new()
+            ViewPipelineKey::new()
                 .with_msaa(*msaa)
                 .with_hdr_format(view.hdr),
         );

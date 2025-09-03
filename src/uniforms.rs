@@ -16,21 +16,24 @@ use bevy::{
     },
 };
 
-use crate::{pipeline::OutlinePipeline, ComputedOutline, TextureChannel};
+use crate::{
+    pipeline::OutlinePipeline,
+    pipeline_key::{ComputedOutlineKey, EntityPipelineKey},
+    ComputedOutline, OutlineWarmUp,
+};
 
 #[derive(Clone, Component)]
 pub struct ExtractedOutline {
     pub(crate) stencil: bool,
     pub(crate) volume: bool,
-    pub(crate) depth_mode: DepthMode,
     pub(crate) draw_mode: DrawMode,
-    pub(crate) double_sided: bool,
+    pub(crate) layers: RenderLayers,
     pub(crate) mesh_id: AssetId<Mesh>,
     pub(crate) alpha_mask_id: Option<AssetId<Image>>,
-    pub(crate) alpha_mask_channel: TextureChannel,
+    pub(crate) pipeline_key: EntityPipelineKey,
     pub(crate) automatic_batching: bool,
     pub(crate) instance_data: OutlineInstanceUniform,
-    pub(crate) layers: RenderLayers,
+    pub(crate) warm_up: OutlineWarmUp,
 }
 
 #[derive(Resource, Default)]
@@ -75,13 +78,13 @@ impl OutlineInstanceUniform {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum DepthMode {
     Flat = 1,
     Real = 2,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum DrawMode {
     Extrude = 1,
     #[cfg(feature = "flood")]
@@ -122,6 +125,7 @@ pub(crate) fn extract_outlines(
             Entity,
             RenderEntity,
             &ComputedOutline,
+            &ComputedOutlineKey,
             &GlobalTransform,
             &Mesh3d,
             Has<NoAutomaticBatching>,
@@ -130,7 +134,8 @@ pub(crate) fn extract_outlines(
 ) {
     render_outlines.entity_map.clear();
 
-    for (entity, render_entity, computed, transform, mesh, no_automatic_batching) in outlines.iter()
+    for (entity, render_entity, computed, key, transform, mesh, no_automatic_batching) in
+        outlines.iter()
     {
         let ComputedOutline(Some(computed)) = computed else {
             continue;
@@ -142,9 +147,7 @@ pub(crate) fn extract_outlines(
                 .enabled
                 .is_enabled(computed.volume.value.enabled),
             volume: computed.volume.value.enabled,
-            depth_mode: computed.mode.value.depth_mode,
             draw_mode: computed.mode.value.draw_mode,
-            double_sided: computed.mode.value.double_sided,
             layers: computed.layers.value.clone(),
             mesh_id: mesh.id(),
             alpha_mask_id: computed
@@ -153,7 +156,7 @@ pub(crate) fn extract_outlines(
                 .texture
                 .as_ref()
                 .map(|texture| texture.id()),
-            alpha_mask_channel: computed.alpha_mask.value.channel,
+            pipeline_key: key.0,
             automatic_batching: !no_automatic_batching
                 && computed.mode.value.draw_mode == DrawMode::Extrude,
             instance_data: OutlineInstanceUniform {
@@ -167,6 +170,7 @@ pub(crate) fn extract_outlines(
                 first_vertex_index: 0,
                 current_skin_index: 0,
             },
+            warm_up: computed.warm_up.value.clone(),
         };
         commands
             .entity(render_entity)
