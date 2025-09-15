@@ -1,4 +1,3 @@
-#![allow(dead_code)] // Workaround for bevy#20400
 //! This crate provides a Bevy plugin, [`OutlinePlugin`], and associated
 //! components for rendering outlines around meshes using the vertex extrusion
 //! and jump flood methods.
