@@ -70,7 +70,7 @@ fn add_outline(
             .spawn(
                 Observer::new(
                     move |trigger: On<SceneInstanceReady>, mut commands: Commands| {
-                        commands.run_system_with(add_outline, trigger.entity());
+                        commands.run_system_with(add_outline, trigger.entity);
                     },
                 )
                 .with_entity(*entity_input),

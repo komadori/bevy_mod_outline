@@ -1,7 +1,7 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{
-    core_pipeline::bloom::{Bloom, BloomCompositeMode},
+    post_process::bloom::{Bloom, BloomCompositeMode},
     prelude::*,
     render::view::Hdr,
 };

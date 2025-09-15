@@ -11,7 +11,7 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { git="https://github.com/bevyengine/bevy.git", rev = "69745d40e594fb34a99507e2f0be2385711e46a6", default-features = false, features = [
+bevy = { version = "0.17.0-rc.1", default-features = false, features = [
     "std",
     "async_executor",
     "bevy_log",
@@ -33,11 +33,13 @@ reflect = []
 scene = ["bevy/bevy_scene"]
 
 [dev-dependencies]
-bevy = { git="https://github.com/bevyengine/bevy.git", rev = "69745d40e594fb34a99507e2f0be2385711e46a6", default-features = false, features = [
+bevy = { version = "0.17.0-rc.1", default-features = false, features = [
     "animation",
+    "bevy_anti_alias",
     "bevy_gltf",
     "bevy_mesh_picking_backend",
     "bevy_pbr",
+    "bevy_post_process",
     "bevy_sprite",
     "bevy_state",
     "bevy_text",

@@ -1,5 +1,5 @@
 use bevy::{
-    anti_aliasing::{
+    anti_alias::{
         fxaa::Fxaa,
         smaa::{Smaa, SmaaPreset},
         taa::TemporalAntiAliasing,

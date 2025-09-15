@@ -122,7 +122,7 @@ fn on_click(
     }
 
     // Select a mesh
-    if let Ok((entity, mut outline, selected)) = query.get_mut(event.entity()) {
+    if let Ok((entity, mut outline, selected)) = query.get_mut(event.entity) {
         if let Ok(mut entity) = commands.get_entity(entity) {
             // When selecting multiple objects, allow clicking a selected object to deselect it.
             if multi_select && selected.is_some() {

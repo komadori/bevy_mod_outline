@@ -259,7 +259,7 @@ fn interaction<T: Component + FreelyMutableState>(
 
 fn change_mode(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawMethod>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawMethod>>,
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {
@@ -278,7 +278,7 @@ fn change_mode(
 
 fn change_shape(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawShape>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawShape>>,
     query: Query<Entity, With<TheObject>>,
     shapes: Res<Shapes>,
 ) {
@@ -293,7 +293,7 @@ fn change_shape(
 
 fn change_orientation(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawOrientation>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawOrientation>>,
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {
