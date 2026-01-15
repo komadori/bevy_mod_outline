@@ -15,7 +15,6 @@ use crate::pipeline::OutlinePipeline;
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineViewUniform {
-    #[align(16)]
     pub clip_from_world: Mat4,
     pub world_from_view_a: [Vec4; 2],
     pub world_from_view_b: f32,

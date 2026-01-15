@@ -22,7 +22,6 @@ use super::JUMP_FLOOD_SHADER_HANDLE;
 
 #[derive(ShaderType)]
 pub(crate) struct JumpFloodUniform {
-    #[align(16)]
     pub(crate) size: u32,
 }
 

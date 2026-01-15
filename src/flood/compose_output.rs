@@ -27,7 +27,6 @@ use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
-    #[align(16)]
     pub volume_offset: f32,
     pub volume_colour: Vec4,
 }
