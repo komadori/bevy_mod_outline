@@ -55,7 +55,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineViewBindGroup<
     type Param = SRes<OutlineViewBindGroup>;
     fn render<'w>(
         _item: &P,
-        view_data: ROQueryItem<'w, Self::ViewQuery>,
+        view_data: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity_data: Option<()>,
         bind_group: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -74,7 +74,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineAlphaMaskBindG
     fn render<'w>(
         item: &P,
         _view_data: (),
-        _entity_data: Option<ROQueryItem<'w, Self::ItemQuery>>,
+        _entity_data: Option<ROQueryItem<'w, '_, Self::ItemQuery>>,
         (bind_groups, render_outlines): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -99,8 +99,8 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetOutlineAlphaMaskBindG
 pub(crate) type DrawOutline = (
     SetItemPipeline,
     SetOutlineViewBindGroup<0>,
-    SetMeshBindGroup<1>,
-    SetOutlineInstanceBindGroup<2>,
+    SetOutlineInstanceBindGroup<1>,
+    SetMeshBindGroup<2>,
     SetOutlineAlphaMaskBindGroup<3>,
     DrawMesh,
 );

@@ -1,7 +1,7 @@
 use std::mem;
 
 use bevy::{
-    ecs::{component::HookContext, system::SystemId, world::DeferredWorld},
+    ecs::{lifecycle::HookContext, system::SystemId, world::DeferredWorld},
     prelude::*,
     scene::{InstanceId, SceneInstance, SceneInstanceReady},
 };
@@ -69,8 +69,8 @@ fn add_outline(
         let observer = commands
             .spawn(
                 Observer::new(
-                    move |trigger: Trigger<SceneInstanceReady>, mut commands: Commands| {
-                        commands.run_system_with(add_outline, trigger.target());
+                    move |trigger: On<SceneInstanceReady>, mut commands: Commands| {
+                        commands.run_system_with(add_outline, trigger.entity);
                     },
                 )
                 .with_entity(*entity_input),

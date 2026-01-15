@@ -1,5 +1,5 @@
 use bevy::{
-    core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    core_pipeline::FullscreenShader,
     platform::collections::HashMap,
     prelude::*,
     render::{
@@ -84,17 +84,18 @@ impl ComposeOutputPipeline {
     pub(crate) fn get_pipeline(
         &mut self,
         pipeline_cache: &PipelineCache,
+        fullscreen_shader: &FullscreenShader,
         key: ViewPipelineKey,
     ) -> CachedRenderPipelineId {
         *self.pipeline_cache.entry(key).or_insert_with(|| {
             pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
                 label: Some("outline_flood_compose_output_pipeline".into()),
                 layout: vec![self.layout.clone()],
-                vertex: fullscreen_shader_vertex_state(),
+                vertex: fullscreen_shader.to_vertex_state(),
                 fragment: Some(FragmentState {
                     shader: COMPOSE_OUTPUT_SHADER_HANDLE,
                     shader_defs: vec![],
-                    entry_point: "fragment".into(),
+                    entry_point: None,
                     targets: vec![Some(ColorTargetState {
                         format: if key.hdr_format() {
                             ViewTarget::TEXTURE_FORMAT_HDR
@@ -134,11 +135,13 @@ pub(crate) fn prepare_compose_output_pass(
     mut commands: Commands,
     query: Query<(Entity, &ExtractedView, &Msaa), With<OutlineViewUniform>>,
     pipeline_cache: Res<PipelineCache>,
+    fullscreen_shader: Res<FullscreenShader>,
     mut compose_output_pipeline: ResMut<ComposeOutputPipeline>,
 ) {
     for (entity, view, msaa) in query.iter() {
         let pipeline_id = compose_output_pipeline.get_pipeline(
             &pipeline_cache,
+            &fullscreen_shader,
             ViewPipelineKey::new()
                 .with_msaa(*msaa)
                 .with_hdr_format(view.hdr),

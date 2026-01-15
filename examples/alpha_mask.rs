@@ -1,5 +1,4 @@
-use bevy::prelude::*;
-use bevy::render::render_asset::RenderAssetUsages;
+use bevy::{asset::RenderAssetUsages, prelude::*};
 use bevy_mod_outline::*;
 use std::f32::consts::TAU;
 
