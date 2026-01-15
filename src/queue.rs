@@ -1,6 +1,6 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::core_pipeline::prepass::MotionVectorPrepass;
-use bevy::ecs::component::Tick;
+use bevy::ecs::change_detection::Tick;
 use bevy::ecs::system::SystemChangeTick;
 use bevy::math::Mat3A;
 use bevy::pbr::ViewSpecializationTicks;
@@ -72,7 +72,7 @@ impl OutlineRangefinder {
     pub(crate) fn distance_of(&self, outline: &ExtractedOutline) -> f32 {
         let world_plane = outline.instance_data.world_plane_origin
             + self.world_from_view.mul_vec3(-Vec3::Z) * outline.instance_data.world_plane_offset;
-        self.rangefinder.distance_translation(&world_plane)
+        self.rangefinder.distance(&world_plane)
     }
 }
 

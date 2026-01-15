@@ -64,11 +64,12 @@ impl FromWorld for OutlinePipeline {
                 uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
             ),
         );
+        let limits = render_device.limits();
         let outline_instance_bind_group_layout = render_device.create_bind_group_layout(
             "outline_instance_bind_group_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
-                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(render_device),
+                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(&limits),
             ),
         );
         let alpha_mask_bind_group_layout = render_device.create_bind_group_layout(
@@ -82,9 +83,8 @@ impl FromWorld for OutlinePipeline {
             ),
         );
 
-        let instance_batch_size =
-            GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
-        let skins_use_uniform_buffers = skins_use_uniform_buffers(render_device);
+        let instance_batch_size = GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(&limits);
+        let skins_use_uniform_buffers = skins_use_uniform_buffers(&limits);
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,

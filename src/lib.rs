@@ -530,7 +530,8 @@ impl Plugin for OutlinePlugin {
             .init_resource::<AlphaMaskBindGroups>();
 
         let render_device = render_app.world().resource::<RenderDevice>();
-        let instance_buffer = BatchedInstanceBuffer::<OutlineInstanceUniform>::new(render_device);
+        let instance_buffer =
+            BatchedInstanceBuffer::<OutlineInstanceUniform>::new(&render_device.limits());
         render_app.insert_resource(instance_buffer).add_systems(
             Render,
             write_batched_instance_buffer::<OutlinePipeline>
