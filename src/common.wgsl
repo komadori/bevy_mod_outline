@@ -1,7 +1,6 @@
 #define_import_path bevy_mod_outline::common
 
 struct OutlineViewUniform {
-    @align(16)
     clip_from_world: mat4x4<f32>,
     world_from_view_a: mat2x4<f32>,
     world_from_view_b: f32,

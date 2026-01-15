@@ -2,7 +2,6 @@
 #import bevy_mod_outline::common::OutlineViewUniform
 
 struct ComposeOutputUniform {
-    @align(16)
     volume_offset: f32,
     volume_colour: vec4<f32>,
 }

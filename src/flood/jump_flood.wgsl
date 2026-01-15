@@ -1,7 +1,6 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 
 struct JumpFloodUniform {
-    @align(16)
     step_length: u32,
 }
 
