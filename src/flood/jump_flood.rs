@@ -4,8 +4,8 @@ use bevy::{
     render::{
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
-            DynamicUniformBuffer, FragmentState, Operations, PipelineCache,
+            BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
+            CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, Operations, PipelineCache,
             RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
             RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType,
         },
@@ -20,6 +20,7 @@ use wgpu_types::{
 
 use super::JUMP_FLOOD_SHADER_HANDLE;
 
+// #[repr(C, align(16))]
 #[derive(ShaderType)]
 pub(crate) struct JumpFloodUniform {
     pub(crate) size: u32,
@@ -27,7 +28,7 @@ pub(crate) struct JumpFloodUniform {
 
 #[derive(Resource)]
 pub(crate) struct JumpFloodPipeline {
-    pub(crate) layout: BindGroupLayout,
+    pub(crate) layout: BindGroupLayoutDescriptor,
     pub(crate) sampler: Sampler,
     pub(crate) pipeline_id: CachedRenderPipelineId,
     pub(crate) lookup_buffer: DynamicUniformBuffer<JumpFloodUniform>,
@@ -38,7 +39,7 @@ impl FromWorld for JumpFloodPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let layout = render_device.create_bind_group_layout(
+        let layout = BindGroupLayoutDescriptor::new(
             "outline_jump_flood_bind_group_layout",
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
@@ -120,12 +121,13 @@ impl<'w> JumpFloodPass<'w> {
         render_context: &mut RenderContext<'_>,
         input: &CachedTexture,
         output: &CachedTexture,
+        pipeline_cache: &PipelineCache,
         size: u32,
         bounds: &URect,
     ) {
         let bind_group = render_context.render_device().create_bind_group(
             "outline_jump_flood_bind_group",
-            &self.pipeline.layout,
+            &pipeline_cache.get_bind_group_layout(&self.pipeline.layout),
             &BindGroupEntries::sequential((
                 &input.default_view,
                 &self.pipeline.sampler,
