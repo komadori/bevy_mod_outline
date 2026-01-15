@@ -15,7 +15,7 @@ fn main() {
             OutlinePlugin,
             AutoGenerateOutlineNormalsPlugin::default(),
         ))
-        .insert_resource(AmbientLight::default())
+        .insert_resource(GlobalAmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(Update, setup_scene_once_loaded)
         .run();

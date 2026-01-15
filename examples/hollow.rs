@@ -16,7 +16,7 @@ fn main() {
             ),
         )
         .add_plugins(OutlinePlugin)
-        .insert_resource(AmbientLight::default())
+        .insert_resource(GlobalAmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(
             Update,

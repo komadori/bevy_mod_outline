@@ -140,10 +140,10 @@ fn setup(
                             border: UiRect::all(Val::Px(5.0)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::MAX,
                             ..default()
                         },
                         BorderColor::all(Color::BLACK),
-                        BorderRadius::MAX,
                         BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
                         mode,
                     ))
