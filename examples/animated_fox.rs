@@ -67,16 +67,16 @@ fn setup(
         .observe(play_anim_when_ready);
 
     // Plane
-    // commands.spawn((
-    //     Mesh3d(
-    //         meshes.add(
-    //             Plane3d::new(Vec3::Y, Vec2::new(500000.0, 500000.0))
-    //                 .mesh()
-    //                 .build(),
-    //         ),
-    //     ),
-    //     MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3)))),
-    // ));
+    commands.spawn((
+        Mesh3d(
+            meshes.add(
+                Plane3d::new(Vec3::Y, Vec2::new(500000.0, 500000.0))
+                    .mesh()
+                    .build(),
+            ),
+        ),
+        MeshMaterial3d(materials.add(StandardMaterial::from(Color::srgb(0.3, 0.5, 0.3)))),
+    ));
 
     // Light
     commands.spawn((
