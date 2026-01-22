@@ -1,4 +1,5 @@
 use bevy::{
+    camera::visibility::{RenderLayers, SetViewVisibility},
     math::Affine3,
     pbr::SkinUniforms,
     platform::collections::HashMap,
@@ -7,11 +8,10 @@ use bevy::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
         mesh::allocator::MeshAllocator,
         render_asset::RenderAssets,
-        render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, ShaderType},
+        render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, PipelineCache, ShaderType},
         renderer::RenderDevice,
         sync_world::{MainEntity, MainEntityHashMap, RenderEntity},
         texture::{FallbackImage, GpuImage},
-        view::{PreviousVisibleEntities, RenderLayers},
         Extract,
     },
 };
@@ -19,7 +19,7 @@ use bevy::{
 use crate::{
     pipeline::OutlinePipeline,
     pipeline_key::{ComputedOutlineKey, EntityPipelineKey},
-    ComputedOutline, OutlineWarmUp,
+    ComputedOutline, OutlineWarmUp, PreviousVisibleEntities,
 };
 
 #[derive(Clone, Component)]
@@ -103,7 +103,7 @@ pub(crate) fn set_outline_visibility(
     for (entity, mut visibility, computed) in query.iter_mut() {
         if let ComputedOutline(Some(computed)) = computed {
             if computed.volume.value.enabled || computed.stencil.value.enabled {
-                visibility.set();
+                visibility.set_visible();
                 previous_visible.remove(&entity);
             }
         }
@@ -174,13 +174,14 @@ pub(crate) fn extract_outlines(
 pub(crate) fn prepare_outline_instance_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
+    pipeline_cache: Res<PipelineCache>,
     batched_instance_buffer: Res<BatchedInstanceBuffer<OutlineInstanceUniform>>,
     outline_pipeline: Res<OutlinePipeline>,
 ) {
     if let Some(instance_binding) = batched_instance_buffer.instance_data_binding() {
         let bind_group = render_device.create_bind_group(
             "outline_instance_mesh_bind_group",
-            &outline_pipeline.outline_instance_bind_group_layout,
+            &pipeline_cache.get_bind_group_layout(&outline_pipeline.outline_instance_layout),
             &[BindGroupEntry {
                 binding: 0,
                 resource: instance_binding,
@@ -201,12 +202,13 @@ impl FromWorld for AlphaMaskBindGroups {
         let render_device = world.resource::<RenderDevice>();
         let fallback_image = world.resource::<FallbackImage>();
         let outline_pipeline = world.resource::<OutlinePipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
 
         Self {
             bind_groups: HashMap::new(),
             default_bind_group: render_device.create_bind_group(
                 "default_outline_alpha_mask_bind_group",
-                &outline_pipeline.alpha_mask_bind_group_layout,
+                &pipeline_cache.get_bind_group_layout(&outline_pipeline.alpha_mask_layout),
                 &BindGroupEntries::sequential((
                     &fallback_image.d2.texture_view,
                     &fallback_image.d2.sampler,
@@ -219,6 +221,7 @@ impl FromWorld for AlphaMaskBindGroups {
 pub(crate) fn prepare_alpha_mask_bind_groups(
     mut alpha_mask_bind_groups: ResMut<AlphaMaskBindGroups>,
     render_device: Res<RenderDevice>,
+    pipeline_cache: Res<PipelineCache>,
     outline_pipeline: Res<OutlinePipeline>,
     gpu_images: Res<RenderAssets<GpuImage>>,
     outlines: Query<&ExtractedOutline>,
@@ -235,7 +238,8 @@ pub(crate) fn prepare_alpha_mask_bind_groups(
                     .or_insert_with(|| {
                         render_device.create_bind_group(
                             "outline_alpha_mask_bind_group",
-                            &outline_pipeline.alpha_mask_bind_group_layout,
+                            &pipeline_cache
+                                .get_bind_group_layout(&outline_pipeline.alpha_mask_layout),
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &gpu_image.sampler,

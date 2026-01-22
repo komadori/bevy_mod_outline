@@ -32,17 +32,19 @@
 
 use std::any::TypeId;
 
-use bevy::asset::{load_internal_asset, AssetEvents};
+use bevy::asset::{load_internal_asset, AssetEventSystems};
+use bevy::camera::visibility::{RenderLayers, VisibilitySystems};
 use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
+use bevy::mesh::MeshVertexAttribute;
 use bevy::pbr::{MeshInputUniform, MeshUniform};
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use bevy::render::batching::gpu_preprocessing::{self, GpuPreprocessingSupport};
 use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
 use bevy::render::extract_component::UniformComponentPlugin;
-use bevy::render::mesh::MeshVertexAttribute;
-use bevy::render::render_graph::{EmptyNode, RenderGraphApp, RenderLabel, ViewNodeRunner};
+use bevy::render::render_graph::{EmptyNode, RenderGraphExt, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions, PhaseItem,
     SortedRenderPhasePlugin,
@@ -50,9 +52,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::sync_component::SyncComponentPlugin;
-use bevy::render::view::{RenderLayers, VisibilitySystems};
-use bevy::render::{Render, RenderApp, RenderDebugFlags, RenderSet};
-use bevy::transform::TransformSystem;
+use bevy::render::{Render, RenderApp, RenderDebugFlags, RenderSystems};
 use uniforms::extract_outlines;
 use uniforms::AlphaMaskBindGroups;
 use uniforms::RenderOutlineInstances;
@@ -93,9 +93,7 @@ pub use generate::*;
 #[cfg(feature = "flood")]
 mod flood;
 
-#[cfg(feature = "scene")]
 mod scene;
-#[cfg(feature = "scene")]
 pub use scene::*;
 
 /// Legacy bundles.
@@ -390,6 +388,22 @@ fn add_dummy_phase_buffers(
     add_dummy_phase_buffer::<TransparentOutline>(&mut bibs);
 }
 
+// Adding previous visible entities since it was removed from core bevy
+#[derive(Resource, Clone, Default)]
+pub struct PreviousVisibleEntities {
+    pub entities: HashSet<Entity>,
+}
+
+impl PreviousVisibleEntities {
+    pub fn add(&mut self, entity: Entity) {
+        self.entities.insert(entity);
+    }
+
+    pub fn remove(&mut self, entity: &Entity) {
+        self.entities.remove(entity);
+    }
+}
+
 /// Adds support for rendering outlines.
 pub struct OutlinePlugin;
 
@@ -426,16 +440,17 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
+        .init_resource::<PreviousVisibleEntities>()
         .init_resource::<OutlineEntitiesChanged>()
         .add_systems(
             PostUpdate,
             (
                 compute_outline
-                    .after(TransformSystem::TransformPropagate)
+                    .after(TransformSystems::Propagate)
                     .after(VisibilitySystems::VisibilityPropagate),
                 compute_outline_key
                     .after(compute_outline)
-                    .after(AssetEvents),
+                    .after(AssetEventSystems),
                 check_outline_entities_changed.after(compute_outline_key),
                 set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
             ),
@@ -458,7 +473,7 @@ impl Plugin for OutlinePlugin {
         )
         .add_systems(
             Render,
-            msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSet::Prepare),
+            msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSystems::Prepare),
         )
         .add_systems(
             Render,
@@ -467,19 +482,25 @@ impl Plugin for OutlinePlugin {
                 prepare_outline_instance_bind_group,
                 prepare_alpha_mask_bind_groups,
             )
-                .in_set(RenderSet::PrepareBindGroups),
+                .in_set(RenderSystems::PrepareBindGroups),
         )
-        .add_systems(Render, specialise_outlines.in_set(RenderSet::PrepareMeshes))
-        .add_systems(Render, queue_outline_mesh.in_set(RenderSet::QueueMeshes))
         .add_systems(
             Render,
-            sort_phase_system::<TransparentOutline>.in_set(RenderSet::PhaseSort),
+            specialise_outlines.in_set(RenderSystems::PrepareMeshes),
+        )
+        .add_systems(
+            Render,
+            queue_outline_mesh.in_set(RenderSystems::QueueMeshes),
+        )
+        .add_systems(
+            Render,
+            sort_phase_system::<TransparentOutline>.in_set(RenderSystems::PhaseSort),
         )
         .add_systems(
             Render,
             clear_batched_cpu_instance_buffers::<OutlinePipeline>
-                .in_set(RenderSet::Cleanup)
-                .after(RenderSet::Render),
+                .in_set(RenderSystems::Cleanup)
+                .after(RenderSystems::Render),
         )
         .add_render_graph_node::<ViewNodeRunner<MsaaExtraWritebackNode>>(
             Core3d,
@@ -510,7 +531,6 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineAlphaMask>()
             .register_type::<InheritOutline>();
 
-        #[cfg(feature = "scene")]
         app.init_resource::<AsyncSceneInheritOutlineSystems>();
 
         #[cfg(feature = "flood")]
@@ -526,18 +546,19 @@ impl Plugin for OutlinePlugin {
             .init_resource::<AlphaMaskBindGroups>();
 
         let render_device = render_app.world().resource::<RenderDevice>();
-        let instance_buffer = BatchedInstanceBuffer::<OutlineInstanceUniform>::new(render_device);
+        let instance_buffer =
+            BatchedInstanceBuffer::<OutlineInstanceUniform>::new(&render_device.limits());
         render_app.insert_resource(instance_buffer).add_systems(
             Render,
             write_batched_instance_buffer::<OutlinePipeline>
-                .in_set(RenderSet::PrepareResourcesFlush),
+                .in_set(RenderSystems::PrepareResourcesFlush),
         );
 
         let gpu_preprocessing_support = render_app.world().resource::<GpuPreprocessingSupport>();
         if gpu_preprocessing_support.is_available() {
             render_app.add_systems(
                 Render,
-                add_dummy_phase_buffers.in_set(RenderSet::PrepareResourcesCollectPhaseBuffers),
+                add_dummy_phase_buffers.in_set(RenderSystems::PrepareResourcesCollectPhaseBuffers),
             );
         }
     }

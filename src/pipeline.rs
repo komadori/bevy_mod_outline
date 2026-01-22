@@ -1,34 +1,33 @@
 use std::borrow::Cow;
 
-use bevy::asset::weak_handle;
+use bevy::asset::uuid_handle;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
+use bevy::mesh::MeshVertexBufferLayoutRef;
 use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, SkinUniforms};
 use bevy::prelude::*;
 use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
 use bevy::render::render_resource::{
-    BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
-    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, ShaderDefVal, ShaderStages,
-    ShaderType, StencilState, TextureFormat, VertexState,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, PushConstantRange,
+    SamplerBindingType, ShaderStages, ShaderType, StencilState, TextureFormat, TextureSampleType,
+    VertexState,
 };
 use bevy::render::renderer::RenderDevice;
-use bevy::render::settings::WgpuSettings;
+use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::ViewTarget;
+use bevy::shader::ShaderDefVal;
 use bevy::{
     pbr::MeshPipeline,
-    render::{
-        mesh::MeshVertexBufferLayoutRef,
-        render_resource::{
-            RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
-        },
+    render::render_resource::{
+        RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
     },
 };
 use nonmax::NonMaxU32;
-use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
 use crate::pipeline_key::{DerivedPipelineKey, PassType};
 use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances};
@@ -36,20 +35,20 @@ use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
 pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
+    uuid_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
 
 pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
+    uuid_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
 
 pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
+    uuid_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
 
 #[derive(Resource)]
 pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
-    pub outline_view_bind_group_layout: BindGroupLayout,
-    pub outline_instance_bind_group_layout: BindGroupLayout,
-    pub alpha_mask_bind_group_layout: BindGroupLayout,
+    pub outline_view_layout: BindGroupLayoutDescriptor,
+    pub outline_instance_layout: BindGroupLayoutDescriptor,
+    pub alpha_mask_layout: BindGroupLayoutDescriptor,
     pub instance_batch_size: Option<u32>,
     pub skins_use_uniform_buffers: bool,
 }
@@ -58,22 +57,23 @@ impl FromWorld for OutlinePipeline {
     fn from_world(world: &mut World) -> Self {
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let outline_view_bind_group_layout = render_device.create_bind_group_layout(
-            "outline_view_bind_group_layout",
+
+        let outline_view_layout = BindGroupLayoutDescriptor::new(
+            "outline_view_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
                 uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
             ),
         );
-        let outline_instance_bind_group_layout = render_device.create_bind_group_layout(
-            "outline_instance_bind_group_layout",
+        let outline_instance_layout = BindGroupLayoutDescriptor::new(
+            "outline_instance_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
-                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(render_device),
+                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(&render_device.limits()),
             ),
         );
-        let alpha_mask_bind_group_layout = render_device.create_bind_group_layout(
-            "alpha_mask_bind_group_layout",
+        let alpha_mask_layout = BindGroupLayoutDescriptor::new(
+            "alpha_mask_layout",
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
                 (
@@ -84,13 +84,14 @@ impl FromWorld for OutlinePipeline {
         );
 
         let instance_batch_size =
-            GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
-        let skins_use_uniform_buffers = skins_use_uniform_buffers(render_device);
+            GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(&render_device.limits());
+        let skins_use_uniform_buffers = skins_use_uniform_buffers(&render_device.limits());
+
         OutlinePipeline {
             mesh_pipeline,
-            outline_view_bind_group_layout,
-            outline_instance_bind_group_layout,
-            alpha_mask_bind_group_layout,
+            outline_view_layout,
+            outline_instance_layout,
+            alpha_mask_layout,
             instance_batch_size,
             skins_use_uniform_buffers,
         }
@@ -111,7 +112,8 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         let mut buffer_attrs = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
 
         let bind_layouts = vec![
-            self.outline_view_bind_group_layout.clone(),
+            self.outline_view_layout.clone(),
+            self.outline_instance_layout.clone(),
             setup_morph_and_skinning_defs(
                 &self.mesh_pipeline.mesh_layouts,
                 layout,
@@ -121,8 +123,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 &mut buffer_attrs,
                 self.skins_use_uniform_buffers,
             ),
-            self.outline_instance_bind_group_layout.clone(),
-            self.alpha_mask_bind_group_layout.clone(),
+            self.alpha_mask_layout.clone(),
         ];
 
         if key.alpha_mask_texture() {
@@ -231,14 +232,14 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE,
-                entry_point: "vertex".into(),
+                entry_point: Some("vertex".into()),
                 shader_defs: vertex_defs,
                 buffers,
             },
             fragment: Some(FragmentState {
                 shader: FRAGMENT_SHADER_HANDLE,
                 shader_defs: fragment_defs,
-                entry_point: "fragment".into(),
+                entry_point: Some("fragment".into()),
                 targets,
             }),
             layout: bind_layouts,

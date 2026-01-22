@@ -1,8 +1,9 @@
 use std::ops::BitOr;
 
-use bevy::{math::Vec3, pbr::MeshPipelineKey, prelude::*, render::view::Msaa};
+use bevy::{
+    math::Vec3, mesh::PrimitiveTopology, pbr::MeshPipelineKey, prelude::*, render::view::Msaa,
+};
 use bitfield::{bitfield_bitrange, bitfield_fields};
-use wgpu_types::PrimitiveTopology;
 
 use crate::{uniforms::DepthMode, ComputedOutline, TextureChannel};
 

@@ -115,12 +115,13 @@ impl ViewNode for FloodNode {
         &'static ComposeOutputView,
     );
 
-    fn run<'w>(
+    fn run<'w, 's>(
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
         (view, camera, target, depth, view_uniform, flood_textures, compose_output_view): QueryItem<
             'w,
+            's,
             Self::ViewQuery,
         >,
         world: &'w World,
@@ -188,6 +189,7 @@ impl ViewNode for FloodNode {
                     flood_textures.output(),
                     size,
                     &screen_space_bounds,
+                    world,
                 );
                 flood_textures.flip();
             }
@@ -198,6 +200,7 @@ impl ViewNode for FloodNode {
                 first_item.entity,
                 flood_textures.input(),
                 &screen_space_bounds,
+                world,
             );
         }
 

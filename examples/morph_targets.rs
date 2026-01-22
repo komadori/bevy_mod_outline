@@ -25,7 +25,7 @@ fn main() {
             OutlinePlugin,
             AutoGenerateOutlineNormalsPlugin::default(),
         ))
-        .insert_resource(AmbientLight::default())
+        .insert_resource(GlobalAmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (name_morphs, setup_outlines, setup_animations))
         .run();
@@ -50,6 +50,7 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
             colour: Color::srgb(1.0, 0.0, 0.0),
         },
     ));
+
     commands.spawn(DirectionalLight {
         color: Color::WHITE,
         illuminance: 19350.0,

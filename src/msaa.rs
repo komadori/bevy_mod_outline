@@ -17,6 +17,7 @@ use bevy::{
         view::{Msaa, ViewTarget},
     },
 };
+use wgpu::Color;
 
 #[derive(Component)]
 pub(crate) struct MsaaExtraWritebackPipeline(CachedRenderPipelineId);
@@ -32,11 +33,11 @@ impl FromWorld for MsaaExtraWritebackNode {
 impl ViewNode for MsaaExtraWritebackNode {
     type ViewQuery = (&'static ViewTarget, &'static MsaaExtraWritebackPipeline);
 
-    fn run<'w>(
+    fn run<'w, 's>(
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (target, blit_pipeline_id): QueryItem<'w, Self::ViewQuery>,
+        (target, blit_pipeline_id): QueryItem<'w, 's, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let blit_pipeline = world.resource::<BlitPipeline>();
@@ -51,9 +52,10 @@ impl ViewNode for MsaaExtraWritebackNode {
             label: Some("msaa_extra_writeback"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: target.sampled_main_texture_view().unwrap(),
+                depth_slice: None,
                 resolve_target: Some(post_process.destination),
                 ops: Operations {
-                    load: LoadOp::Clear(wgpu_types::Color::BLACK),
+                    load: LoadOp::Clear(Color::BLACK),
                     store: StoreOp::Store,
                 },
             })],
@@ -64,7 +66,7 @@ impl ViewNode for MsaaExtraWritebackNode {
 
         let bind_group = render_context.render_device().create_bind_group(
             None,
-            &blit_pipeline.texture_bind_group,
+            &pipeline_cache.get_bind_group_layout(&blit_pipeline.layout),
             &BindGroupEntries::sequential((post_process.source, &blit_pipeline.sampler)),
         );
 

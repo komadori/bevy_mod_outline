@@ -211,10 +211,10 @@ fn create_buttons<T: Component + States>(builder: &mut ChildSpawnerCommands, val
                             border: UiRect::all(Val::Px(5.0)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::MAX,
                             ..default()
                         },
-                        BorderColor(Color::BLACK),
-                        BorderRadius::MAX,
+                        BorderColor::from(Color::BLACK),
                         BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
                         value.clone(),
                     ))
@@ -233,9 +233,9 @@ fn highlight<T: Component + States>(
 ) {
     for (mut border, m) in query.iter_mut() {
         *border = if m == state.get() {
-            BorderColor(Color::srgb(0.0, 0.0, 1.0))
+            BorderColor::from(Color::srgb(0.0, 0.0, 1.0))
         } else {
-            BorderColor(Color::BLACK)
+            BorderColor::from(Color::BLACK)
         };
     }
 }
@@ -259,7 +259,7 @@ fn interaction<T: Component + FreelyMutableState>(
 
 fn change_mode(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawMethod>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawMethod>>,
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {
@@ -278,7 +278,7 @@ fn change_mode(
 
 fn change_shape(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawShape>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawShape>>,
     query: Query<Entity, With<TheObject>>,
     shapes: Res<Shapes>,
 ) {
@@ -293,7 +293,7 @@ fn change_shape(
 
 fn change_orientation(
     mut commands: Commands,
-    mut reader: EventReader<StateTransitionEvent<DrawOrientation>>,
+    mut reader: MessageReader<StateTransitionEvent<DrawOrientation>>,
     query: Query<Entity, With<TheObject>>,
 ) {
     for event in reader.read() {

@@ -1,6 +1,5 @@
 use bevy::{
-    core_pipeline::{
-        experimental::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing},
+    anti_alias::{
         fxaa::Fxaa,
         smaa::{Smaa, SmaaPreset},
     },
@@ -13,7 +12,7 @@ use bevy_mod_outline::*;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
-        .add_plugins((DefaultPlugins, TemporalAntiAliasPlugin, OutlinePlugin))
+        .add_plugins((DefaultPlugins, OutlinePlugin))
         .insert_state(AAMode::NoAA)
         .add_systems(Startup, setup)
         .add_systems(Update, (bounce, highlight, interaction))
@@ -57,22 +56,6 @@ fn main() {
             OnExit(AAMode::SMAA),
             |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
                 commands.entity(query.single().unwrap()).remove::<Smaa>();
-            },
-        )
-        .add_systems(
-            OnEnter(AAMode::TAA),
-            |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands
-                    .entity(query.single().unwrap())
-                    .insert(TemporalAntiAliasing::default());
-            },
-        )
-        .add_systems(
-            OnExit(AAMode::TAA),
-            |mut query: Query<Entity, With<TheCamera>>, mut commands: Commands| {
-                commands
-                    .entity(query.single().unwrap())
-                    .remove::<TemporalAntiAliasing>();
             },
         )
         .run();
@@ -140,10 +123,10 @@ fn setup(
                             border: UiRect::all(Val::Px(5.0)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::MAX,
                             ..default()
                         },
-                        BorderColor(Color::BLACK),
-                        BorderRadius::MAX,
+                        BorderColor::from(Color::BLACK),
                         BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
                         mode,
                     ))
@@ -182,9 +165,9 @@ fn bounce(mut query: Query<&mut Transform, With<Bounce>>, timer: Res<Time>, mut 
 fn highlight(mut query: Query<(&mut BorderColor, &AAMode)>, state: Res<State<AAMode>>) {
     for (mut border, m) in query.iter_mut() {
         *border = if m == state.get() {
-            BorderColor(Color::srgb(0.0, 0.0, 1.0))
+            BorderColor::from(Color::srgb(0.0, 0.0, 1.0))
         } else {
-            BorderColor(Color::BLACK)
+            BorderColor::from(Color::BLACK)
         };
     }
 }

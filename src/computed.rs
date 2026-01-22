@@ -1,4 +1,5 @@
-use bevy::{ecs::query::QueryItem, prelude::*, render::view::RenderLayers};
+use bevy::camera::visibility::RenderLayers;
+use bevy::{ecs::query::QueryItem, prelude::*};
 
 use crate::{
     pipeline_key::ComputedOutlineKey,
@@ -215,7 +216,7 @@ fn update_computed_outline(
         fallback_layers,
         alpha_mask,
         warm_up,
-    ): QueryItem<'_, OutlineComponents>,
+    ): QueryItem<'_, '_, OutlineComponents>,
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,

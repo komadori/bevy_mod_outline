@@ -1,11 +1,11 @@
 use bevy::{
-    core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    core_pipeline::FullscreenShader,
     prelude::*,
     render::{
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
-            DynamicUniformBuffer, FragmentState, Operations, PipelineCache,
+            BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
+            CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, Operations, PipelineCache,
             RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
             RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType,
         },
@@ -13,7 +13,7 @@ use bevy::{
         texture::CachedTexture,
     },
 };
-use wgpu_types::{
+use wgpu::{
     ColorTargetState, ColorWrites, MultisampleState, PrimitiveState, SamplerBindingType,
     ShaderStages, TextureFormat, TextureSampleType,
 };
@@ -22,13 +22,13 @@ use super::JUMP_FLOOD_SHADER_HANDLE;
 
 #[derive(ShaderType)]
 pub(crate) struct JumpFloodUniform {
-    #[align(16)]
+    #[shader(align(16))]
     pub(crate) size: u32,
 }
 
 #[derive(Resource)]
 pub(crate) struct JumpFloodPipeline {
-    pub(crate) layout: BindGroupLayout,
+    pub(crate) layout: BindGroupLayoutDescriptor,
     pub(crate) sampler: Sampler,
     pub(crate) pipeline_id: CachedRenderPipelineId,
     pub(crate) lookup_buffer: DynamicUniformBuffer<JumpFloodUniform>,
@@ -38,8 +38,9 @@ pub(crate) struct JumpFloodPipeline {
 impl FromWorld for JumpFloodPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
+        let vertex_layout = world.resource::<FullscreenShader>().to_vertex_state();
 
-        let layout = render_device.create_bind_group_layout(
+        let layout = BindGroupLayoutDescriptor::new(
             "outline_jump_flood_bind_group_layout",
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
@@ -59,11 +60,11 @@ impl FromWorld for JumpFloodPipeline {
                 .queue_render_pipeline(RenderPipelineDescriptor {
                     label: Some("outline_jump_flood_pipeline".into()),
                     layout: vec![layout.clone()],
-                    vertex: fullscreen_shader_vertex_state(),
+                    vertex: vertex_layout,
                     fragment: Some(FragmentState {
                         shader: JUMP_FLOOD_SHADER_HANDLE,
                         shader_defs: vec![],
-                        entry_point: "fragment".into(),
+                        entry_point: Some("fragment".into()),
                         targets: vec![Some(ColorTargetState {
                             format: TextureFormat::Rgba16Float,
                             blend: None,
@@ -122,10 +123,13 @@ impl<'w> JumpFloodPass<'w> {
         output: &CachedTexture,
         size: u32,
         bounds: &URect,
+        world: &'w World,
     ) {
+        let pipeline_cache = world.resource::<PipelineCache>();
+
         let bind_group = render_context.render_device().create_bind_group(
             "outline_jump_flood_bind_group",
-            &self.pipeline.layout,
+            &pipeline_cache.get_bind_group_layout(&self.pipeline.layout),
             &BindGroupEntries::sequential((
                 &input.default_view,
                 &self.pipeline.sampler,
@@ -137,6 +141,7 @@ impl<'w> JumpFloodPass<'w> {
             label: Some("outline_jump_flood_pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: &output.default_view,
+                depth_slice: None,
                 resolve_target: None,
                 ops: Operations::default(),
             })],

@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode;
 use bevy::render::extract_component::ComponentUniforms;
 use bevy::render::render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases};
-use bevy::render::render_resource::ShaderType;
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
+use bevy::render::render_resource::{PipelineCache, ShaderType};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::sync_world::RenderEntity;
 use bevy::render::view::RetainedViewEntity;
@@ -15,7 +15,7 @@ use crate::pipeline::OutlinePipeline;
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineViewUniform {
-    #[align(16)]
+    #[shader(align(16))]
     pub clip_from_world: Mat4,
     pub world_from_view_a: [Vec4; 2],
     pub world_from_view_b: f32,
@@ -58,7 +58,7 @@ pub(crate) fn extract_outline_view_uniforms(
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
-            let view_from_world = transform.compute_matrix().inverse();
+            let view_from_world = transform.to_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             commands
                 .entity(entity.id())
@@ -84,12 +84,13 @@ pub(crate) fn prepare_outline_view_bind_group(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
+    pipeline_cache: Res<PipelineCache>,
     view_uniforms: Res<ComponentUniforms<OutlineViewUniform>>,
 ) {
     if let Some(view_binding) = view_uniforms.binding() {
         let bind_group = render_device.create_bind_group(
             "outline_view_bind_group",
-            &outline_pipeline.outline_view_bind_group_layout,
+            &pipeline_cache.get_bind_group_layout(&outline_pipeline.outline_view_layout),
             &[BindGroupEntry {
                 binding: 0,
                 resource: view_binding.clone(),

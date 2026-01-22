@@ -1,11 +1,9 @@
 use bevy::{
     math::FloatOrd,
+    mesh::{Indices, VertexAttributeValues},
     platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::{
-        mesh::{Indices, VertexAttributeValues},
-        render_resource::{PrimitiveTopology, VertexFormat},
-    },
+    render::render_resource::{PrimitiveTopology, VertexFormat},
 };
 
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
@@ -188,7 +186,7 @@ impl OutlineMeshExt for Mesh {
 
 fn auto_generate_outline_normals(
     mut meshes: ResMut<Assets<Mesh>>,
-    mut events: EventReader<'_, '_, AssetEvent<Mesh>>,
+    mut events: MessageReader<'_, '_, AssetEvent<Mesh>>,
     mut squelch: Local<HashSet<AssetId<Mesh>>>,
     plugin: Res<AutoGenerateOutlineNormalsPlugin>,
 ) {

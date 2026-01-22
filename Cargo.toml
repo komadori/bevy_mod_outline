@@ -1,7 +1,7 @@
 [package]
 name = "bevy_mod_outline"
-version = "0.10.3"
-edition = "2021"
+version = "0.11.0"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "A mesh outlining plugin for Bevy."
 readme = "README.md"
@@ -11,7 +11,14 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.16.0", default-features = false, features = [
+bevy = { version = "0.18.0", default-features = false, features = [
+    "async_executor",
+    "bevy_anti_alias",
+    "bevy_post_process",
+    "bevy_animation",
+    "bevy_gltf",
+    "gltf_animation",
+    "bevy_scene",
     "std",
     "async_executor",
     "bevy_log",
@@ -19,24 +26,29 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "bevy_image",
     "bevy_pbr",
 ] }
-bitfield = "0.15"
+bitfield = "0.19.4"
 interpolation = { version = "0.3", optional = true }
-thiserror = "1.0"
+thiserror = "2.0.18"
 nonmax = "0.5"
-wgpu-types = "24"
 itertools = { version = "0.14", optional = true }
+wgpu = "27.0.1"
 
 [features]
-default = ["flood", "interpolation", "reflect", "scene"]
+default = ["flood", "interpolation", "reflect"]
 flood = ["dep:itertools"]
 reflect = []
-scene = ["bevy/bevy_scene"]
 
 [dev-dependencies]
-bevy = { version = "0.16.0", default-features = false, features = [
-    "animation",
+bevy = { version = "0.18.0", default-features = true, features = [
+    "debug",
+    "bevy_animation",
+    "gltf_animation",
+    "bevy_scene",
+    "bevy_anti_alias",
+    "bevy_picking",
+    "mesh_picking",
+    "bevy_post_process",
     "bevy_gltf",
-    "bevy_mesh_picking_backend",
     "bevy_pbr",
     "bevy_sprite",
     "bevy_state",
@@ -50,7 +62,7 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "ktx2",
     "smaa_luts",
     "tonemapping_luts",
-    "zstd",
+    "zstd_rust",
 ] }
 
 [[example]]

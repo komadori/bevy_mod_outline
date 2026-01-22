@@ -1,11 +1,13 @@
 use std::ops::Range;
 
+use bevy::camera::visibility::RenderLayers;
+use bevy::camera::Viewport;
 use bevy::prelude::*;
-use bevy::render::camera::{ExtractedCamera, Viewport};
+use bevy::render::camera::ExtractedCamera;
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::{ExtractedView, RenderLayers};
+use bevy::render::view::ExtractedView;
 use bevy::render::{
     render_phase::SortedRenderPhase,
     render_resource::{
@@ -14,7 +16,7 @@ use bevy::render::{
     renderer::RenderContext,
     texture::CachedTexture,
 };
-use wgpu_types::ImageSubresourceRange;
+use wgpu::{Color, ImageSubresourceRange};
 
 use crate::queue::{OutlineCache, OutlineCacheEntry, OutlineRangefinder};
 use crate::uniforms::ExtractedOutline;
@@ -64,9 +66,9 @@ pub(crate) fn queue_flood_meshes(
         };
         let viewport = camera.viewport.as_ref().unwrap_or(&fallback_viewport);
 
-        let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
-            view.clip_from_view * view.world_from_view.compute_matrix().inverse()
-        });
+        let clip_from_world = view
+            .clip_from_world
+            .unwrap_or_else(|| view.clip_from_view * view.world_from_view.to_matrix().inverse());
 
         let rangefinder = OutlineRangefinder::new(view);
 
@@ -162,9 +164,10 @@ impl<'w> FloodInitPass<'w> {
 
         let color_attachment = RenderPassColorAttachment {
             view: &output.default_view,
+            depth_slice: None,
             resolve_target: None,
             ops: Operations {
-                load: LoadOp::Clear(wgpu_types::Color {
+                load: LoadOp::Clear(Color {
                     r: -1.0,
                     g: -1.0,
                     b: -1.0,

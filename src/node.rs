@@ -12,13 +12,12 @@ use bevy::render::render_phase::{
     ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{
-    CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-    StoreOp,
+    CachedRenderPipelineId, ImageSubresourceRange, Operations, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, StoreOp,
 };
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
-use wgpu_types::ImageSubresourceRange;
 
 use crate::view_uniforms::OutlineQueueStatus;
 
@@ -265,11 +264,11 @@ impl ViewNode for OutlineNode {
         &'static OutlineQueueStatus,
     );
 
-    fn run<'w>(
+    fn run<'w, 's>(
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, camera, camera_3d, target, depth, queue_status): QueryItem<'w, Self::ViewQuery>,
+        (view, camera, camera_3d, target, depth, queue_status): QueryItem<'w, 's, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();

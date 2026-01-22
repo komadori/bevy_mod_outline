@@ -1,10 +1,7 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
-use bevy_mod_outline::{
-    AsyncSceneInheritOutline, OutlinePlugin, OutlineStencil, OutlineVolume,
-    ATTRIBUTE_OUTLINE_NORMAL,
-};
+use bevy_mod_outline::{OutlinePlugin, OutlineStencil, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL};
 
 fn main() {
     App::new()
@@ -16,7 +13,7 @@ fn main() {
             ),
         )
         .add_plugins(OutlinePlugin)
-        .insert_resource(AmbientLight::default())
+        .insert_resource(GlobalAmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -38,7 +35,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_xyz(20.0, 20.0, 30.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
     ));
 
-    // Light
     commands.spawn((
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
         DirectionalLight {
@@ -60,7 +56,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             enabled: true,
             offset: 0.0,
         },
-        AsyncSceneInheritOutline::default(),
     ));
 }
 
