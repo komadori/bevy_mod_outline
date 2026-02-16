@@ -23,7 +23,7 @@ use super::JUMP_FLOOD_SHADER_HANDLE;
 #[derive(ShaderType)]
 pub(crate) struct JumpFloodUniform {
     pub(crate) size: u32,
-    _padding: Vec3
+    _padding: Vec3,
 }
 
 #[derive(Resource)]
@@ -85,7 +85,10 @@ impl FromWorld for JumpFloodPipeline {
         );
         let mut offsets = Vec::new();
         for bit in 0..32 {
-            offsets.push(uniform_buffer.push(&JumpFloodUniform { size: 1 << bit, _padding: Vec3::default() }));
+            offsets.push(uniform_buffer.push(&JumpFloodUniform {
+                size: 1 << bit,
+                _padding: Vec3::default(),
+            }));
         }
         uniform_buffer.write_buffer(render_device, render_queue);
 
