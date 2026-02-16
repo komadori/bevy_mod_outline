@@ -180,7 +180,7 @@ fn lerp_stencil_enabled(
             (OutlineStencilEnabled::Always, _) => OutlineStencilEnabled::Always,
             (_, OutlineStencilEnabled::Always) => OutlineStencilEnabled::Always,
             (OutlineStencilEnabled::IfVolume, _) => OutlineStencilEnabled::IfVolume,
-            (_, OutlineStencilEnabled::IfVolume) => OutlineStencilEnabled::Never,
+            (_, OutlineStencilEnabled::IfVolume) => OutlineStencilEnabled::IfVolume,
             _ => OutlineStencilEnabled::Never,
         }
     }
