@@ -16,7 +16,6 @@ use bevy::render::{
     renderer::RenderContext,
     texture::CachedTexture,
 };
-use wgpu_types::ImageSubresourceRange;
 
 use crate::queue::{OutlineCache, OutlineCacheEntry, OutlineRangefinder};
 use crate::uniforms::ExtractedOutline;
@@ -158,10 +157,6 @@ impl<'w> FloodInitPass<'w> {
         range: Range<usize>,
         output: &CachedTexture,
     ) {
-        render_context
-            .command_encoder()
-            .clear_texture(&output.texture, &ImageSubresourceRange::default());
-
         let color_attachment = RenderPassColorAttachment {
             view: &output.default_view,
             depth_slice: None,
