@@ -99,7 +99,7 @@ pub(crate) struct OutlineInstanceBindGroup {
 pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
     for (mut visibility, computed) in query.iter_mut() {
         if let ComputedOutline(Some(computed)) = computed {
-            if computed.volume.value.enabled || computed.stencil.value.enabled {
+            if computed.volume.value.enabled || computed.stencil.value.enabled.is_enabled(computed.volume.value.enabled) {
                 visibility.set_visible();
             }
         }
@@ -131,7 +131,11 @@ pub(crate) fn extract_outlines(
             continue;
         };
         let extracted_outline = ExtractedOutline {
-            stencil: computed.stencil.value.enabled,
+            stencil: computed
+                .stencil
+                .value
+                .enabled
+                .is_enabled(computed.volume.value.enabled),
             volume: computed.volume.value.enabled,
             draw_mode: computed.mode.value.draw_mode,
             layers: computed.layers.value.clone(),

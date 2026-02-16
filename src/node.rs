@@ -18,7 +18,6 @@ use bevy::render::render_resource::{
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
 use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
-use wgpu_types::ImageSubresourceRange;
 
 use crate::view_uniforms::OutlineQueueStatus;
 
@@ -289,10 +288,6 @@ impl ViewNode for OutlineNode {
 
         // If drawing anything, run stencil pass to clear the depth buffer
         if queue_status.has_volume {
-            render_context
-                .command_encoder()
-                .clear_texture(&depth.texture, &ImageSubresourceRange::default());
-
             let pass_descriptor = RenderPassDescriptor {
                 label: Some("outline_stencil_pass"),
                 color_attachments: &[],
