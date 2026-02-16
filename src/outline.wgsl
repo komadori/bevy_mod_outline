@@ -41,9 +41,9 @@ var<uniform> view_uniform: OutlineViewUniform;
 #import bevy_pbr::morph
 
 #ifdef INSTANCE_BATCH_SIZE
-@group(2) @binding(0) var<uniform> mesh: array<Instance, #{INSTANCE_BATCH_SIZE}u>;
+@group(1) @binding(0) var<uniform> mesh: array<Instance, #{INSTANCE_BATCH_SIZE}u>;
 #else
-@group(2) @binding(0) var<storage> mesh: array<Instance>;
+@group(1) @binding(0) var<storage> mesh: array<Instance>;
 #endif
 
 #ifdef MORPH_TARGETS

@@ -1,8 +1,9 @@
-use bevy::asset::{load_internal_asset, weak_handle};
+use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::render::batching::gpu_preprocessing::{BatchedInstanceBuffers, GpuPreprocessingSupport};
 use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
+use bevy::render::render_graph::RenderGraphExt;
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
 };
@@ -11,13 +12,13 @@ use bevy::{
     prelude::*,
     render::{
         camera::ExtractedCamera,
-        render_graph::{RenderGraphApp, ViewNodeRunner},
+        render_graph::ViewNodeRunner,
         render_resource::{
             Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
         },
         renderer::RenderDevice,
         texture::{CachedTexture, TextureCache},
-        Render, RenderApp, RenderSet,
+        Render, RenderApp, RenderSystems,
     },
 };
 use compose_output::{
@@ -41,9 +42,9 @@ mod jump_flood;
 mod node;
 
 const JUMP_FLOOD_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("66f5981f-0cc2-4e62-8221-cd495062f3ac");
+    uuid_handle!("66f5981f-0cc2-4e62-8221-cd495062f3ac");
 const COMPOSE_OUTPUT_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("3c0c1990-4202-48ef-8aa4-bbbb3a334471");
+    uuid_handle!("3c0c1990-4202-48ef-8aa4-bbbb3a334471");
 
 #[derive(Clone, Component)]
 pub(crate) struct FloodTextures {
@@ -144,23 +145,23 @@ impl Plugin for FloodPlugin {
         .add_systems(
             Render,
             prepare_flood_phases
-                .after(RenderSet::ExtractCommands)
-                .before(RenderSet::QueueMeshes),
+                .after(RenderSystems::ExtractCommands)
+                .before(RenderSystems::QueueMeshes),
         )
         .add_systems(
             Render,
             prepare_compose_output_uniform
-                .after(RenderSet::ExtractCommands)
-                .before(RenderSet::PrepareResources),
+                .after(RenderSystems::ExtractCommands)
+                .before(RenderSystems::PrepareResources),
         )
         .add_systems(
             Render,
-            (prepare_flood_textures, prepare_compose_output_pass).in_set(RenderSet::Prepare),
+            (prepare_flood_textures, prepare_compose_output_pass).in_set(RenderSystems::Prepare),
         )
-        .add_systems(Render, queue_flood_meshes.in_set(RenderSet::QueueMeshes))
+        .add_systems(Render, queue_flood_meshes.in_set(RenderSystems::QueueMeshes))
         .add_systems(
             Render,
-            sort_phase_system::<FloodOutline>.in_set(RenderSet::PhaseSort),
+            sort_phase_system::<FloodOutline>.in_set(RenderSystems::PhaseSort),
         )
         .add_render_graph_node::<ViewNodeRunner<FloodNode>>(Core3d, NodeOutline::FloodPass)
         .add_render_graph_edges(
@@ -183,7 +184,7 @@ impl Plugin for FloodPlugin {
         if gpu_preprocessing_support.is_available() {
             render_app.add_systems(
                 Render,
-                add_dummy_phase_buffers.in_set(RenderSet::PrepareResourcesCollectPhaseBuffers),
+                add_dummy_phase_buffers.in_set(RenderSystems::PrepareResourcesCollectPhaseBuffers),
             );
         }
     }
