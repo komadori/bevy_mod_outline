@@ -1,5 +1,17 @@
 # Changelog
 
+## bevy_mod_outline 0.11.0 (2026-02-16)
+
+### Fixed
+- Fixed WebGPU support by removing clear_texture() calls.
+
+### Added
+- Added OutlineStencilEnabled.
+
+### Changed
+- Updated Bevy dependency to 0.17.
+- Changed default stencil enable to be conditional upon volume enable.
+
 ## bevy_mod_outline 0.10.3 (2025-08-24)
 
 ### Added
