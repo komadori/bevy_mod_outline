@@ -4,7 +4,7 @@ use crate::{
     pipeline_key::ComputedOutlineKey,
     uniforms::{DepthMode, DrawMode},
     InheritOutline, OutlineAlphaMask, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
-    OutlineStencil, OutlineVolume, OutlineWarmUp,
+    OutlineStencil, OutlineStencilEnabled, OutlineVolume, OutlineWarmUp,
 };
 
 #[derive(Clone)]
@@ -16,7 +16,7 @@ pub(crate) struct ComputedVolume {
 
 #[derive(Clone)]
 pub(crate) struct ComputedStencil {
-    pub(crate) enabled: bool,
+    pub(crate) enabled: OutlineStencilEnabled,
     pub(crate) offset: f32,
 }
 
@@ -53,12 +53,22 @@ impl<T: Clone> Sourced<T> {
         inherit: Option<T>,
         f: impl FnOnce(&U) -> T,
     ) -> Self {
-        Self::set_with_fallback::<U, U>(value, None, inherit, f)
+        Self::set_with_fallback::<U, U>(value, None, &U::default(), inherit, f)
     }
 
-    pub fn set_with_fallback<U: Default, V: Clone + Into<U>>(
+    pub fn set_with_default<U: Clone + Default>(
+        value: Option<Ref<U>>,
+        default: &U,
+        inherit: Option<T>,
+        f: impl FnOnce(&U) -> T,
+    ) -> Self {
+        Self::set_with_fallback::<U, U>(value, None, default, inherit, f)
+    }
+
+    pub fn set_with_fallback<U, V: Clone + Into<U>>(
         value: Option<Ref<U>>,
         fallback: Option<Ref<V>>,
+        default: &U,
         inherit: Option<T>,
         f: impl FnOnce(&U) -> T,
     ) -> Self {
@@ -79,7 +89,7 @@ impl<T: Clone> Sourced<T> {
             }
         } else {
             Sourced {
-                value: f(&U::default()),
+                value: f(default),
                 source: Source::Default,
             }
         }
@@ -249,11 +259,16 @@ fn update_computed_outline(
                     colour: vol.colour.into(),
                 },
             ),
-            stencil: Sourced::set(
+            stencil: Sourced::set_with_default(
                 stencil,
+                &OutlineStencil::INHERIT_DEFAULT,
                 parent_computed.map(|p| p.stencil.value.clone()),
                 |sten| ComputedStencil {
-                    enabled: visibility.get() && sten.enabled,
+                    enabled: if visibility.get() {
+                        sten.enabled
+                    } else {
+                        OutlineStencilEnabled::Never
+                    },
                     offset: sten.offset,
                 },
             ),
@@ -309,6 +324,7 @@ fn update_computed_outline(
             layers: Sourced::set_with_fallback(
                 layers,
                 fallback_layers,
+                &default(),
                 parent_computed.map(|p| p.layers.value.clone()),
                 |layers| layers.0.clone(),
             ),
@@ -360,7 +376,10 @@ mod tests {
             .0
             .as_ref()
             .expect("ComputedOutline should have Some value after update");
-        assert!(internal.stencil.value.enabled);
+        assert_eq!(
+            internal.stencil.value.enabled,
+            OutlineStencilEnabled::IfVolume
+        );
         assert!(!internal.volume.value.enabled);
 
         // Update the system again and check that nothing has changed
