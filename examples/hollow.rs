@@ -2,8 +2,7 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, OutlinePlugin, OutlineStencil, OutlineStencilEnabled, OutlineVolume,
-    ATTRIBUTE_OUTLINE_NORMAL,
+    AsyncSceneInheritOutline, OutlinePlugin, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
 };
 
 fn main() {
@@ -55,10 +54,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             visible: true,
             width: 0.0,
             colour: Color::srgb(0.0, 0.0, 1.0),
-        },
-        OutlineStencil {
-            enabled: OutlineStencilEnabled::Always,
-            offset: 0.0,
         },
         AsyncSceneInheritOutline::default(),
     ));
