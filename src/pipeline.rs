@@ -10,13 +10,14 @@ use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
 use bevy::render::render_resource::{
-    BindGroupLayout, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
-    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, ShaderStages, ShaderType,
-    StencilState, TextureFormat, VertexState,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, PushConstantRange,
+    SamplerBindingType, ShaderStages, ShaderType, StencilState, TextureFormat, TextureSampleType,
+    VertexState,
 };
 use bevy::render::renderer::RenderDevice;
-use bevy::render::settings::WgpuSettings;
+use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::ViewTarget;
 use bevy::shader::ShaderDefVal;
@@ -27,7 +28,6 @@ use bevy::{
     },
 };
 use nonmax::NonMaxU32;
-use wgpu_types::{Backends, PushConstantRange, SamplerBindingType, TextureSampleType};
 
 use crate::pipeline_key::{DerivedPipelineKey, PassType};
 use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances};
@@ -46,9 +46,9 @@ pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
 #[derive(Resource)]
 pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
-    pub outline_view_bind_group_layout: BindGroupLayout,
-    pub outline_instance_bind_group_layout: BindGroupLayout,
-    pub alpha_mask_bind_group_layout: BindGroupLayout,
+    pub outline_view_bind_group_layout: BindGroupLayoutDescriptor,
+    pub outline_instance_bind_group_layout: BindGroupLayoutDescriptor,
+    pub alpha_mask_bind_group_layout: BindGroupLayoutDescriptor,
     pub instance_batch_size: Option<u32>,
     pub skins_use_uniform_buffers: bool,
 }
@@ -57,21 +57,22 @@ impl FromWorld for OutlinePipeline {
     fn from_world(world: &mut World) -> Self {
         let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
         let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let outline_view_bind_group_layout = render_device.create_bind_group_layout(
+        let limits = render_device.limits();
+        let outline_view_bind_group_layout = BindGroupLayoutDescriptor::new(
             "outline_view_bind_group_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
                 uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
             ),
         );
-        let outline_instance_bind_group_layout = render_device.create_bind_group_layout(
+        let outline_instance_bind_group_layout = BindGroupLayoutDescriptor::new(
             "outline_instance_bind_group_layout",
             &BindGroupLayoutEntries::single(
                 ShaderStages::VERTEX,
-                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(render_device),
+                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(&limits),
             ),
         );
-        let alpha_mask_bind_group_layout = render_device.create_bind_group_layout(
+        let alpha_mask_bind_group_layout = BindGroupLayoutDescriptor::new(
             "alpha_mask_bind_group_layout",
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
@@ -82,9 +83,8 @@ impl FromWorld for OutlinePipeline {
             ),
         );
 
-        let instance_batch_size =
-            GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(render_device);
-        let skins_use_uniform_buffers = skins_use_uniform_buffers(render_device);
+        let instance_batch_size = GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(&limits);
+        let skins_use_uniform_buffers = skins_use_uniform_buffers(&limits);
         OutlinePipeline {
             mesh_pipeline,
             outline_view_bind_group_layout,

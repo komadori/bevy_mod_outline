@@ -6,9 +6,10 @@ use bevy::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
-            FragmentState, PipelineCache, RenderPassDescriptor, RenderPipeline,
-            RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType, StoreOp,
+            BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
+            CachedRenderPipelineId, FragmentState, PipelineCache, RenderPassDescriptor,
+            RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType,
+            StoreOp,
         },
         renderer::{RenderContext, RenderDevice},
         texture::CachedTexture,
@@ -27,7 +28,6 @@ use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
-    #[align(16)]
     pub volume_offset: f32,
     pub volume_colour: Vec4,
 }
@@ -48,7 +48,7 @@ pub(crate) fn prepare_compose_output_uniform(
 
 #[derive(Clone, Resource)]
 pub(crate) struct ComposeOutputPipeline {
-    pub(crate) layout: BindGroupLayout,
+    pub(crate) layout: BindGroupLayoutDescriptor,
     pub(crate) sampler: Sampler,
     pub(crate) pipeline_cache: HashMap<ViewPipelineKey, CachedRenderPipelineId>,
 }
@@ -57,7 +57,7 @@ impl FromWorld for ComposeOutputPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let layout = render_device.create_bind_group_layout(
+        let layout = BindGroupLayoutDescriptor::new(
             "outline_flood_compose_output_bind_group_layout",
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
@@ -193,6 +193,7 @@ impl<'w> ComposeOutputPass<'w> {
         view_entity: Entity,
         render_entity: Entity,
         input: &CachedTexture,
+        pipeline_cache: &PipelineCache,
         bounds: &URect,
     ) {
         let view_dynamic_index = self
@@ -210,7 +211,7 @@ impl<'w> ComposeOutputPass<'w> {
 
         let bind_group = render_context.render_device().create_bind_group(
             "outline_flood_compose_output_bind_group",
-            &self.pipeline.layout,
+            &pipeline_cache.get_bind_group_layout(&self.pipeline.layout),
             &BindGroupEntries::sequential((
                 &input.default_view,
                 &self.pipeline.sampler,

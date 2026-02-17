@@ -1,5 +1,5 @@
 use bevy::{
-    camera::visibility::{PreviousVisibleEntities, RenderLayers},
+    camera::visibility::{RenderLayers, SetViewVisibility},
     math::Affine3,
     pbr::SkinUniforms,
     platform::collections::HashMap,
@@ -8,7 +8,7 @@ use bevy::{
         batching::{no_gpu_preprocessing::BatchedInstanceBuffer, NoAutomaticBatching},
         mesh::allocator::MeshAllocator,
         render_asset::RenderAssets,
-        render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, ShaderType},
+        render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, PipelineCache, ShaderType},
         renderer::RenderDevice,
         sync_world::{MainEntity, MainEntityHashMap, RenderEntity},
         texture::{FallbackImage, GpuImage},
@@ -96,11 +96,8 @@ pub(crate) struct OutlineInstanceBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(
-    mut query: Query<(Entity, &mut ViewVisibility, &ComputedOutline)>,
-    mut previous_visible: ResMut<PreviousVisibleEntities>,
-) {
-    for (entity, mut visibility, computed) in query.iter_mut() {
+pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
+    for (mut visibility, computed) in query.iter_mut() {
         if let ComputedOutline(Some(computed)) = computed {
             if computed.volume.value.enabled
                 || computed
@@ -109,8 +106,7 @@ pub(crate) fn set_outline_visibility(
                     .enabled
                     .is_enabled(computed.volume.value.enabled)
             {
-                visibility.set();
-                previous_visible.remove(&entity);
+                visibility.set_visible();
             }
         }
     }
@@ -186,11 +182,13 @@ pub(crate) fn prepare_outline_instance_bind_group(
     render_device: Res<RenderDevice>,
     batched_instance_buffer: Res<BatchedInstanceBuffer<OutlineInstanceUniform>>,
     outline_pipeline: Res<OutlinePipeline>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     if let Some(instance_binding) = batched_instance_buffer.instance_data_binding() {
         let bind_group = render_device.create_bind_group(
             "outline_instance_mesh_bind_group",
-            &outline_pipeline.outline_instance_bind_group_layout,
+            &pipeline_cache
+                .get_bind_group_layout(&outline_pipeline.outline_instance_bind_group_layout),
             &[BindGroupEntry {
                 binding: 0,
                 resource: instance_binding,
@@ -211,12 +209,14 @@ impl FromWorld for AlphaMaskBindGroups {
         let render_device = world.resource::<RenderDevice>();
         let fallback_image = world.resource::<FallbackImage>();
         let outline_pipeline = world.resource::<OutlinePipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
 
         Self {
             bind_groups: HashMap::new(),
             default_bind_group: render_device.create_bind_group(
                 "default_outline_alpha_mask_bind_group",
-                &outline_pipeline.alpha_mask_bind_group_layout,
+                &pipeline_cache
+                    .get_bind_group_layout(&outline_pipeline.alpha_mask_bind_group_layout),
                 &BindGroupEntries::sequential((
                     &fallback_image.d2.texture_view,
                     &fallback_image.d2.sampler,
@@ -232,6 +232,7 @@ pub(crate) fn prepare_alpha_mask_bind_groups(
     outline_pipeline: Res<OutlinePipeline>,
     gpu_images: Res<RenderAssets<GpuImage>>,
     outlines: Query<&ExtractedOutline>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     alpha_mask_bind_groups.bind_groups.clear();
 
@@ -245,7 +246,9 @@ pub(crate) fn prepare_alpha_mask_bind_groups(
                     .or_insert_with(|| {
                         render_device.create_bind_group(
                             "outline_alpha_mask_bind_group",
-                            &outline_pipeline.alpha_mask_bind_group_layout,
+                            &pipeline_cache.get_bind_group_layout(
+                                &outline_pipeline.alpha_mask_bind_group_layout,
+                            ),
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &gpu_image.sampler,

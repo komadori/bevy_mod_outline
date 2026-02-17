@@ -1,8 +1,8 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 
 struct JumpFloodUniform {
-    @align(16)
     step_length: u32,
+    _padding: vec3<f32>
 }
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;

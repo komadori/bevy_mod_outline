@@ -10,7 +10,7 @@ use bevy::{
         camera::ExtractedCamera,
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_phase::{PhaseItemExtraIndex, SortedPhaseItem},
-        render_resource::CachedRenderPipelineId,
+        render_resource::{CachedRenderPipelineId, PipelineCache},
         renderer::RenderContext,
         sync_world::MainEntity,
         view::ViewTarget,
@@ -127,6 +127,7 @@ impl ViewNode for FloodNode {
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();
+        let pipeline_cache = world.resource::<PipelineCache>();
         let Some(flood_phase) = world
             .get_resource::<ViewSortedRenderPhases<FloodOutline>>()
             .and_then(|ps| ps.get(&view.retained_view_entity))
@@ -187,6 +188,7 @@ impl ViewNode for FloodNode {
                     render_context,
                     flood_textures.input(),
                     flood_textures.output(),
+                    pipeline_cache,
                     size,
                     &screen_space_bounds,
                 );
@@ -198,6 +200,7 @@ impl ViewNode for FloodNode {
                 view_entity,
                 first_item.entity,
                 flood_textures.input(),
+                pipeline_cache,
                 &screen_space_bounds,
             );
         }
