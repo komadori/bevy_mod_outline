@@ -96,10 +96,6 @@ mod scene;
 #[cfg(feature = "scene")]
 pub use scene::*;
 
-/// Legacy bundles.
-#[deprecated(since = "0.9.0", note = "Use required components instead")]
-pub mod bundles;
-
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
 /// The direction to extrude the vertex when rendering the outline.
