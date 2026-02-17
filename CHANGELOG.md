@@ -1,5 +1,13 @@
 # Changelog
 
+## bevy_mod_outline 0.12.0 (2026-02-17)
+
+### Removed
+- Removed deprecated bundles.
+
+### Changed
+- Updated Bevy dependency to 0.18. (@taboky-dev)
+
 ## bevy_mod_outline 0.11.0 (2026-02-16)
 
 ### Fixed
