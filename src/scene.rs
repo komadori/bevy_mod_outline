@@ -41,13 +41,13 @@ fn add_outline(
     mut commands: Commands,
     mut query: Query<(&mut AsyncSceneInheritOutline, Option<&SceneInstance>)>,
     systems: Res<AsyncSceneInheritOutlineSystems>,
-    scene_spawner: Res<SceneSpawner>,
+    scene_spawner: Option<Res<SceneSpawner>>, // Could be temporarily removed from the world when a scene is spawning
 ) {
     let Ok((mut scene_outline, scene_instance)) = query.get_mut(*entity_input) else {
         return;
     };
     let mut ready = false;
-    if let Some(scene_instance) = scene_instance {
+    if let (Some(scene_instance), Some(scene_spawner)) = (scene_instance, scene_spawner) {
         let iid = **scene_instance;
         if scene_spawner.instance_is_ready(iid) {
             for child in scene_spawner.iter_instance_entities(iid) {
