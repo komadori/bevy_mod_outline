@@ -79,7 +79,7 @@ impl<T: Clone> Sourced<T> {
             }
         } else if let Some(v) = fallback {
             Sourced {
-                value: f(&v.clone().into()),
+                value: f(&v.as_ref().clone().into()),
                 source: Source::SetFallback,
             }
         } else if let Some(v) = inherit {

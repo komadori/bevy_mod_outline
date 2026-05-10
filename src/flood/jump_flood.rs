@@ -35,71 +35,67 @@ pub(crate) struct JumpFloodPipeline {
     pub(crate) lookup_offsets: Vec<u32>,
 }
 
-impl FromWorld for JumpFloodPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let layout = BindGroupLayoutDescriptor::new(
-            "outline_jump_flood_bind_group_layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    sampler(SamplerBindingType::Filtering),
-                    uniform_buffer::<JumpFloodUniform>(true),
-                ),
+pub(crate) fn init_jump_flood_pipeline(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    fullscreen_shader: Res<FullscreenShader>,
+    pipeline_cache: Res<PipelineCache>,
+) {
+    let layout = BindGroupLayoutDescriptor::new(
+        "outline_jump_flood_bind_group_layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                uniform_buffer::<JumpFloodUniform>(true),
             ),
-        );
+        ),
+    );
 
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        let fullscreen_shader = world.resource::<FullscreenShader>().to_vertex_state();
-        let pipeline_id =
-            world
-                .resource_mut::<PipelineCache>()
-                .queue_render_pipeline(RenderPipelineDescriptor {
-                    label: Some("outline_jump_flood_pipeline".into()),
-                    layout: vec![layout.clone()],
-                    vertex: fullscreen_shader,
-                    fragment: Some(FragmentState {
-                        shader: JUMP_FLOOD_SHADER_HANDLE,
-                        shader_defs: vec![],
-                        entry_point: None,
-                        targets: vec![Some(ColorTargetState {
-                            format: TextureFormat::Rgba16Float,
-                            blend: None,
-                            write_mask: ColorWrites::ALL,
-                        })],
-                    }),
-                    primitive: PrimitiveState::default(),
-                    depth_stencil: None,
-                    multisample: MultisampleState::default(),
-                    push_constant_ranges: vec![],
-                    zero_initialize_workgroup_memory: false,
-                });
+    let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
+        label: Some("outline_jump_flood_pipeline".into()),
+        layout: vec![layout.clone()],
+        vertex: fullscreen_shader.to_vertex_state(),
+        fragment: Some(FragmentState {
+            shader: JUMP_FLOOD_SHADER_HANDLE,
+            shader_defs: vec![],
+            entry_point: None,
+            targets: vec![Some(ColorTargetState {
+                format: TextureFormat::Rgba16Float,
+                blend: None,
+                write_mask: ColorWrites::ALL,
+            })],
+        }),
+        primitive: PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: MultisampleState::default(),
+        immediate_size: 0,
+        zero_initialize_workgroup_memory: false,
+    });
 
-        let render_device = world.resource::<RenderDevice>();
-        let render_queue = world.resource::<RenderQueue>();
-        let mut uniform_buffer = DynamicUniformBuffer::new_with_alignment(
-            render_device.limits().min_uniform_buffer_offset_alignment as u64,
-        );
-        let mut offsets = Vec::new();
-        for bit in 0..32 {
-            offsets.push(uniform_buffer.push(&JumpFloodUniform {
-                size: 1 << bit,
-                _padding: Vec3::default(),
-            }));
-        }
-        uniform_buffer.write_buffer(render_device, render_queue);
-
-        Self {
-            layout,
-            sampler,
-            pipeline_id,
-            lookup_buffer: uniform_buffer,
-            lookup_offsets: offsets,
-        }
+    let mut uniform_buffer = DynamicUniformBuffer::new_with_alignment(
+        render_device.limits().min_uniform_buffer_offset_alignment as u64,
+    );
+    let mut offsets = Vec::new();
+    for bit in 0..32 {
+        offsets.push(uniform_buffer.push(&JumpFloodUniform {
+            size: 1 << bit,
+            _padding: Vec3::default(),
+        }));
     }
+    uniform_buffer.write_buffer(&render_device, &render_queue);
+
+    commands.insert_resource(JumpFloodPipeline {
+        layout,
+        sampler,
+        pipeline_id,
+        lookup_buffer: uniform_buffer,
+        lookup_offsets: offsets,
+    });
 }
 
 pub(crate) struct JumpFloodPass<'w> {
@@ -121,7 +117,7 @@ impl<'w> JumpFloodPass<'w> {
 
     pub fn execute(
         &mut self,
-        render_context: &mut RenderContext<'_>,
+        render_context: &mut RenderContext<'_, '_>,
         input: &CachedTexture,
         output: &CachedTexture,
         pipeline_cache: &PipelineCache,
@@ -149,6 +145,7 @@ impl<'w> JumpFloodPass<'w> {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
 
         render_pass.set_scissor_rect(bounds.min.x, bounds.min.y, bounds.width(), bounds.height());

@@ -3,17 +3,14 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        query::QueryItem,
         system::{Commands, Query, Res, ResMut},
-        world::{FromWorld, World},
     },
     render::{
-        render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
             CachedRenderPipelineId, LoadOp, Operations, PipelineCache, RenderPassColorAttachment,
             RenderPassDescriptor, SpecializedRenderPipelines, StoreOp,
         },
-        renderer::RenderContext,
+        renderer::{RenderContext, ViewQuery},
         view::{Msaa, ViewTarget},
     },
 };
@@ -21,64 +18,50 @@ use bevy::{
 #[derive(Component)]
 pub(crate) struct MsaaExtraWritebackPipeline(CachedRenderPipelineId);
 
-pub(crate) struct MsaaExtraWritebackNode;
+pub(crate) fn msaa_extra_writeback_pass(
+    view: ViewQuery<(&ViewTarget, &MsaaExtraWritebackPipeline)>,
+    blit_pipeline: Res<BlitPipeline>,
+    pipeline_cache: Res<PipelineCache>,
+    mut render_context: RenderContext,
+) {
+    let (target, blit_pipeline_id) = view.into_inner();
 
-impl FromWorld for MsaaExtraWritebackNode {
-    fn from_world(_world: &mut World) -> Self {
-        Self
-    }
-}
+    let Some(pipeline) = pipeline_cache.get_render_pipeline(blit_pipeline_id.0) else {
+        return;
+    };
 
-impl ViewNode for MsaaExtraWritebackNode {
-    type ViewQuery = (&'static ViewTarget, &'static MsaaExtraWritebackPipeline);
+    let post_process = target.post_process_write();
 
-    fn run<'w>(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext<'w>,
-        (target, blit_pipeline_id): QueryItem<'w, '_, Self::ViewQuery>,
-        world: &'w World,
-    ) -> Result<(), NodeRunError> {
-        let blit_pipeline = world.resource::<BlitPipeline>();
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(blit_pipeline_id.0) else {
-            return Ok(());
-        };
+    let pass_descriptor = RenderPassDescriptor {
+        label: Some("msaa_extra_writeback"),
+        color_attachments: &[Some(RenderPassColorAttachment {
+            view: target.sampled_main_texture_view().unwrap(),
+            depth_slice: None,
+            resolve_target: Some(post_process.destination),
+            ops: Operations {
+                load: LoadOp::Clear(wgpu_types::Color::BLACK),
+                store: StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    };
 
-        let post_process = target.post_process_write();
+    let bind_group = blit_pipeline.create_bind_group(
+        render_context.render_device(),
+        post_process.source,
+        &pipeline_cache,
+    );
 
-        let pass_descriptor = RenderPassDescriptor {
-            label: Some("msaa_extra_writeback"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: target.sampled_main_texture_view().unwrap(),
-                depth_slice: None,
-                resolve_target: Some(post_process.destination),
-                ops: Operations {
-                    load: LoadOp::Clear(wgpu_types::Color::BLACK),
-                    store: StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        };
+    let mut render_pass = render_context
+        .command_encoder()
+        .begin_render_pass(&pass_descriptor);
 
-        let bind_group = blit_pipeline.create_bind_group(
-            render_context.render_device(),
-            post_process.source,
-            pipeline_cache,
-        );
-
-        let mut render_pass = render_context
-            .command_encoder()
-            .begin_render_pass(&pass_descriptor);
-
-        render_pass.set_pipeline(pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[]);
-        render_pass.draw(0..3, 0..1);
-
-        Ok(())
-    }
+    render_pass.set_pipeline(pipeline);
+    render_pass.set_bind_group(0, &bind_group, &[]);
+    render_pass.draw(0..3, 0..1);
 }
 
 pub(crate) fn prepare_msaa_extra_writeback_pipelines(
@@ -91,9 +74,10 @@ pub(crate) fn prepare_msaa_extra_writeback_pipelines(
     for (entity, view_target, msaa) in view_targets.iter() {
         if *msaa != Msaa::Off {
             let key = BlitPipelineKey {
-                texture_format: view_target.main_texture_format(),
+                target_format: view_target.main_texture_format(),
                 samples: msaa.samples(),
                 blend_state: None,
+                source_space: None,
             };
 
             let pipeline = pipelines.specialize(&pipeline_cache, &blit_pipeline, key);

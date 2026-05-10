@@ -1,32 +1,58 @@
 use std::ops::Range;
 
-use bevy::ecs::query::QueryItem;
-use bevy::math::FloatOrd;
+use bevy::ecs::entity::EntityHash;
+use bevy::math::{FloatOrd, Mat3A};
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
-use bevy::render::mesh::allocator::SlabId;
-use bevy::render::render_graph::{NodeRunError, ViewNode};
+use bevy::render::mesh::allocator::MeshSlabId;
 use bevy::render::render_phase::{
     BinnedPhaseItem, CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem,
     PhaseItemBatchSetKey, PhaseItemExtraIndex, SortedPhaseItem, ViewBinnedRenderPhases,
-    ViewSortedRenderPhases,
+    ViewRangefinder3d, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{
     CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     StoreOp,
 };
+use bevy::render::renderer::{RenderContext, ViewQuery};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
-use bevy::render::{render_graph::RenderGraphContext, renderer::RenderContext};
+use indexmap::IndexMap;
 
 use crate::view_uniforms::OutlineQueueStatus;
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct OutlineSortingInfo {
+    pub world_plane_origin: Vec3,
+    pub world_plane_offset: Vec3,
+}
+
+pub(crate) struct OutlineRangefinder {
+    rangefinder: ViewRangefinder3d,
+    world_from_view: Mat3A,
+}
+
+impl OutlineRangefinder {
+    pub(crate) fn new(view: &ExtractedView) -> Self {
+        Self {
+            rangefinder: view.rangefinder3d(),
+            world_from_view: view.world_from_view.affine().matrix3,
+        }
+    }
+
+    pub(crate) fn distance_of(&self, sorting_info: &OutlineSortingInfo) -> f32 {
+        let world_plane = sorting_info.world_plane_origin
+            + self.world_from_view.mul_vec3(-Vec3::Z) * sorting_info.world_plane_offset;
+        self.rangefinder.distance(&world_plane)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct OutlineBatchSetKey {
     pub pipeline: CachedRenderPipelineId,
     pub draw_function: DrawFunctionId,
-    pub vertex_slab: SlabId,
-    pub index_slab: Option<SlabId>,
+    pub vertex_slab: MeshSlabId,
+    pub index_slab: Option<MeshSlabId>,
 }
 
 impl PhaseItemBatchSetKey for OutlineBatchSetKey {
@@ -186,6 +212,7 @@ impl CachedRenderPipelinePhaseItem for OpaqueOutline {
 }
 
 pub(crate) struct TransparentOutline {
+    pub sorting_info: OutlineSortingInfo,
     pub distance: f32,
     pub pipeline: CachedRenderPipelineId,
     pub entity: Entity,
@@ -234,6 +261,16 @@ impl SortedPhaseItem for TransparentOutline {
         FloatOrd(self.distance)
     }
 
+    fn recalculate_sort_keys(
+        items: &mut IndexMap<(Entity, MainEntity), Self, EntityHash>,
+        view: &ExtractedView,
+    ) {
+        let rangefinder = OutlineRangefinder::new(view);
+        for item in items.values_mut() {
+            item.distance = rangefinder.distance_of(&item.sorting_info);
+        }
+    }
+
     fn indexed(&self) -> bool {
         self.indexed
     }
@@ -246,105 +283,91 @@ impl CachedRenderPipelinePhaseItem for TransparentOutline {
     }
 }
 
-pub(crate) struct OutlineNode;
+pub(crate) fn outline_render_pass(
+    world: &World,
+    view: ViewQuery<(
+        &ExtractedView,
+        &ExtractedCamera,
+        &Camera3d,
+        &ViewTarget,
+        &ViewDepthTexture,
+        &OutlineQueueStatus,
+    )>,
+    stencil_phases: Res<ViewBinnedRenderPhases<StencilOutline>>,
+    opaque_phases: Res<ViewBinnedRenderPhases<OpaqueOutline>>,
+    transparent_phases: Res<ViewSortedRenderPhases<TransparentOutline>>,
+    mut render_context: RenderContext,
+) {
+    let view_entity = view.entity();
+    let (view_extracted, camera, camera_3d, target, depth, queue_status) = view.into_inner();
 
-impl FromWorld for OutlineNode {
-    fn from_world(_world: &mut World) -> Self {
-        Self
-    }
-}
+    let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
+        stencil_phases.get(&view_extracted.retained_view_entity),
+        opaque_phases.get(&view_extracted.retained_view_entity),
+        transparent_phases.get(&view_extracted.retained_view_entity),
+    ) else {
+        return;
+    };
 
-impl ViewNode for OutlineNode {
-    type ViewQuery = (
-        &'static ExtractedView,
-        &'static ExtractedCamera,
-        &'static Camera3d,
-        &'static ViewTarget,
-        &'static ViewDepthTexture,
-        &'static OutlineQueueStatus,
-    );
-
-    fn run<'w>(
-        &self,
-        graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext<'w>,
-        (view, camera, camera_3d, target, depth, queue_status): QueryItem<'w, '_, Self::ViewQuery>,
-        world: &'w World,
-    ) -> Result<(), NodeRunError> {
-        let view_entity = graph.view_entity();
-        let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
-            world
-                .get_resource::<ViewBinnedRenderPhases<StencilOutline>>()
-                .and_then(|ps| ps.get(&view.retained_view_entity)),
-            world
-                .get_resource::<ViewBinnedRenderPhases<OpaqueOutline>>()
-                .and_then(|ps| ps.get(&view.retained_view_entity)),
-            world
-                .get_resource::<ViewSortedRenderPhases<TransparentOutline>>()
-                .and_then(|ps| ps.get(&view.retained_view_entity)),
-        ) else {
-            return Ok(());
-        };
-
-        // If drawing anything, run stencil pass to clear the depth buffer
-        if queue_status.has_volume {
-            let pass_descriptor = RenderPassDescriptor {
-                label: Some("outline_stencil_pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: depth.view(),
-                    depth_ops: Some(Operations {
-                        load: camera_3d.depth_load_op.clone().into(),
-                        store: StoreOp::Store,
-                    }),
-                    stencil_ops: None,
+    // If drawing anything, run stencil pass to clear the depth buffer
+    if queue_status.has_volume {
+        let pass_descriptor = RenderPassDescriptor {
+            label: Some("outline_stencil_pass"),
+            color_attachments: &[],
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(Operations {
+                    load: camera_3d.depth_load_op.clone().into(),
+                    store: StoreOp::Store,
                 }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            };
-            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
-            if let Some(viewport) = camera.viewport.as_ref() {
-                tracked_pass.set_camera_viewport(viewport);
-            }
-            if let Err(err) = stencil_phase.render(&mut tracked_pass, world, view_entity) {
-                error!("Error encountered while rendering the outline stencil phase {err:?}");
-            }
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        };
+        let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
+        if let Some(viewport) = camera.viewport.as_ref() {
+            tracked_pass.set_camera_viewport(viewport);
         }
-
-        if !opaque_phase.is_empty() {
-            let pass_descriptor = RenderPassDescriptor {
-                label: Some("outline_opaque_pass"),
-                color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            };
-            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
-            if let Some(viewport) = camera.viewport.as_ref() {
-                tracked_pass.set_camera_viewport(viewport);
-            }
-            if let Err(err) = opaque_phase.render(&mut tracked_pass, world, view_entity) {
-                error!("Error encountered while rendering the outline opaque phase {err:?}");
-            }
+        if let Err(err) = stencil_phase.render(&mut tracked_pass, world, view_entity) {
+            error!("Error encountered while rendering the outline stencil phase {err:?}");
         }
+    }
 
-        if !transparent_phase.items.is_empty() {
-            let pass_descriptor = RenderPassDescriptor {
-                label: Some("outline_transparent_pass"),
-                color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            };
-            let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
-            if let Some(viewport) = camera.viewport.as_ref() {
-                tracked_pass.set_camera_viewport(viewport);
-            }
-            if let Err(err) = transparent_phase.render(&mut tracked_pass, world, view_entity) {
-                error!("Error encountered while rendering the outline opaque phase {err:?}");
-            }
+    if !opaque_phase.is_empty() {
+        let pass_descriptor = RenderPassDescriptor {
+            label: Some("outline_opaque_pass"),
+            color_attachments: &[Some(target.get_color_attachment())],
+            depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        };
+        let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
+        if let Some(viewport) = camera.viewport.as_ref() {
+            tracked_pass.set_camera_viewport(viewport);
         }
+        if let Err(err) = opaque_phase.render(&mut tracked_pass, world, view_entity) {
+            error!("Error encountered while rendering the outline opaque phase {err:?}");
+        }
+    }
 
-        Ok(())
+    if !transparent_phase.items.is_empty() {
+        let pass_descriptor = RenderPassDescriptor {
+            label: Some("outline_transparent_pass"),
+            color_attachments: &[Some(target.get_color_attachment())],
+            depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        };
+        let mut tracked_pass = render_context.begin_tracked_render_pass(pass_descriptor);
+        if let Some(viewport) = camera.viewport.as_ref() {
+            tracked_pass.set_camera_viewport(viewport);
+        }
+        if let Err(err) = transparent_phase.render(&mut tracked_pass, world, view_entity) {
+            error!("Error encountered while rendering the outline transparent phase {err:?}");
+        }
     }
 }

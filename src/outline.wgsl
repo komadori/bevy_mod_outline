@@ -14,6 +14,7 @@ struct Instance {
     alpha_mask_threshold: f32,
     first_vertex_index: u32,
     current_skin_index: u32,
+    current_morph_index: u32,
 };
 
 struct Vertex {
@@ -47,18 +48,19 @@ var<uniform> view_uniform: OutlineViewUniform;
 #endif
 
 #ifdef MORPH_TARGETS
-fn morph_vertex(vertex_in: Vertex) -> Vertex {
+fn morph_vertex(vertex_in: Vertex, instance_index: u32) -> Vertex {
     var vertex = vertex_in;
-    let first_vertex = mesh[vertex.instance_index].first_vertex_index;
+    let first_vertex = mesh[instance_index].first_vertex_index;
+    var morph_index = mesh[instance_index].current_morph_index;
     let vertex_index = vertex.index - first_vertex;
 
-    let weight_count = bevy_pbr::morph::layer_count();
+    let weight_count = bevy_pbr::morph::layer_count(morph_index);
     for (var i: u32 = 0u; i < weight_count; i ++) {
-        let weight = bevy_pbr::morph::weight_at(i);
+        let weight = bevy_pbr::morph::weight_at(i, morph_index);
         if weight == 0.0 {
             continue;
         }
-        vertex.position += weight * bevy_pbr::morph::morph(vertex_index, bevy_pbr::morph::position_offset, i);
+        vertex.position += weight * bevy_pbr::morph::morph_position(vertex_index, i, morph_index);
     }
     return vertex;
 }
@@ -103,7 +105,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     let iid = vertex_no_morph.instance_index;
 #ifdef MORPH_TARGETS
-    var vertex = morph_vertex(vertex_no_morph);
+    var vertex = morph_vertex(vertex_no_morph, iid);
 #else
     var vertex = vertex_no_morph;
 #endif

@@ -31,9 +31,12 @@
 
 use std::any::TypeId;
 
+use bevy::anti_alias::fxaa::fxaa;
+use bevy::anti_alias::smaa::smaa;
 use bevy::asset::{load_internal_asset, AssetEventSystems};
 use bevy::camera::visibility::{RenderLayers, VisibilitySystems};
-use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
+use bevy::core_pipeline::tonemapping::tonemapping;
+use bevy::core_pipeline::{Core3d, Core3dSystems};
 use bevy::mesh::MeshVertexAttribute;
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::prelude::*;
@@ -41,40 +44,51 @@ use bevy::render::batching::gpu_preprocessing::{self, GpuPreprocessingSupport};
 use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
+use bevy::render::camera::DirtySpecializationSystems;
 use bevy::render::extract_component::UniformComponentPlugin;
-use bevy::render::render_graph::{EmptyNode, RenderGraphExt, RenderLabel, ViewNodeRunner};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions, PhaseItem,
     SortedRenderPhasePlugin,
 };
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
-use bevy::render::sync_component::SyncComponentPlugin;
-use bevy::render::{Render, RenderApp, RenderDebugFlags, RenderSystems};
-use uniforms::extract_outlines;
-use uniforms::AlphaMaskBindGroups;
-use uniforms::RenderOutlineInstances;
-
-use crate::msaa::MsaaExtraWritebackNode;
-use crate::node::{OpaqueOutline, OutlineNode, StencilOutline, TransparentOutline};
-use crate::pipeline::{
-    OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE, OUTLINE_SHADER_HANDLE,
+use bevy::render::texture::FallbackImage;
+use bevy::render::{
+    init_gpu_resource, Render, RenderApp, RenderDebugFlags, RenderStartup, RenderSystems,
 };
-use crate::pipeline_key::{compute_outline_key, ComputedOutlineKey};
+
+use crate::culling::{
+    check_outline_view_visibility, collect_outline_cpu_culled_entities,
+    extract_outline_visible_entities, OutlineVisibleEntities, RenderExtractedOutlineEntities,
+    RenderOutlineEntities,
+};
+use crate::msaa::msaa_extra_writeback_pass;
+use crate::node::{outline_render_pass, OpaqueOutline, StencilOutline, TransparentOutline};
+use crate::pipeline::{
+    init_outline_pipeline, OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE,
+    OUTLINE_SHADER_HANDLE,
+};
+use crate::pipeline_key::compute_outline_key;
 use crate::queue::{
-    check_outline_entities_changed, extract_outline_entities_changed, queue_outline_mesh,
-    specialise_outlines, OutlineCache, OutlineEntitiesChanged,
+    check_outline_entities_needing_specialisation, clear_dirty_outline_specialisations,
+    expire_outline_specialisations_for_views, extract_outline_entities_needing_specialisation,
+    extract_outline_entities_needing_specialisation_removed, queue_outline_mesh,
+    specialise_outlines, DirtyOutlineSpecialisations, OutlineCache,
+    OutlineEntitiesNeedingSpecialisation, PendingOutlineQueues,
 };
 use crate::render::DrawOutline;
-use crate::uniforms::set_outline_visibility;
+use crate::uniforms::extract_outlines;
+use crate::uniforms::RenderOutlineInstances;
 use crate::uniforms::{
-    prepare_alpha_mask_bind_groups, prepare_outline_instance_bind_group, OutlineInstanceUniform,
+    init_alpha_mask_bind_groups, prepare_alpha_mask_bind_groups,
+    prepare_outline_instance_bind_group, OutlineInstanceUniform,
 };
 use crate::view_uniforms::{
     extract_outline_view_uniforms, prepare_outline_view_bind_group, OutlineViewUniform,
 };
 
 mod computed;
+mod culling;
 mod generate;
 mod msaa;
 mod node;
@@ -91,30 +105,16 @@ pub use generate::*;
 #[cfg(feature = "flood")]
 mod flood;
 
-#[cfg(feature = "scene")]
-mod scene;
-#[cfg(feature = "scene")]
-pub use scene::*;
+#[cfg(feature = "world_serialisation")]
+mod world_serialisation;
+#[cfg(feature = "world_serialisation")]
+pub use world_serialisation::*;
 
 // See https://alexanderameye.github.io/notes/rendering-outlines/
 
 /// The direction to extrude the vertex when rendering the outline.
 pub const ATTRIBUTE_OUTLINE_NORMAL: MeshVertexAttribute =
     MeshVertexAttribute::new("Outline_Normal", 1585570526, VertexFormat::Float32x3);
-
-/// Labels for render graph nodes which draw outlines.
-#[derive(Copy, Clone, Debug, RenderLabel, Hash, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum NodeOutline {
-    /// This node writes back unsampled post-processing effects to the sampled attachment.
-    MsaaExtraWritebackPass,
-    /// This node runs the jump flood algorithm for outlines
-    FloodPass,
-    /// This node runs after the main 3D passes and before the UI pass.
-    OutlinePass,
-    /// This node marks the end of the outline passes.
-    EndOutlinePasses,
-}
 
 /// Specifies when a stencil should be rendered.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
@@ -359,35 +359,11 @@ pub struct OutlineAlphaMask {
 #[cfg_attr(feature = "reflect", derive(Reflect))]
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct OutlineWarmUp {
-    layers: RenderLayers,
-    disabled_stencil: bool,
-    disabled_volume: bool,
     transparency: bool,
     vertex_offsets: bool,
 }
 
 impl OutlineWarmUp {
-    /// Warms up the shaders for the given render layers.
-    pub fn with_layers(self, layers: RenderLayers) -> Self {
-        let mut s = self.clone();
-        s.layers = layers;
-        s
-    }
-
-    /// Warms up the stencil shader even if the outline stencil is disabled.
-    pub fn with_disabled_stencil(self, disabled_stencil: bool) -> Self {
-        let mut s = self.clone();
-        s.disabled_stencil = disabled_stencil;
-        s
-    }
-
-    /// Warms up the volume shader even if the outline volume is disabled.
-    pub fn with_disabled_volume(self, disabled_volume: bool) -> Self {
-        let mut s = self.clone();
-        s.disabled_volume = disabled_volume;
-        s
-    }
-
     /// Warms up both the opaque and transparent versions of the volume shader.
     pub fn with_transparency(self, transparency: bool) -> Self {
         let mut s = self.clone();
@@ -400,7 +376,7 @@ impl OutlineWarmUp {
     pub fn with_vertex_offsets(self, vertex_offset_zero: bool) -> Self {
         let mut s = self.clone();
         s.vertex_offsets = vertex_offset_zero;
-        self
+        s
     }
 }
 
@@ -446,8 +422,6 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugins((
-            SyncComponentPlugin::<ComputedOutline>::default(),
-            SyncComponentPlugin::<ComputedOutlineKey>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
                 RenderDebugFlags::empty(),
@@ -462,7 +436,8 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
-        .init_resource::<OutlineEntitiesChanged>()
+        .init_resource::<OutlineEntitiesNeedingSpecialisation>()
+        .init_resource::<OutlineVisibleEntities>()
         .add_systems(
             PostUpdate,
             (
@@ -472,8 +447,10 @@ impl Plugin for OutlinePlugin {
                 compute_outline_key
                     .after(compute_outline)
                     .after(AssetEventSystems),
-                check_outline_entities_changed.after(compute_outline_key),
-                set_outline_visibility.in_set(VisibilitySystems::CheckVisibility),
+                check_outline_entities_needing_specialisation.after(compute_outline_key),
+                check_outline_view_visibility
+                    .after(VisibilitySystems::CheckVisibility)
+                    .after(compute_outline),
             ),
         )
         .sub_app_mut(RenderApp)
@@ -487,9 +464,15 @@ impl Plugin for OutlinePlugin {
         .add_systems(
             ExtractSchedule,
             (
+                clear_dirty_outline_specialisations.in_set(DirtySpecializationSystems::Clear),
                 extract_outline_view_uniforms,
                 extract_outlines,
-                extract_outline_entities_changed,
+                extract_outline_visible_entities,
+                extract_outline_entities_needing_specialisation
+                    .in_set(DirtySpecializationSystems::CheckForChanges),
+                extract_outline_entities_needing_specialisation_removed
+                    .in_set(DirtySpecializationSystems::CheckForRemovals),
+                expire_outline_specialisations_for_views.in_set(RenderSystems::Cleanup),
             ),
         )
         .add_systems(
@@ -504,6 +487,10 @@ impl Plugin for OutlinePlugin {
                 prepare_alpha_mask_bind_groups,
             )
                 .in_set(RenderSystems::PrepareBindGroups),
+        )
+        .add_systems(
+            Render,
+            collect_outline_cpu_culled_entities.in_set(RenderSystems::PrepareAssets),
         )
         .add_systems(
             Render,
@@ -523,26 +510,16 @@ impl Plugin for OutlinePlugin {
                 .in_set(RenderSystems::Cleanup)
                 .after(RenderSystems::Render),
         )
-        .add_render_graph_node::<ViewNodeRunner<MsaaExtraWritebackNode>>(
+        // Outlining occurs after tone-mapping.
+        .add_systems(
             Core3d,
-            NodeOutline::MsaaExtraWritebackPass,
-        )
-        .add_render_graph_node::<ViewNodeRunner<OutlineNode>>(Core3d, NodeOutline::OutlinePass)
-        .add_render_graph_node::<EmptyNode>(Core3d, NodeOutline::EndOutlinePasses)
-        // Outlining occurs after tone-mapping...
-        .add_render_graph_edges(
-            Core3d,
-            (
-                Node3d::Tonemapping,
-                NodeOutline::MsaaExtraWritebackPass,
-                NodeOutline::OutlinePass,
-                NodeOutline::EndOutlinePasses,
-                Node3d::EndMainPassPostProcessing,
-            ),
-        )
-        // ...and before any later anti-aliasing.
-        .add_render_graph_edge(Core3d, NodeOutline::EndOutlinePasses, Node3d::Fxaa)
-        .add_render_graph_edge(Core3d, NodeOutline::EndOutlinePasses, Node3d::Smaa);
+            (msaa_extra_writeback_pass, outline_render_pass)
+                .chain()
+                .in_set(Core3dSystems::PostProcess)
+                .after(tonemapping)
+                .before(fxaa)
+                .before(smaa),
+        );
 
         #[cfg(feature = "reflect")]
         app.register_type::<OutlineStencil>()
@@ -552,8 +529,8 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineAlphaMask>()
             .register_type::<InheritOutline>();
 
-        #[cfg(feature = "scene")]
-        app.init_resource::<AsyncSceneInheritOutlineSystems>();
+        #[cfg(feature = "world_serialisation")]
+        app.init_resource::<AsyncWorldInheritOutlineSystems>();
 
         #[cfg(feature = "flood")]
         app.add_plugins(flood::FloodPlugin);
@@ -563,18 +540,26 @@ impl Plugin for OutlinePlugin {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<RenderOutlineInstances>()
+            .init_resource::<RenderExtractedOutlineEntities>()
+            .init_resource::<RenderOutlineEntities>()
+            .init_resource::<PendingOutlineQueues>()
+            .init_resource::<DirtyOutlineSpecialisations>()
             .init_resource::<OutlineCache>()
-            .init_resource::<OutlinePipeline>()
-            .init_resource::<AlphaMaskBindGroups>();
-
-        let render_device = render_app.world().resource::<RenderDevice>();
-        let instance_buffer =
-            BatchedInstanceBuffer::<OutlineInstanceUniform>::new(&render_device.limits());
-        render_app.insert_resource(instance_buffer).add_systems(
-            Render,
-            write_batched_instance_buffer::<OutlinePipeline>
-                .in_set(RenderSystems::PrepareResourcesFlush),
-        );
+            .add_systems(
+                RenderStartup,
+                (
+                    (init_outline_pipeline, init_outline_instance_buffer)
+                        .after(bevy::pbr::MeshPipelineSystems),
+                    init_alpha_mask_bind_groups
+                        .after(init_outline_pipeline)
+                        .after(init_gpu_resource::<FallbackImage>),
+                ),
+            )
+            .add_systems(
+                Render,
+                write_batched_instance_buffer::<OutlinePipeline>
+                    .in_set(RenderSystems::PrepareResourcesFlush),
+            );
 
         let gpu_preprocessing_support = render_app.world().resource::<GpuPreprocessingSupport>();
         if gpu_preprocessing_support.is_available() {
@@ -584,4 +569,10 @@ impl Plugin for OutlinePlugin {
             );
         }
     }
+}
+
+fn init_outline_instance_buffer(mut commands: Commands, render_device: Res<RenderDevice>) {
+    commands.insert_resource(BatchedInstanceBuffer::<OutlineInstanceUniform>::new(
+        &render_device.limits(),
+    ));
 }

@@ -1,9 +1,9 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{
+    camera::Hdr,
     post_process::bloom::{Bloom, BloomCompositeMode},
     prelude::*,
-    render::view::Hdr,
 };
 
 use bevy_mod_outline::*;

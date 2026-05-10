@@ -1,7 +1,6 @@
 use bevy::{
-    camera::visibility::{RenderLayers, SetViewVisibility},
-    math::Affine3,
-    pbr::SkinUniforms,
+    math::{Affine3, Affine3Ext},
+    pbr::{MorphDescriptorIndex, MorphIndices, SkinUniforms},
     platform::collections::HashMap,
     prelude::*,
     render::{
@@ -10,7 +9,7 @@ use bevy::{
         render_asset::RenderAssets,
         render_resource::{BindGroup, BindGroupEntries, BindGroupEntry, PipelineCache, ShaderType},
         renderer::RenderDevice,
-        sync_world::{MainEntity, MainEntityHashMap, RenderEntity},
+        sync_world::{MainEntity, MainEntityHashMap},
         texture::{FallbackImage, GpuImage},
         Extract,
     },
@@ -22,12 +21,11 @@ use crate::{
     ComputedOutline, OutlineWarmUp,
 };
 
-#[derive(Clone, Component)]
+#[derive(Clone)]
 pub struct ExtractedOutline {
     pub(crate) stencil: bool,
     pub(crate) volume: bool,
     pub(crate) draw_mode: DrawMode,
-    pub(crate) layers: RenderLayers,
     pub(crate) mesh_id: AssetId<Mesh>,
     pub(crate) alpha_mask_id: Option<AssetId<Image>>,
     pub(crate) pipeline_key: EntityPipelineKey,
@@ -36,15 +34,9 @@ pub struct ExtractedOutline {
     pub(crate) warm_up: OutlineWarmUp,
 }
 
-#[derive(Resource, Default)]
-pub struct RenderOutlineInstances {
+#[derive(Resource, Default, Deref)]
+pub(crate) struct RenderOutlineInstances {
     entity_map: MainEntityHashMap<ExtractedOutline>,
-}
-
-impl RenderOutlineInstances {
-    pub fn get(&self, main_entity: &MainEntity) -> Option<&ExtractedOutline> {
-        self.entity_map.get(main_entity)
-    }
 }
 
 #[derive(Clone, ShaderType)]
@@ -58,6 +50,7 @@ pub(crate) struct OutlineInstanceUniform {
     pub alpha_mask_threshold: f32,
     pub first_vertex_index: u32,
     pub current_skin_index: u32,
+    pub current_morph_index: u32,
 }
 
 impl OutlineInstanceUniform {
@@ -67,6 +60,7 @@ impl OutlineInstanceUniform {
         main_entity: MainEntity,
         mesh_allocator: &MeshAllocator,
         skin_uniforms: &SkinUniforms,
+        morph_indices: &MorphIndices,
     ) -> Self {
         let mut instance_data = self.clone();
         instance_data.first_vertex_index = mesh_allocator
@@ -74,6 +68,10 @@ impl OutlineInstanceUniform {
             .map(|x| x.range.start)
             .unwrap_or(0);
         instance_data.current_skin_index = skin_uniforms.skin_index(main_entity).unwrap_or(0);
+        instance_data.current_morph_index = morph_indices
+            .morph_descriptor_index(main_entity)
+            .unwrap_or(MorphDescriptorIndex(0))
+            .0;
         instance_data
     }
 }
@@ -96,30 +94,12 @@ pub(crate) struct OutlineInstanceBindGroup {
     pub bind_group: BindGroup,
 }
 
-pub(crate) fn set_outline_visibility(mut query: Query<(&mut ViewVisibility, &ComputedOutline)>) {
-    for (mut visibility, computed) in query.iter_mut() {
-        if let ComputedOutline(Some(computed)) = computed {
-            if computed.volume.value.enabled
-                || computed
-                    .stencil
-                    .value
-                    .enabled
-                    .is_enabled(computed.volume.value.enabled)
-            {
-                visibility.set_visible();
-            }
-        }
-    }
-}
-
 #[allow(clippy::type_complexity)]
 pub(crate) fn extract_outlines(
-    mut commands: Commands,
     mut render_outlines: ResMut<RenderOutlineInstances>,
     outlines: Extract<
         Query<(
             Entity,
-            RenderEntity,
             &ComputedOutline,
             &ComputedOutlineKey,
             &GlobalTransform,
@@ -130,9 +110,7 @@ pub(crate) fn extract_outlines(
 ) {
     render_outlines.entity_map.clear();
 
-    for (entity, render_entity, computed, key, transform, mesh, no_automatic_batching) in
-        outlines.iter()
-    {
+    for (entity, computed, key, transform, mesh, no_automatic_batching) in outlines.iter() {
         let ComputedOutline(Some(computed)) = computed else {
             continue;
         };
@@ -144,7 +122,6 @@ pub(crate) fn extract_outlines(
                 .is_enabled(computed.volume.value.enabled),
             volume: computed.volume.value.enabled,
             draw_mode: computed.mode.value.draw_mode,
-            layers: computed.layers.value.clone(),
             mesh_id: mesh.id(),
             alpha_mask_id: computed
                 .alpha_mask
@@ -156,7 +133,7 @@ pub(crate) fn extract_outlines(
             automatic_batching: !no_automatic_batching
                 && computed.mode.value.draw_mode == DrawMode::Extrude,
             instance_data: OutlineInstanceUniform {
-                world_from_local: Affine3::from(&transform.affine()).to_transpose(),
+                world_from_local: Affine3::from(transform.affine()).to_transpose(),
                 world_plane_origin: computed.depth.value.world_plane_origin,
                 world_plane_offset: computed.depth.value.world_plane_offset,
                 stencil_offset: computed.stencil.value.offset,
@@ -165,12 +142,10 @@ pub(crate) fn extract_outlines(
                 alpha_mask_threshold: computed.alpha_mask.value.threshold,
                 first_vertex_index: 0,
                 current_skin_index: 0,
+                current_morph_index: 0,
             },
             warm_up: computed.warm_up.value.clone(),
         };
-        commands
-            .entity(render_entity)
-            .insert(extracted_outline.clone());
         render_outlines
             .entity_map
             .insert(entity.into(), extracted_outline);
@@ -204,26 +179,24 @@ pub(crate) struct AlphaMaskBindGroups {
     pub default_bind_group: BindGroup,
 }
 
-impl FromWorld for AlphaMaskBindGroups {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-        let fallback_image = world.resource::<FallbackImage>();
-        let outline_pipeline = world.resource::<OutlinePipeline>();
-        let pipeline_cache = world.resource::<PipelineCache>();
-
-        Self {
-            bind_groups: HashMap::new(),
-            default_bind_group: render_device.create_bind_group(
-                "default_outline_alpha_mask_bind_group",
-                &pipeline_cache
-                    .get_bind_group_layout(&outline_pipeline.alpha_mask_bind_group_layout),
-                &BindGroupEntries::sequential((
-                    &fallback_image.d2.texture_view,
-                    &fallback_image.d2.sampler,
-                )),
-            ),
-        }
-    }
+pub(crate) fn init_alpha_mask_bind_groups(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    fallback_image: Res<FallbackImage>,
+    outline_pipeline: Res<OutlinePipeline>,
+    pipeline_cache: Res<PipelineCache>,
+) {
+    commands.insert_resource(AlphaMaskBindGroups {
+        bind_groups: HashMap::new(),
+        default_bind_group: render_device.create_bind_group(
+            "default_outline_alpha_mask_bind_group",
+            &pipeline_cache.get_bind_group_layout(&outline_pipeline.alpha_mask_bind_group_layout),
+            &BindGroupEntries::sequential((
+                &fallback_image.d2.texture_view,
+                &fallback_image.d2.sampler,
+            )),
+        ),
+    });
 }
 
 pub(crate) fn prepare_alpha_mask_bind_groups(
@@ -231,13 +204,13 @@ pub(crate) fn prepare_alpha_mask_bind_groups(
     render_device: Res<RenderDevice>,
     outline_pipeline: Res<OutlinePipeline>,
     gpu_images: Res<RenderAssets<GpuImage>>,
-    outlines: Query<&ExtractedOutline>,
+    render_outlines: Res<RenderOutlineInstances>,
     pipeline_cache: Res<PipelineCache>,
 ) {
     alpha_mask_bind_groups.bind_groups.clear();
 
     // Collect all unique textures used by outline alpha masks
-    for outline in outlines.iter() {
+    for outline in render_outlines.entity_map.values() {
         if let Some(texture_id) = outline.alpha_mask_id {
             if let Some(gpu_image) = gpu_images.get(texture_id) {
                 alpha_mask_bind_groups

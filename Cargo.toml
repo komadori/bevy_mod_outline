@@ -1,6 +1,6 @@
 [package]
 name = "bevy_mod_outline"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A mesh outlining plugin for Bevy."
@@ -11,29 +11,31 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { git = "https://github.com/komadori/bevy", rev = "b9d71f0f63da437423a94da6080cef41356fbd8f", default-features = false, features = [
     "std",
     "async_executor",
     "bevy_log",
     "bevy_color",
     "bevy_image",
+    "bevy_anti_alias",
     "bevy_pbr",
 ] }
 bitfield = "0.15"
+indexmap = "2"
 interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
 nonmax = "0.5"
-wgpu-types = "27"
+wgpu-types = "29"
 itertools = { version = "0.14", optional = true }
 
 [features]
-default = ["flood", "interpolation", "reflect", "scene"]
+default = ["flood", "interpolation", "reflect", "world_serialisation"]
 flood = ["dep:itertools"]
 reflect = []
-scene = ["bevy/bevy_scene"]
+world_serialisation = ["bevy/bevy_world_serialization"]
 
 [dev-dependencies]
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { git = "https://github.com/komadori/bevy", rev = "b9d71f0f63da437423a94da6080cef41356fbd8f", default-features = false, features = [
     "gltf_animation",
     "bevy_anti_alias",
     "bevy_gltf",

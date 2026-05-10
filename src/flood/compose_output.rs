@@ -7,11 +7,12 @@ use bevy::{
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
             BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
-            CachedRenderPipelineId, FragmentState, PipelineCache, RenderPassDescriptor,
-            RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType,
-            StoreOp,
+            CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, PipelineCache,
+            RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler,
+            SamplerDescriptor, ShaderType, StoreOp,
         },
-        renderer::{RenderContext, RenderDevice},
+        renderer::{RenderContext, RenderDevice, RenderQueue},
+        sync_world::{MainEntity, MainEntityHashMap},
         texture::CachedTexture,
         view::{ExtractedView, ViewDepthTexture, ViewTarget},
     },
@@ -22,28 +23,41 @@ use wgpu_types::{
     TextureFormat, TextureSampleType,
 };
 
-use crate::{pipeline_key::ViewPipelineKey, uniforms::ExtractedOutline};
+use crate::{pipeline_key::ViewPipelineKey, uniforms::RenderOutlineInstances};
 
 use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
-#[derive(Clone, Component, ShaderType)]
+#[derive(Clone, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
     pub volume_offset: f32,
     pub volume_colour: Vec4,
 }
 
+#[derive(Resource, Default)]
+pub(crate) struct ComposeOutputUniforms {
+    pub buffer: DynamicUniformBuffer<ComposeOutputUniform>,
+    pub offsets: MainEntityHashMap<u32>,
+}
+
 pub(crate) fn prepare_compose_output_uniform(
-    mut commands: Commands,
-    query: Query<(Entity, &ExtractedOutline)>,
+    render_outlines: Res<RenderOutlineInstances>,
+    mut uniforms: ResMut<ComposeOutputUniforms>,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
 ) {
-    for (entity, outline) in query.iter() {
+    let uniforms = uniforms.as_mut();
+    uniforms.buffer.clear();
+    uniforms.offsets.clear();
+    for (main_entity, outline) in render_outlines.iter() {
         if outline.draw_mode == DrawMode::JumpFlood {
-            commands.entity(entity).insert(ComposeOutputUniform {
+            let offset = uniforms.buffer.push(&ComposeOutputUniform {
                 volume_offset: outline.instance_data.volume_offset,
                 volume_colour: outline.instance_data.volume_colour,
             });
+            uniforms.offsets.insert(*main_entity, offset);
         }
     }
+    uniforms.buffer.write_buffer(&render_device, &render_queue);
 }
 
 #[derive(Clone, Resource)]
@@ -53,31 +67,30 @@ pub(crate) struct ComposeOutputPipeline {
     pub(crate) pipeline_cache: HashMap<ViewPipelineKey, CachedRenderPipelineId>,
 }
 
-impl FromWorld for ComposeOutputPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let layout = BindGroupLayoutDescriptor::new(
-            "outline_flood_compose_output_bind_group_layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    sampler(SamplerBindingType::Filtering),
-                    uniform_buffer::<OutlineViewUniform>(true),
-                    uniform_buffer::<ComposeOutputUniform>(true),
-                ),
+pub(crate) fn init_compose_output_pipeline(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+) {
+    let layout = BindGroupLayoutDescriptor::new(
+        "outline_flood_compose_output_bind_group_layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                uniform_buffer::<OutlineViewUniform>(true),
+                uniform_buffer::<ComposeOutputUniform>(true),
             ),
-        );
+        ),
+    );
 
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        Self {
-            layout,
-            sampler,
-            pipeline_cache: HashMap::new(),
-        }
-    }
+    commands.insert_resource(ComposeOutputPipeline {
+        layout,
+        sampler,
+        pipeline_cache: HashMap::new(),
+    });
 }
 
 impl ComposeOutputPipeline {
@@ -97,11 +110,7 @@ impl ComposeOutputPipeline {
                     shader_defs: vec![],
                     entry_point: None,
                     targets: vec![Some(ColorTargetState {
-                        format: if key.hdr_format() {
-                            ViewTarget::TEXTURE_FORMAT_HDR
-                        } else {
-                            TextureFormat::bevy_default()
-                        },
+                        format: key.target_format(),
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     })],
@@ -109,8 +118,8 @@ impl ComposeOutputPipeline {
                 primitive: PrimitiveState::default(),
                 depth_stencil: Some(DepthStencilState {
                     format: TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: CompareFunction::Greater,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(CompareFunction::Greater),
                     stencil: StencilState::default(),
                     bias: DepthBiasState::default(),
                 }),
@@ -119,7 +128,7 @@ impl ComposeOutputPipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
-                push_constant_ranges: vec![],
+                immediate_size: 0,
                 zero_initialize_workgroup_memory: false,
             })
         })
@@ -144,7 +153,7 @@ pub(crate) fn prepare_compose_output_pass(
             &fullscreen_shader,
             ViewPipelineKey::new()
                 .with_msaa(*msaa)
-                .with_hdr_format(view.hdr),
+                .with_target_format(view.target_format),
         );
         commands
             .entity(entity)
@@ -157,7 +166,7 @@ pub(crate) struct ComposeOutputPass<'w> {
     pipeline: &'w ComposeOutputPipeline,
     render_pipeline: &'w RenderPipeline,
     outline_view_uniforms: &'w ComponentUniforms<OutlineViewUniform>,
-    compose_output_uniforms: &'w ComponentUniforms<ComposeOutputUniform>,
+    compose_output_uniforms: &'w ComposeOutputUniforms,
     view_target: &'w ViewTarget,
     view_depth: &'w ViewDepthTexture,
 }
@@ -174,7 +183,7 @@ impl<'w> ComposeOutputPass<'w> {
         let render_pipeline =
             pipeline_cache.get_render_pipeline(compose_output_view.pipeline_id)?;
         let outline_view_uniforms = world.resource::<ComponentUniforms<OutlineViewUniform>>();
-        let compose_output_uniforms = world.resource::<ComponentUniforms<ComposeOutputUniform>>();
+        let compose_output_uniforms = world.resource::<ComposeOutputUniforms>();
 
         Some(Self {
             world,
@@ -189,9 +198,9 @@ impl<'w> ComposeOutputPass<'w> {
 
     pub fn execute(
         &self,
-        render_context: &mut RenderContext<'_>,
+        render_context: &mut RenderContext<'_, '_>,
         view_entity: Entity,
-        render_entity: Entity,
+        main_entity: MainEntity,
         input: &CachedTexture,
         pipeline_cache: &PipelineCache,
         bounds: &URect,
@@ -202,12 +211,11 @@ impl<'w> ComposeOutputPass<'w> {
             .get::<DynamicUniformIndex<OutlineViewUniform>>()
             .unwrap()
             .index();
-        let dynamic_index = self
-            .world
-            .entity(render_entity)
-            .get::<DynamicUniformIndex<ComposeOutputUniform>>()
-            .unwrap()
-            .index();
+        let dynamic_index = *self
+            .compose_output_uniforms
+            .offsets
+            .get(&main_entity)
+            .unwrap();
 
         let bind_group = render_context.render_device().create_bind_group(
             "outline_flood_compose_output_bind_group",
@@ -216,7 +224,7 @@ impl<'w> ComposeOutputPass<'w> {
                 &input.default_view,
                 &self.pipeline.sampler,
                 self.outline_view_uniforms.binding().unwrap(),
-                self.compose_output_uniforms.binding().unwrap(),
+                self.compose_output_uniforms.buffer.binding().unwrap(),
             )),
         );
 
@@ -226,6 +234,7 @@ impl<'w> ComposeOutputPass<'w> {
             depth_stencil_attachment: Some(self.view_depth.get_attachment(StoreOp::Store)),
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
 
         render_pass.set_scissor_rect(bounds.min.x, bounds.min.y, bounds.width(), bounds.height());

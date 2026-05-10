@@ -1,8 +1,8 @@
 use std::f32::consts::{PI, TAU};
 
-use bevy::{gltf::GltfPlugin, prelude::*, scene::SceneInstance};
+use bevy::{gltf::GltfPlugin, prelude::*, world_serialization::WorldInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, OutlinePlugin, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
+    AsyncWorldInheritOutline, OutlinePlugin, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
 };
 
 fn main() {
@@ -41,29 +41,29 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
         DirectionalLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
     ));
 
     // Hollow
     commands.spawn((
-        SceneRoot(asset_server.load("hollow.glb#Scene0")),
+        WorldAssetRoot(asset_server.load("hollow.glb#Scene0")),
         RotatesAndPulses,
         OutlineVolume {
             visible: true,
             width: 0.0,
             colour: Color::srgb(0.0, 0.0, 1.0),
         },
-        AsyncSceneInheritOutline::default(),
+        AsyncWorldInheritOutline::default(),
     ));
 }
 
 // Once the scene is loaded, start the animation and add an outline
 fn setup_scene_once_loaded(
     mut commands: Commands,
-    scene_query: Query<&SceneInstance>,
-    scene_manager: Res<SceneSpawner>,
+    scene_query: Query<&WorldInstance>,
+    scene_manager: Res<WorldInstanceSpawner>,
     name_query: Query<&Name, With<Mesh3d>>,
     mut done: Local<bool>,
 ) {
@@ -103,7 +103,7 @@ fn rotates_hue(
     timer: Res<Time>,
 ) {
     for handle in query.iter() {
-        let material = materials.get_mut(handle.id()).unwrap();
+        let mut material = materials.get_mut(handle.id()).unwrap();
         if let Color::Hsla(hsla) = material.base_color {
             material.base_color = Color::Hsla(Hsla {
                 hue: (hsla.hue + 15.0 * timer.delta_secs()) % 360.0,
