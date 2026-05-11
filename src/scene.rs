@@ -41,12 +41,13 @@ fn add_outline(
     mut commands: Commands,
     mut query: Query<(&mut AsyncSceneInheritOutline, Option<&SceneInstance>)>,
     systems: Res<AsyncSceneInheritOutlineSystems>,
-    scene_spawner: Option<Res<SceneSpawner>>, // Could be temporarily removed from the world when a scene is spawning
+    scene_spawner: Option<Res<SceneSpawner>>,
 ) {
     let Ok((mut scene_outline, scene_instance)) = query.get_mut(*entity_input) else {
         return;
     };
     let mut ready = false;
+    // Assume that this scene cannot be ready if the SceneSpawner is currently in use.
     if let (Some(scene_instance), Some(scene_spawner)) = (scene_instance, scene_spawner) {
         let iid = **scene_instance;
         if scene_spawner.instance_is_ready(iid) {
@@ -236,5 +237,21 @@ mod tests {
             .remove::<AsyncSceneInheritOutline>();
         app.update();
         assert_counts(&mut app, 2, 0);
+    }
+
+    #[test]
+    fn test_add_when_scene_spawner_missing() {
+        let (mut app, scene_entity) = setup();
+
+        let scene_spawner = app.world_mut().remove_resource::<SceneSpawner>().unwrap();
+        app.world_mut()
+            .get_entity_mut(scene_entity)
+            .unwrap()
+            .insert(AsyncSceneInheritOutline::default());
+        app.world_mut().flush();
+        app.world_mut().insert_resource(scene_spawner);
+
+        app.update();
+        assert_counts(&mut app, 0, 2);
     }
 }
