@@ -11,7 +11,7 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { git = "https://github.com/komadori/bevy", rev = "b9d71f0f63da437423a94da6080cef41356fbd8f", default-features = false, features = [
+bevy = { version = "0.19.0-rc.1", default-features = false, features = [
     "std",
     "async_executor",
     "bevy_log",
@@ -35,7 +35,7 @@ reflect = []
 world_serialisation = ["bevy/bevy_world_serialization"]
 
 [dev-dependencies]
-bevy = { git = "https://github.com/komadori/bevy", rev = "b9d71f0f63da437423a94da6080cef41356fbd8f", default-features = false, features = [
+bevy = { version = "0.19.0-rc.1", default-features = false, features = [
     "gltf_animation",
     "bevy_anti_alias",
     "bevy_gltf",
