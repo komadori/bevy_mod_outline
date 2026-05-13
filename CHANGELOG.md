@@ -11,6 +11,12 @@
 ### Changed
 - Updated Bevy dependency to 0.19.
 
+## bevy_mod_outline 0.12.1 (2026-05-11)
+
+## Changed
+- Fixed recursive AsyncSceneInheritOutline. (@Shatur)
+- Fixed panic in AutoGenerateOutlineNormalsPlugin with render-world only meshes.
+
 ## bevy_mod_outline 0.12.0 (2026-02-17)
 
 ### Removed

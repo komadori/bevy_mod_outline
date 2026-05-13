@@ -41,13 +41,14 @@ fn add_outline(
     mut commands: Commands,
     mut query: Query<(&mut AsyncWorldInheritOutline, Option<&WorldInstance>)>,
     systems: Res<AsyncWorldInheritOutlineSystems>,
-    world_spawner: Res<WorldInstanceSpawner>,
+    world_spawner: Option<Res<WorldInstanceSpawner>>,
 ) {
     let Ok((mut scene_outline, scene_instance)) = query.get_mut(*entity_input) else {
         return;
     };
     let mut ready = false;
-    if let Some(scene_instance) = scene_instance {
+    // Assume that this scene cannot be ready if the SceneSpawner is currently in use.
+    if let (Some(scene_instance), Some(world_spawner)) = (scene_instance, world_spawner) {
         let iid = **scene_instance;
         if world_spawner.instance_is_ready(iid) {
             for child in world_spawner.iter_instance_entities(iid) {
@@ -239,5 +240,24 @@ mod tests {
             .remove::<AsyncWorldInheritOutline>();
         app.update();
         assert_counts(&mut app, 2, 0);
+    }
+
+    #[test]
+    fn test_add_when_scene_spawner_missing() {
+        let (mut app, scene_entity) = setup();
+
+        let scene_spawner = app
+            .world_mut()
+            .remove_resource::<WorldInstanceSpawner>()
+            .unwrap();
+        app.world_mut()
+            .get_entity_mut(scene_entity)
+            .unwrap()
+            .insert(AsyncWorldInheritOutline::default());
+        app.world_mut().flush();
+        app.world_mut().insert_resource(scene_spawner);
+
+        app.update();
+        assert_counts(&mut app, 0, 2);
     }
 }

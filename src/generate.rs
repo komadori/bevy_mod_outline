@@ -1,4 +1,5 @@
 use bevy::{
+    asset::RenderAssetUsages,
     math::FloatOrd,
     mesh::{Indices, VertexAttributeValues},
     platform::collections::{HashMap, HashSet},
@@ -197,8 +198,10 @@ fn auto_generate_outline_normals(
                     // Suppress modification events created by this system
                     squelch.remove(id);
                 } else if let Some(mut mesh) = meshes.get_mut(*id) {
-                    let _ = mesh.generate_outline_normals(&plugin.settings);
-                    squelch.insert(*id);
+                    if mesh.asset_usage.contains(RenderAssetUsages::MAIN_WORLD) {
+                        let _ = mesh.generate_outline_normals(&plugin.settings);
+                        squelch.insert(*id);
+                    }
                 }
             }
             AssetEvent::Removed { id } => {
