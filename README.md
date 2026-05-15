@@ -116,7 +116,7 @@ cargo run --example picking
 - `interpolation` _(default)_ - Define `Lerp` trait impls using the
 `interpolation` crate.
 - `reflect` _(default)_ Define `Reflect` trait impls for the components.
-- `scene` _(default)_ Enable the `AsyncSceneInheritOutline` component.
+- `world_serialisation` _(default)_ Enable the `AsyncWorldInheritOutline` component.
 
 ## Licence
 
