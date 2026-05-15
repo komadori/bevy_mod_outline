@@ -1,12 +1,9 @@
 use std::ops::Range;
 
-use bevy::camera::visibility::RenderLayers;
-use bevy::camera::Viewport;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
-use bevy::render::sync_world::MainEntity;
 use bevy::render::view::ExtractedView;
 use bevy::render::{
     render_phase::SortedRenderPhase,
@@ -17,11 +14,14 @@ use bevy::render::{
     texture::CachedTexture,
 };
 
-use crate::queue::{OutlineCache, OutlineCacheEntry, OutlineRangefinder};
-use crate::uniforms::ExtractedOutline;
+use crate::culling::{RenderExtractedOutlineEntities, RenderOutlineEntities};
+use crate::node::OutlineSortingInfo;
+use crate::queue::{
+    DirtyOutlineSpecialisations, OutlineCache, OutlineCacheEntry, PendingOutlineQueues,
+};
+use crate::uniforms::RenderOutlineInstances;
 use crate::view_uniforms::OutlineQueueStatus;
 
-use super::bounds::FloodMeshBounds;
 use super::node::FloodOutline;
 use super::{DrawMode, DrawOutline, OutlineViewUniform};
 
@@ -30,7 +30,7 @@ pub(crate) fn prepare_flood_phases(
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
 ) {
     for view in query.iter() {
-        flood_phases.insert_or_clear(view.retained_view_entity);
+        flood_phases.prepare_for_new_frame(view.retained_view_entity);
     }
 }
 
@@ -39,83 +39,86 @@ pub(crate) fn queue_flood_meshes(
     flood_draw_functions: Res<DrawFunctions<FloodOutline>>,
     mesh_allocator: Res<MeshAllocator>,
     outline_cache: Res<OutlineCache>,
-    material_meshes: Query<(Entity, &MainEntity, &ExtractedOutline, &FloodMeshBounds)>,
+    render_outlines: Res<RenderOutlineInstances>,
+    render_visible: Res<RenderOutlineEntities>,
+    render_extracted: Res<RenderExtractedOutlineEntities>,
+    pending_queues: ResMut<PendingOutlineQueues>,
+    specialisations: Res<DirtyOutlineSpecialisations>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
-    mut views: Query<(
-        &ExtractedView,
-        &ExtractedCamera,
-        Option<&RenderLayers>,
-        &OutlineViewUniform,
-        &mut OutlineQueueStatus,
-    )>,
+    mut views: Query<(&ExtractedView, &mut OutlineQueueStatus)>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
-    for (view, camera, view_mask, view_uniform, mut queue_status) in views.iter_mut() {
-        let view_mask = view_mask.cloned().unwrap_or_default();
-
+    for (view, mut queue_status) in views.iter_mut() {
         let Some(flood_phase) = flood_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
-
-        // Get the camera's physical target size for correct screen bounds calculation
-        let fallback_viewport = Viewport {
-            physical_size: camera.physical_target_size.unwrap_or_default(),
-            ..default()
-        };
-        let viewport = camera.viewport.as_ref().unwrap_or(&fallback_viewport);
-
-        let clip_from_world = view
-            .clip_from_world
-            .unwrap_or_else(|| view.clip_from_view * view.world_from_view.to_matrix().inverse());
-
-        let rangefinder = OutlineRangefinder::new(view);
 
         let outline_view_cache = outline_cache
             .view_map
             .get(&view.retained_view_entity)
             .unwrap();
 
-        for (entity, main_entity, outline, mesh_bounds) in material_meshes.iter() {
-            if !outline.volume {
-                continue;
-            }
+        let Some(render_view_visible) = render_visible.views.get(&view.retained_view_entity) else {
+            continue;
+        };
 
-            if !view_mask.intersects(&outline.layers) {
+        let Some(render_view_extracted) = render_extracted.views.get(&view.retained_view_entity)
+        else {
+            continue;
+        };
+
+        let Some(view_pending_queues) = pending_queues.get(&view.retained_view_entity) else {
+            continue;
+        };
+
+        for &main_entity in
+            specialisations.iter_to_dequeue(view.retained_view_entity, &render_view_visible.0)
+        {
+            flood_phase.remove(Entity::PLACEHOLDER, main_entity);
+        }
+
+        for (_, &main_entity) in specialisations.iter_to_queue(
+            view.retained_view_entity,
+            &render_view_visible.0,
+            &view_pending_queues.prev_frame,
+        ) {
+            let Some(outline) = render_outlines.get(&main_entity) else {
                 continue;
-            }
+            };
 
             if outline.draw_mode != DrawMode::JumpFlood {
                 continue;
             }
 
-            // Calculate screen-space bounds of outline
-            let border = (view_uniform.scale_physical_from_logical
-                * outline.instance_data.volume_offset)
-                .ceil() as u32;
-            let Some(screen_space_bounds) =
-                mesh_bounds.calculate_screen_space_bounds(&clip_from_world, viewport, border)
+            let Some(visible_info) = render_view_extracted
+                .visible_entities_info
+                .get(&main_entity)
             else {
                 continue;
             };
+            let screen_space_bounds = visible_info.screen_space_bounds;
 
-            let (_vertex_slab, index_slab) = mesh_allocator.mesh_slabs(&outline.mesh_id);
+            let mesh_slabs = mesh_allocator.mesh_slabs(&outline.mesh_id);
+            let index_slab = mesh_slabs.and_then(|s| s.index_slab_id);
 
             let Some(OutlineCacheEntry {
-                changed_tick: _,
                 stencil_pipeline_id: _,
                 volume_pipeline_id,
-            }) = outline_view_cache.entity_map.get(main_entity)
+            }) = outline_view_cache.entity_map.get(&main_entity)
             else {
                 continue;
             };
 
-            queue_status.has_volume = true;
-
+            let sorting_info = OutlineSortingInfo {
+                world_plane_origin: outline.instance_data.world_plane_origin,
+                world_plane_offset: outline.instance_data.world_plane_offset,
+            };
             flood_phase.add(FloodOutline {
-                distance: rangefinder.distance_of(outline),
-                entity,
-                main_entity: *main_entity,
+                sorting_info,
+                distance: 0.0,
+                entity: Entity::PLACEHOLDER,
+                main_entity,
                 pipeline: *volume_pipeline_id,
                 draw_function: draw_flood,
                 batch_range: 0..0,
@@ -125,6 +128,10 @@ pub(crate) fn queue_flood_meshes(
                 volume_colour: outline.instance_data.volume_colour,
                 screen_space_bounds,
             });
+        }
+
+        if !flood_phase.items.is_empty() {
+            queue_status.has_volume = true;
         }
     }
 }
@@ -153,7 +160,7 @@ impl<'w> FloodInitPass<'w> {
 
     pub fn execute(
         &mut self,
-        render_context: &mut RenderContext<'_>,
+        render_context: &mut RenderContext<'_, '_>,
         range: Range<usize>,
         output: &CachedTexture,
     ) {
@@ -178,6 +185,7 @@ impl<'w> FloodInitPass<'w> {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
 
         if let Some(viewport) = self.camera.viewport.as_ref() {

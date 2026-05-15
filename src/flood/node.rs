@@ -1,4 +1,4 @@
-use bevy::ecs::query::QueryItem;
+use bevy::ecs::entity::EntityHash;
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, ViewSortedRenderPhases,
 };
@@ -8,17 +8,18 @@ use bevy::{
     prelude::*,
     render::{
         camera::ExtractedCamera,
-        render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_phase::{PhaseItemExtraIndex, SortedPhaseItem},
         render_resource::{CachedRenderPipelineId, PipelineCache},
-        renderer::RenderContext,
+        renderer::{RenderContext, ViewQuery},
         sync_world::MainEntity,
         view::ViewTarget,
     },
 };
+use indexmap::IndexMap;
 use itertools::*;
 use std::ops::Range;
 
+use crate::node::{OutlineRangefinder, OutlineSortingInfo};
 use crate::OutlineViewUniform;
 
 use super::compose_output::{ComposeOutputPass, ComposeOutputView};
@@ -28,6 +29,7 @@ use super::FloodTextures;
 
 #[derive(Debug)]
 pub struct FloodOutline {
+    pub sorting_info: OutlineSortingInfo,
     pub distance: f32,
     pub entity: Entity,
     pub main_entity: MainEntity,
@@ -91,120 +93,112 @@ impl SortedPhaseItem for FloodOutline {
         FloatOrd(self.distance)
     }
 
+    fn recalculate_sort_keys(
+        items: &mut IndexMap<(Entity, MainEntity), Self, EntityHash>,
+        view: &ExtractedView,
+    ) {
+        let rangefinder = OutlineRangefinder::new(view);
+        for item in items.values_mut() {
+            item.distance = rangefinder.distance_of(&item.sorting_info);
+        }
+    }
+
     fn indexed(&self) -> bool {
         self.indexed
     }
 }
 
-pub(crate) struct FloodNode;
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub(crate) fn flood_render_pass(
+    world: &World,
+    view: ViewQuery<(
+        &ExtractedView,
+        &ExtractedCamera,
+        &ViewTarget,
+        &ViewDepthTexture,
+        &OutlineViewUniform,
+        &FloodTextures,
+        &ComposeOutputView,
+    )>,
+    flood_phases: Res<ViewSortedRenderPhases<FloodOutline>>,
+    pipeline_cache: Res<PipelineCache>,
+    mut render_context: RenderContext,
+) {
+    let view_entity = view.entity();
+    let (view_extracted, camera, target, depth, view_uniform, flood_textures, compose_output_view) =
+        view.into_inner();
 
-impl FromWorld for FloodNode {
-    fn from_world(_world: &mut World) -> Self {
-        Self
-    }
-}
+    let Some(flood_phase) = flood_phases.get(&view_extracted.retained_view_entity) else {
+        return;
+    };
 
-impl ViewNode for FloodNode {
-    type ViewQuery = (
-        &'static ExtractedView,
-        &'static ExtractedCamera,
-        &'static ViewTarget,
-        &'static ViewDepthTexture,
-        &'static OutlineViewUniform,
-        &'static FloodTextures,
-        &'static ComposeOutputView,
-    );
+    let mut flood_textures = flood_textures.clone();
 
-    fn run<'w>(
-        &self,
-        graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext<'w>,
-        (view, camera, target, depth, view_uniform, flood_textures, compose_output_view): QueryItem<
-            'w,
-            '_,
-            Self::ViewQuery,
-        >,
-        world: &'w World,
-    ) -> Result<(), NodeRunError> {
-        let view_entity = graph.view_entity();
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let Some(flood_phase) = world
-            .get_resource::<ViewSortedRenderPhases<FloodOutline>>()
-            .and_then(|ps| ps.get(&view.retained_view_entity))
-        else {
-            return Ok(());
+    let mut flood_init_pass = FloodInitPass::new(world, view_entity, flood_phase, camera);
+    let Some(mut jump_flood_pass) = JumpFloodPass::new(world) else {
+        return;
+    };
+    let Some(compose_output_pass) =
+        ComposeOutputPass::new(world, compose_output_view, target, depth)
+    else {
+        return;
+    };
+
+    for ((_, volume_offset, _), group) in &flood_phase
+        .items
+        .values()
+        .enumerate()
+        .chunk_by(|(_, item)| (item.distance, item.volume_offset, item.volume_colour))
+    {
+        let mut group_iter = group.into_iter();
+        let Some((first_index, first_item)) = group_iter.next() else {
+            continue;
         };
 
-        let mut flood_textures = flood_textures.clone();
-
-        let mut flood_init_pass = FloodInitPass::new(world, view_entity, flood_phase, camera);
-        let Some(mut jump_flood_pass) = JumpFloodPass::new(world) else {
-            return Ok(());
-        };
-        let Some(compose_output_pass) =
-            ComposeOutputPass::new(world, compose_output_view, target, depth)
-        else {
-            return Ok(());
-        };
-
-        for ((_, volume_offset, _), group) in &flood_phase
-            .items
-            .iter()
-            .enumerate()
-            .chunk_by(|(_, item)| (item.distance, item.volume_offset, item.volume_colour))
-        {
-            let mut group_iter = group.into_iter();
-            let Some((first_index, first_item)) = group_iter.next() else {
-                continue;
-            };
-
-            // Sum item range and screen-space bounds
-            let mut last_index = first_index;
-            let mut screen_space_bounds = first_item.screen_space_bounds;
-            for (index, item) in group_iter {
-                last_index = index;
-                screen_space_bounds = screen_space_bounds.union(item.screen_space_bounds);
-            }
-
-            flood_init_pass.execute(
-                render_context,
-                first_index..last_index + 1,
-                flood_textures.output(),
-            );
-            flood_textures.flip();
-
-            let scaled_offset = view_uniform.scale_physical_from_logical * volume_offset;
-            let passes = if scaled_offset > 0.0 {
-                (scaled_offset.ceil() as u32 / 2 + 1)
-                    .next_power_of_two()
-                    .trailing_zeros()
-                    + 1
-            } else {
-                0
-            };
-
-            for size in (0..passes).rev() {
-                jump_flood_pass.execute(
-                    render_context,
-                    flood_textures.input(),
-                    flood_textures.output(),
-                    pipeline_cache,
-                    size,
-                    &screen_space_bounds,
-                );
-                flood_textures.flip();
-            }
-
-            compose_output_pass.execute(
-                render_context,
-                view_entity,
-                first_item.entity,
-                flood_textures.input(),
-                pipeline_cache,
-                &screen_space_bounds,
-            );
+        // Sum item range and screen-space bounds
+        let mut last_index = first_index;
+        let mut screen_space_bounds = first_item.screen_space_bounds;
+        for (index, item) in group_iter {
+            last_index = index;
+            screen_space_bounds = screen_space_bounds.union(item.screen_space_bounds);
         }
 
-        Ok(())
+        flood_init_pass.execute(
+            &mut render_context,
+            first_index..last_index + 1,
+            flood_textures.output(),
+        );
+        flood_textures.flip();
+
+        let scaled_offset = view_uniform.scale_physical_from_logical * volume_offset;
+        let passes = if scaled_offset > 0.0 {
+            (scaled_offset.ceil() as u32 / 2 + 1)
+                .next_power_of_two()
+                .trailing_zeros()
+                + 1
+        } else {
+            0
+        };
+
+        for size in (0..passes).rev() {
+            jump_flood_pass.execute(
+                &mut render_context,
+                flood_textures.input(),
+                flood_textures.output(),
+                &pipeline_cache,
+                size,
+                &screen_space_bounds,
+            );
+            flood_textures.flip();
+        }
+
+        compose_output_pass.execute(
+            &mut render_context,
+            view_entity,
+            first_item.main_entity,
+            flood_textures.input(),
+            &pipeline_cache,
+            &screen_space_bounds,
+        );
     }
 }

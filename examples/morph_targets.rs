@@ -7,7 +7,7 @@
 //! - How to read morph target names in [`name_morphs`].
 //! - How to play morph target animations in [`setup_animations`].
 
-use bevy::{prelude::*, scene::SceneInstance};
+use bevy::{prelude::*, world_serialization::WorldInstance};
 use bevy_mod_outline::{
     AutoGenerateOutlineNormalsPlugin, InheritOutline, OutlinePlugin, OutlineVolume,
 };
@@ -43,7 +43,7 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
         mesh: asset_server.load("MorphStressTest.gltf#Mesh0/Primitive0"),
     });
     commands.spawn((
-        SceneRoot(asset_server.load("MorphStressTest.gltf#Scene0")),
+        WorldAssetRoot(asset_server.load("MorphStressTest.gltf#Scene0")),
         OutlineVolume {
             visible: true,
             width: 3.0,
@@ -65,8 +65,8 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
 fn setup_outlines(
     mut commands: Commands,
     mut has_setup: Local<bool>,
-    scene_query: Query<&SceneInstance>,
-    scene_manager: Res<SceneSpawner>,
+    scene_query: Query<&WorldInstance>,
+    scene_manager: Res<WorldInstanceSpawner>,
 ) {
     if *has_setup {
         return;

@@ -4,22 +4,22 @@ use bevy::asset::uuid_handle;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
 use bevy::mesh::MeshVertexBufferLayoutRef;
-use bevy::pbr::{setup_morph_and_skinning_defs, skins_use_uniform_buffers, SkinUniforms};
+use bevy::pbr::{
+    setup_morph_and_skinning_defs, skins_use_uniform_buffers, MorphIndices, SkinUniforms,
+};
 use bevy::prelude::*;
 use bevy::render::batching::{gpu_preprocessing, GetBatchData, GetFullBatchData};
-use bevy::render::mesh::allocator::MeshAllocator;
+use bevy::render::mesh::allocator::{MeshAllocator, MeshSlabs};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer_sized};
 use bevy::render::render_resource::{
     BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendState, ColorTargetState, ColorWrites,
     CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace,
-    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, PushConstantRange,
-    SamplerBindingType, ShaderStages, ShaderType, StencilState, TextureFormat, TextureSampleType,
-    VertexState,
+    GpuArrayBuffer, MultisampleState, PolygonMode, PrimitiveState, SamplerBindingType,
+    ShaderStages, ShaderType, StencilState, TextureFormat, TextureSampleType, VertexState,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::ViewTarget;
 use bevy::shader::ShaderDefVal;
 use bevy::{
     pbr::MeshPipeline,
@@ -53,47 +53,47 @@ pub(crate) struct OutlinePipeline {
     pub skins_use_uniform_buffers: bool,
 }
 
-impl FromWorld for OutlinePipeline {
-    fn from_world(world: &mut World) -> Self {
-        let mesh_pipeline = world.get_resource::<MeshPipeline>().unwrap().clone();
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let limits = render_device.limits();
-        let outline_view_bind_group_layout = BindGroupLayoutDescriptor::new(
-            "outline_view_bind_group_layout",
-            &BindGroupLayoutEntries::single(
-                ShaderStages::VERTEX,
-                uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
+pub(crate) fn init_outline_pipeline(
+    mut commands: Commands,
+    mesh_pipeline: Res<MeshPipeline>,
+    render_device: Res<RenderDevice>,
+) {
+    let limits = render_device.limits();
+    let outline_view_bind_group_layout = BindGroupLayoutDescriptor::new(
+        "outline_view_bind_group_layout",
+        &BindGroupLayoutEntries::single(
+            ShaderStages::VERTEX,
+            uniform_buffer_sized(true, Some(OutlineViewUniform::min_size())),
+        ),
+    );
+    let outline_instance_bind_group_layout = BindGroupLayoutDescriptor::new(
+        "outline_instance_bind_group_layout",
+        &BindGroupLayoutEntries::single(
+            ShaderStages::VERTEX,
+            GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(&limits),
+        ),
+    );
+    let alpha_mask_bind_group_layout = BindGroupLayoutDescriptor::new(
+        "alpha_mask_bind_group_layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
             ),
-        );
-        let outline_instance_bind_group_layout = BindGroupLayoutDescriptor::new(
-            "outline_instance_bind_group_layout",
-            &BindGroupLayoutEntries::single(
-                ShaderStages::VERTEX,
-                GpuArrayBuffer::<OutlineInstanceUniform>::binding_layout(&limits),
-            ),
-        );
-        let alpha_mask_bind_group_layout = BindGroupLayoutDescriptor::new(
-            "alpha_mask_bind_group_layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    sampler(SamplerBindingType::Filtering),
-                ),
-            ),
-        );
+        ),
+    );
 
-        let instance_batch_size = GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(&limits);
-        let skins_use_uniform_buffers = skins_use_uniform_buffers(&limits);
-        OutlinePipeline {
-            mesh_pipeline,
-            outline_view_bind_group_layout,
-            outline_instance_bind_group_layout,
-            alpha_mask_bind_group_layout,
-            instance_batch_size,
-            skins_use_uniform_buffers,
-        }
-    }
+    let instance_batch_size = GpuArrayBuffer::<OutlineInstanceUniform>::batch_size(&limits);
+    let skins_use_uniform_buffers = skins_use_uniform_buffers(&limits);
+    commands.insert_resource(OutlinePipeline {
+        mesh_pipeline: mesh_pipeline.clone(),
+        outline_view_bind_group_layout,
+        outline_instance_bind_group_layout,
+        alpha_mask_bind_group_layout,
+        instance_batch_size,
+        skins_use_uniform_buffers,
+    });
 }
 
 impl SpecializedMeshPipeline for OutlinePipeline {
@@ -182,11 +182,7 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 vertex_defs.push(val.clone());
                 fragment_defs.push(val);
                 targets.push(Some(ColorTargetState {
-                    format: if key.hdr_format() {
-                        ViewTarget::TEXTURE_FORMAT_HDR
-                    } else {
-                        TextureFormat::bevy_default()
-                    },
+                    format: key.target_format(),
                     blend: Some(if key.transparent() {
                         BlendState::ALPHA_BLENDING
                     } else {
@@ -210,8 +206,8 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         let depth_stencil = match key.pass_type() {
             PassType::Stencil | PassType::Volume => Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),
@@ -219,14 +215,12 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             PassType::FloodInit => None,
         };
         let buffers = vec![layout.0.get_layout(&buffer_attrs)?];
-        let mut push_constant_ranges = Vec::with_capacity(1);
         // Proxy for webgl feature flag in bevy
-        if WgpuSettings::default().backends == Some(Backends::GL) {
-            push_constant_ranges.push(PushConstantRange {
-                stages: ShaderStages::VERTEX,
-                range: 0..4,
-            });
-        }
+        let immediate_size = if WgpuSettings::default().backends == Some(Backends::GL) {
+            4
+        } else {
+            0
+        };
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: OUTLINE_SHADER_HANDLE,
@@ -256,11 +250,17 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            push_constant_ranges,
+            immediate_size,
             label: Some(Cow::Borrowed("outline_pipeline")),
             zero_initialize_workgroup_memory: false,
         })
     }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct OutlineBatchSetCompareData {
+    mesh_slabs: Option<MeshSlabs>,
+    alpha_mask_id: Option<AssetId<Image>>,
 }
 
 impl GetBatchData for OutlinePipeline {
@@ -268,25 +268,39 @@ impl GetBatchData for OutlinePipeline {
         SRes<RenderOutlineInstances>,
         SRes<MeshAllocator>,
         SRes<SkinUniforms>,
+        SRes<MorphIndices>,
     );
-    type CompareData = (AssetId<Mesh>, Option<AssetId<Image>>);
+    type BatchSetCompareData = OutlineBatchSetCompareData;
+    type BatchCompareData = AssetId<Mesh>;
     type BufferData = OutlineInstanceUniform;
 
     fn get_batch_data(
-        (render_outlines, mesh_allocator, skin_uniforms): &SystemParamItem<Self::Param>,
+        (render_outlines, mesh_allocator, skin_uniforms, morph_indices): &SystemParamItem<
+            Self::Param,
+        >,
         (_entity, main_entity): (Entity, MainEntity),
-    ) -> Option<(Self::BufferData, Option<Self::CompareData>)> {
+    ) -> Option<(
+        Self::BufferData,
+        Option<(Self::BatchSetCompareData, Self::BatchCompareData)>,
+    )> {
         let outline = render_outlines.get(&main_entity)?;
         let instance_data = outline.instance_data.prepare_instance(
             &outline.mesh_id,
             main_entity,
             mesh_allocator,
             skin_uniforms,
+            morph_indices,
         );
 
         // Only batch entities with the same mesh and alpha mask texture
         let batch_data = if outline.automatic_batching {
-            Some((outline.mesh_id, outline.alpha_mask_id))
+            Some((
+                OutlineBatchSetCompareData {
+                    mesh_slabs: mesh_allocator.mesh_slabs(&outline.mesh_id),
+                    alpha_mask_id: outline.alpha_mask_id,
+                },
+                outline.mesh_id,
+            ))
         } else {
             None
         };
@@ -299,7 +313,9 @@ impl GetFullBatchData for OutlinePipeline {
     type BufferInputData = ();
 
     fn get_binned_batch_data(
-        (render_outlines, mesh_allocator, skin_uniforms): &SystemParamItem<Self::Param>,
+        (render_outlines, mesh_allocator, skin_uniforms, morph_indices): &SystemParamItem<
+            Self::Param,
+        >,
         main_entity: MainEntity,
     ) -> Option<Self::BufferData> {
         let outline = render_outlines.get(&main_entity)?;
@@ -308,13 +324,17 @@ impl GetFullBatchData for OutlinePipeline {
             main_entity,
             mesh_allocator,
             skin_uniforms,
+            morph_indices,
         ))
     }
 
     fn get_index_and_compare_data(
         _param: &SystemParamItem<Self::Param>,
         _main_entity: MainEntity,
-    ) -> Option<(NonMaxU32, Option<Self::CompareData>)> {
+    ) -> Option<(
+        NonMaxU32,
+        Option<(Self::BatchSetCompareData, Self::BatchCompareData)>,
+    )> {
         unimplemented!("GPU batching is not used.");
     }
 

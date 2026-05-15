@@ -1,8 +1,13 @@
 use std::ops::BitOr;
 
 use bevy::{
-    math::Vec3, pbr::MeshPipelineKey, prelude::*, render::render_resource::PrimitiveTopology,
-    render::view::Msaa,
+    math::Vec3,
+    pbr::MeshPipelineKey,
+    prelude::*,
+    render::{
+        render_resource::{PrimitiveTopology, TextureFormat},
+        view::{texture_format_from_code, texture_format_to_code, Msaa},
+    },
 };
 use bitfield::{bitfield_bitrange, bitfield_fields};
 
@@ -23,10 +28,10 @@ bitfield_bitrange! {struct RawPipelineKey(u32)}
 impl RawPipelineKey {
     bitfield_fields! {
         u32;
-        // View parameters (0-7)
+        // View parameters (0:7)
         msaa_samples_minus_one, set_msaa_samples_minus_one: 2, 0;
-        pub hdr_format, set_hdr_format: 3;
-        pub motion_vector_prepass, set_motion_vector_prepass: 4;
+        pub motion_vector_prepass, set_motion_vector_prepass: 3;
+        target_format_code, set_target_format_code: 7, 4;
         // Mesh parameters (8:15)
         primitive_topology_int, set_primitive_topology_int: 10, 8;
         pub morph_targets, set_morph_targets: 11;
@@ -60,6 +65,10 @@ impl RawPipelineKey {
             x if x == Msaa::Sample8 as u32 => Msaa::Sample8,
             x => panic!("Invalid value for Msaa: {x}"),
         }
+    }
+
+    pub(crate) fn target_format(&self) -> TextureFormat {
+        texture_format_from_code(self.target_format_code() as u8).unwrap()
     }
 
     pub(crate) fn primitive_topology(&self) -> PrimitiveTopology {
@@ -113,8 +122,9 @@ impl ViewPipelineKey {
         self
     }
 
-    pub(crate) fn with_hdr_format(mut self, hdr_format: bool) -> Self {
-        self.0.set_hdr_format(hdr_format);
+    pub(crate) fn with_target_format(mut self, format: TextureFormat) -> Self {
+        self.0
+            .set_target_format_code(texture_format_to_code(format).unwrap() as u32);
         self
     }
 
@@ -205,10 +215,7 @@ impl DerivedPipelineKey {
         DerivedPipelineKey(
             match pass_type {
                 PassType::Stencil => {
-                    view_key
-                        .with_hdr_format(false)
-                        .with_motion_vector_prepass(false)
-                        .0
+                    view_key.with_motion_vector_prepass(false).0
                         | entity_key
                             .with_transparent(false)
                             .with_vertex_offset_zero(entity_key.stencil_vertex_offset_zero())

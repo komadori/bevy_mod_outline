@@ -1,9 +1,7 @@
 use bevy::asset::{load_internal_asset, uuid_handle};
-use bevy::core_pipeline::core_3d::graph::Core3d;
+use bevy::core_pipeline::{Core3d, Core3dSystems};
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::render::batching::gpu_preprocessing::{BatchedInstanceBuffers, GpuPreprocessingSupport};
-use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
-use bevy::render::render_graph::RenderGraphExt;
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, DrawFunctions, SortedRenderPhasePlugin,
 };
@@ -12,30 +10,29 @@ use bevy::{
     prelude::*,
     render::{
         camera::ExtractedCamera,
-        render_graph::ViewNodeRunner,
         render_resource::{
             Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
         },
         renderer::RenderDevice,
         texture::{CachedTexture, TextureCache},
-        Render, RenderApp, RenderSystems,
+        Render, RenderApp, RenderStartup, RenderSystems,
     },
 };
 use compose_output::{
-    prepare_compose_output_pass, prepare_compose_output_uniform, ComposeOutputPipeline,
-    ComposeOutputUniform,
+    init_compose_output_pipeline, prepare_compose_output_pass, prepare_compose_output_uniform,
+    ComposeOutputUniforms,
 };
 use flood_init::{prepare_flood_phases, queue_flood_meshes};
-use jump_flood::JumpFloodPipeline;
-use node::{FloodNode, FloodOutline};
+use jump_flood::init_jump_flood_pipeline;
+use node::{flood_render_pass, FloodOutline};
 
+use crate::add_dummy_phase_buffer;
+use crate::node::outline_render_pass;
 use crate::pipeline::OutlinePipeline;
 use crate::render::DrawOutline;
 use crate::uniforms::DrawMode;
 use crate::view_uniforms::OutlineViewUniform;
-use crate::{add_dummy_phase_buffer, NodeOutline};
 
-mod bounds;
 mod compose_output;
 mod flood_init;
 mod jump_flood;
@@ -134,12 +131,11 @@ impl Plugin for FloodPlugin {
             "compose_output.wgsl",
             Shader::from_wgsl
         );
-        app.add_plugins((
-            UniformComponentPlugin::<ComposeOutputUniform>::default(),
-            SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(RenderDebugFlags::empty()),
-            ExtractComponentPlugin::<bounds::FloodMeshBounds>::default(),
+        app.add_plugins(SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(
+            RenderDebugFlags::empty(),
         ))
         .sub_app_mut(RenderApp)
+        .init_resource::<ComposeOutputUniforms>()
         .init_resource::<DrawFunctions<FloodOutline>>()
         .add_render_command::<FloodOutline, DrawOutline>()
         .add_systems(
@@ -150,35 +146,27 @@ impl Plugin for FloodPlugin {
         )
         .add_systems(
             Render,
-            prepare_compose_output_uniform
-                .after(RenderSystems::ExtractCommands)
-                .before(RenderSystems::PrepareResources),
-        )
-        .add_systems(
-            Render,
-            (prepare_flood_textures, prepare_compose_output_pass).in_set(RenderSystems::Prepare),
+            (prepare_flood_textures, prepare_compose_output_uniform, prepare_compose_output_pass).in_set(RenderSystems::Prepare),
         )
         .add_systems(Render, queue_flood_meshes.in_set(RenderSystems::QueueMeshes))
         .add_systems(
             Render,
             sort_phase_system::<FloodOutline>.in_set(RenderSystems::PhaseSort),
         )
-        .add_render_graph_node::<ViewNodeRunner<FloodNode>>(Core3d, NodeOutline::FloodPass)
-        .add_render_graph_edges(
+        .add_systems(
             Core3d,
-            (
-                NodeOutline::OutlinePass,
-                NodeOutline::FloodPass,
-                NodeOutline::EndOutlinePasses,
-            ),
+            flood_render_pass
+                .after(outline_render_pass)
+                .in_set(Core3dSystems::PostProcess),
         );
     }
 
     fn finish(&self, app: &mut App) {
         let render_app = app.sub_app_mut(RenderApp);
-        render_app
-            .init_resource::<JumpFloodPipeline>()
-            .init_resource::<ComposeOutputPipeline>();
+        render_app.add_systems(
+            RenderStartup,
+            (init_jump_flood_pipeline, init_compose_output_pipeline),
+        );
 
         let gpu_preprocessing_support = render_app.world().resource::<GpuPreprocessingSupport>();
         if gpu_preprocessing_support.is_available() {

@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, scene::SceneInstance};
+use bevy::{prelude::*, world_serialization::WorldInstance};
 use bevy_mod_outline::{
-    AsyncSceneInheritOutline, AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
+    AsyncWorldInheritOutline, AutoGenerateOutlineNormalsPlugin, OutlinePlugin, OutlineVolume,
 };
 
 #[derive(Resource)]
@@ -51,7 +51,7 @@ fn setup(
     // Light
     commands.spawn((
         DirectionalLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 1.0, -PI / 4.)),
@@ -59,21 +59,21 @@ fn setup(
 
     // Fox
     commands.spawn((
-        SceneRoot(asset_server.load("Fox.glb#Scene0")),
+        WorldAssetRoot(asset_server.load("Fox.glb#Scene0")),
         OutlineVolume {
             visible: true,
             width: 3.0,
             colour: Color::srgb(1.0, 0.0, 0.0),
         },
-        AsyncSceneInheritOutline::default(),
+        AsyncWorldInheritOutline::default(),
     ));
 }
 
 // Once the scene is loaded, start the animation
 fn setup_scene_once_loaded(
     mut commands: Commands,
-    scene_query: Query<&SceneInstance>,
-    scene_manager: Res<SceneSpawner>,
+    scene_query: Query<&WorldInstance>,
+    scene_manager: Res<WorldInstanceSpawner>,
     mut player_query: Query<(Entity, &mut AnimationPlayer)>,
     animation: Res<Fox>,
     mut done: Local<bool>,

@@ -12,7 +12,7 @@ vertex extrusion and jump flood methods.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.12"
+bevy_mod_outline = "0.13"
 ```
 
 ## Examples
@@ -96,6 +96,7 @@ cargo run --example picking
 
 | This Version | Bevy version |
 |--------------|--------------|
+| 0.13.x       | 0.19.x       |
 | 0.12.x       | 0.18.x       |
 | 0.11.x       | 0.17.x       |
 | 0.10.x       | 0.16.x       |
@@ -115,7 +116,7 @@ cargo run --example picking
 - `interpolation` _(default)_ - Define `Lerp` trait impls using the
 `interpolation` crate.
 - `reflect` _(default)_ Define `Reflect` trait impls for the components.
-- `scene` _(default)_ Enable the `AsyncSceneInheritOutline` component.
+- `world_serialisation` _(default)_ Enable the `AsyncWorldInheritOutline` component.
 
 ## Licence
 

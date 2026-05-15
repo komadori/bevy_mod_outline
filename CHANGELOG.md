@@ -1,5 +1,16 @@
 # Changelog
 
+## bevy_mod_outline 0.13.0 (unreleased)
+
+###
+- Added frustum culling.
+
+### Removed
+- Removed facility to warm-up invisible outlines.
+
+### Changed
+- Updated Bevy dependency to 0.19.
+
 ## bevy_mod_outline 0.12.1 (2026-05-11)
 
 ## Changed

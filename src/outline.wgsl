@@ -1,6 +1,6 @@
 #import bevy_render::view::View
 #import bevy_render::maths
-#import bevy_pbr::mesh_types::SkinnedMesh
+#import bevy_pbr::mesh_types::{SkinnedMesh, MorphAttributes, MorphDescriptor, MorphWeights}
 #import bevy_pbr::skinning::joint_matrices
 #import bevy_mod_outline::common::{OutlineViewUniform, VertexOutput}
 
@@ -14,6 +14,7 @@ struct Instance {
     alpha_mask_threshold: f32,
     first_vertex_index: u32,
     current_skin_index: u32,
+    current_morph_index: u32,
 };
 
 struct Vertex {
@@ -38,7 +39,6 @@ struct Vertex {
 var<uniform> view_uniform: OutlineViewUniform;
 
 #import bevy_pbr::skinning
-#import bevy_pbr::morph
 
 #ifdef INSTANCE_BATCH_SIZE
 @group(1) @binding(0) var<uniform> mesh: array<Instance, #{INSTANCE_BATCH_SIZE}u>;
@@ -47,18 +47,85 @@ var<uniform> view_uniform: OutlineViewUniform;
 #endif
 
 #ifdef MORPH_TARGETS
-fn morph_vertex(vertex_in: Vertex) -> Vertex {
+#ifdef SKINS_USE_UNIFORM_BUFFERS
+@group(2) @binding(2) var<uniform> morph_weights: MorphWeights;
+@group(2) @binding(3) var morph_targets: texture_3d<f32>;
+#else
+@group(2) @binding(2) var<storage> morph_weights: array<f32>;
+@group(2) @binding(3) var<storage> morph_targets: array<MorphAttributes>;
+@group(2) @binding(8) var<storage> morph_descriptors: array<MorphDescriptor>;
+#endif
+
+fn morph_layer_count(descriptor_index: u32) -> u32 {
+#ifdef SKINS_USE_UNIFORM_BUFFERS
+    let dimensions = textureDimensions(morph_targets);
+    return u32(dimensions.z);
+#else
+    return morph_descriptors[descriptor_index].weight_count;
+#endif
+}
+
+fn morph_weight_at(weight_index: u32, descriptor_index: u32) -> f32 {
+#ifdef SKINS_USE_UNIFORM_BUFFERS
+    let i = weight_index;
+    return morph_weights.weights[i / 4u][i % 4u];
+#else
+    let weights_offset = morph_descriptors[descriptor_index].current_weights_offset;
+    return morph_weights[weights_offset + weight_index];
+#endif
+}
+
+#ifdef SKINS_USE_UNIFORM_BUFFERS
+const morph_position_offset: u32 = 0u;
+const morph_total_component_count: u32 = 9u;
+
+fn morph_component_texture_coord(vertex_index: u32, component_offset: u32) -> vec2<u32> {
+    let width = u32(textureDimensions(morph_targets).x);
+    let component_index = morph_total_component_count * vertex_index + component_offset;
+    return vec2<u32>(component_index % width, component_index / width);
+}
+
+fn morph_pixel(vertex: u32, component: u32, weight: u32) -> f32 {
+    let coord = morph_component_texture_coord(vertex, component);
+    return textureLoad(morph_targets, vec3(coord, weight), 0).r;
+}
+
+fn morph(vertex_index: u32, component_offset: u32, weight_index: u32) -> vec3<f32> {
+    return vec3<f32>(
+        morph_pixel(vertex_index, component_offset, weight_index),
+        morph_pixel(vertex_index, component_offset + 1u, weight_index),
+        morph_pixel(vertex_index, component_offset + 2u, weight_index),
+    );
+}
+
+fn morph_position(vertex_index: u32, weight_index: u32, instance_index: u32) -> vec3<f32> {
+    return morph(vertex_index, morph_position_offset, weight_index);
+}
+#else
+fn get_morph_target(vertex_index: u32, weight_index: u32, descriptor_index: u32) -> MorphAttributes {
+    let targets_offset = morph_descriptors[descriptor_index].targets_offset;
+    let vertex_count = morph_descriptors[descriptor_index].vertex_count;
+    return morph_targets[targets_offset + weight_index * vertex_count + vertex_index];
+}
+
+fn morph_position(vertex_index: u32, weight_index: u32, descriptor_index: u32) -> vec3<f32> {
+    return get_morph_target(vertex_index, weight_index, descriptor_index).position;
+}
+#endif
+
+fn morph_vertex(vertex_in: Vertex, instance_index: u32) -> Vertex {
     var vertex = vertex_in;
-    let first_vertex = mesh[vertex.instance_index].first_vertex_index;
+    let first_vertex = mesh[instance_index].first_vertex_index;
+    var morph_index = mesh[instance_index].current_morph_index;
     let vertex_index = vertex.index - first_vertex;
 
-    let weight_count = bevy_pbr::morph::layer_count();
+    let weight_count = morph_layer_count(morph_index);
     for (var i: u32 = 0u; i < weight_count; i ++) {
-        let weight = bevy_pbr::morph::weight_at(i);
+        let weight = morph_weight_at(i, morph_index);
         if weight == 0.0 {
             continue;
         }
-        vertex.position += weight * bevy_pbr::morph::morph(vertex_index, bevy_pbr::morph::position_offset, i);
+        vertex.position += weight * morph_position(vertex_index, i, morph_index);
     }
     return vertex;
 }
@@ -103,7 +170,7 @@ fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
 fn vertex(vertex_no_morph: Vertex) -> VertexOutput {
     let iid = vertex_no_morph.instance_index;
 #ifdef MORPH_TARGETS
-    var vertex = morph_vertex(vertex_no_morph);
+    var vertex = morph_vertex(vertex_no_morph, iid);
 #else
     var vertex = vertex_no_morph;
 #endif
