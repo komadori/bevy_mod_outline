@@ -8,9 +8,8 @@ struct ComposeOutputUniform {
 }
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
-@group(0) @binding(1) var texture_sampler: sampler;
-@group(0) @binding(2) var<uniform> view: OutlineViewUniform;
-@group(0) @binding(3) var<uniform> instance: ComposeOutputUniform;
+@group(0) @binding(1) var<uniform> view: OutlineViewUniform;
+@group(0) @binding(2) var<uniform> instance: ComposeOutputUniform;
 
 struct FragmentOutput {
     @location(0) colour: vec4<f32>,
@@ -19,7 +18,7 @@ struct FragmentOutput {
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> FragmentOutput {
-    let tex = textureSample(screen_texture, texture_sampler, in.uv);
+    let tex = textureLoad(screen_texture, vec2<i32>(in.position.xy), 0);
     let threshold = view.scale_physical_from_logical * instance.volume_offset;
     let dist = distance(in.position.xy, tex.xy);
     var out: FragmentOutput;

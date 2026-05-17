@@ -6,11 +6,10 @@ use bevy::{
     render::{
         extract_component::{ComponentUniforms, DynamicUniformIndex},
         render_resource::{
-            binding_types::{sampler, texture_2d, uniform_buffer},
+            binding_types::{texture_2d, uniform_buffer},
             BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
             CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, PipelineCache,
-            RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler,
-            SamplerDescriptor, ShaderType, StoreOp,
+            RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderType, StoreOp,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         sync_world::MainEntity,
@@ -20,8 +19,7 @@ use bevy::{
 };
 use wgpu_types::{
     BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
-    MultisampleState, PrimitiveState, SamplerBindingType, ShaderStages, StencilState,
-    TextureFormat, TextureSampleType,
+    MultisampleState, PrimitiveState, ShaderStages, StencilState, TextureFormat, TextureSampleType,
 };
 
 use crate::{
@@ -87,32 +85,24 @@ pub(crate) fn prepare_compose_output_uniform(
 #[derive(Clone, Resource)]
 pub(crate) struct ComposeOutputPipeline {
     pub(crate) layout: BindGroupLayoutDescriptor,
-    pub(crate) sampler: Sampler,
     pub(crate) pipeline_cache: HashMap<ViewPipelineKey, CachedRenderPipelineId>,
 }
 
-pub(crate) fn init_compose_output_pipeline(
-    mut commands: Commands,
-    render_device: Res<RenderDevice>,
-) {
+pub(crate) fn init_compose_output_pipeline(mut commands: Commands) {
     let layout = BindGroupLayoutDescriptor::new(
         "outline_flood_compose_output_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::FRAGMENT,
             (
                 texture_2d(TextureSampleType::Float { filterable: true }),
-                sampler(SamplerBindingType::Filtering),
                 uniform_buffer::<OutlineViewUniform>(true),
                 uniform_buffer::<ComposeOutputUniform>(true),
             ),
         ),
     );
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-
     commands.insert_resource(ComposeOutputPipeline {
         layout,
-        sampler,
         pipeline_cache: HashMap::new(),
     });
 }
@@ -250,7 +240,6 @@ impl<'w> ComposeOutputPass<'w> {
             &pipeline_cache.get_bind_group_layout(&self.pipeline.layout),
             &BindGroupEntries::sequential((
                 &input.default_view,
-                &self.pipeline.sampler,
                 self.outline_view_uniforms.binding().unwrap(),
                 self.compose_output_uniforms.buffer.binding().unwrap(),
             )),
