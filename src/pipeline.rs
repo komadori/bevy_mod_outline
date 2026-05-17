@@ -148,23 +148,25 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         if key.msaa() != Msaa::Off {
             fragment_defs.push(ShaderDefVal::from("MSAA"));
         }
-        if key.pass_type() != PassType::FloodInit && key.depth_mode() == DepthMode::Flat {
-            let val = ShaderDefVal::from("FLAT_DEPTH");
-            vertex_defs.push(val.clone());
-            fragment_defs.push(val);
-        }
-        let cull_mode =
-            if key.pass_type() == PassType::FloodInit || key.depth_mode() == DepthMode::Flat {
+        match (key.pass_type(), key.depth_mode()) {
+            (PassType::Stencil | PassType::Volume, DepthMode::Flat) => {
+                let val = ShaderDefVal::from("FLAT_DEPTH");
+                vertex_defs.push(val.clone());
+                fragment_defs.push(val);
+            }
+            _ => {}
+        };
+        let cull_mode = match (key.pass_type(), key.depth_mode()) {
+            (PassType::Stencil, DepthMode::Real) => Some(Face::Back),
+            (PassType::Volume, DepthMode::Real) => Some(Face::Front),
+            _ => {
                 if key.double_sided() {
                     None
                 } else {
                     Some(Face::Back)
                 }
-            } else if key.pass_type() == PassType::Stencil {
-                Some(Face::Back)
-            } else {
-                Some(Face::Front)
-            };
+            }
+        };
         if key.vertex_offset_zero() {
             vertex_defs.push(ShaderDefVal::from("VERTEX_OFFSET_ZERO"));
         } else {
