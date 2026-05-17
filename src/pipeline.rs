@@ -145,21 +145,26 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             ));
         }
 
-        let cull_mode;
-        if key.depth_mode() == DepthMode::Flat {
+        if key.msaa() != Msaa::Off {
+            fragment_defs.push(ShaderDefVal::from("MSAA"));
+        }
+        if key.pass_type() != PassType::FloodInit && key.depth_mode() == DepthMode::Flat {
             let val = ShaderDefVal::from("FLAT_DEPTH");
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
-            if key.double_sided() {
-                cull_mode = None;
-            } else {
-                cull_mode = Some(Face::Back);
-            }
-        } else if key.pass_type() == PassType::Stencil {
-            cull_mode = Some(Face::Back);
-        } else {
-            cull_mode = Some(Face::Front);
         }
+        let cull_mode =
+            if key.pass_type() == PassType::FloodInit || key.depth_mode() == DepthMode::Flat {
+                if key.double_sided() {
+                    None
+                } else {
+                    Some(Face::Back)
+                }
+            } else if key.pass_type() == PassType::Stencil {
+                Some(Face::Back)
+            } else {
+                Some(Face::Front)
+            };
         if key.vertex_offset_zero() {
             vertex_defs.push(ShaderDefVal::from("VERTEX_OFFSET_ZERO"));
         } else {
@@ -197,7 +202,11 @@ impl SpecializedMeshPipeline for OutlinePipeline {
                 vertex_defs.push(val.clone());
                 fragment_defs.push(val);
                 targets.push(Some(ColorTargetState {
-                    format: TextureFormat::Rgba16Float,
+                    format: if key.msaa() != Msaa::Off {
+                        TextureFormat::R8Unorm
+                    } else {
+                        TextureFormat::Rg16Float
+                    },
                     blend: Some(BlendState::REPLACE),
                     write_mask: ColorWrites::ALL,
                 }));

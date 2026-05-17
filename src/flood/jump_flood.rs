@@ -65,7 +65,7 @@ pub(crate) fn init_jump_flood_pipeline(
             shader_defs: vec![],
             entry_point: None,
             targets: vec![Some(ColorTargetState {
-                format: TextureFormat::Rgba16Float,
+                format: TextureFormat::Rg16Float,
                 blend: None,
                 write_mask: ColorWrites::ALL,
             })],

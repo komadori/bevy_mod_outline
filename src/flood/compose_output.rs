@@ -1,3 +1,4 @@
+use bevy::shader::ShaderDefVal;
 use bevy::{
     core_pipeline::FullscreenShader,
     platform::collections::HashMap,
@@ -12,7 +13,7 @@ use bevy::{
             SamplerDescriptor, ShaderType, StoreOp,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
-        sync_world::{MainEntity, MainEntityHashMap},
+        sync_world::MainEntity,
         texture::CachedTexture,
         view::{ExtractedView, ViewDepthTexture, ViewTarget},
     },
@@ -23,12 +24,16 @@ use wgpu_types::{
     TextureFormat, TextureSampleType,
 };
 
-use crate::{pipeline_key::ViewPipelineKey, uniforms::RenderOutlineInstances};
+use crate::{
+    culling::RenderExtractedOutlineEntities, pipeline_key::ViewPipelineKey,
+    uniforms::RenderOutlineInstances,
+};
 
 use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
 #[derive(Clone, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
+    pub flat_depth: f32,
     pub volume_offset: f32,
     pub volume_colour: Vec4,
 }
@@ -36,11 +41,13 @@ pub(crate) struct ComposeOutputUniform {
 #[derive(Resource, Default)]
 pub(crate) struct ComposeOutputUniforms {
     pub buffer: DynamicUniformBuffer<ComposeOutputUniform>,
-    pub offsets: MainEntityHashMap<u32>,
+    pub offsets: HashMap<(Entity, MainEntity), u32>,
 }
 
 pub(crate) fn prepare_compose_output_uniform(
     render_outlines: Res<RenderOutlineInstances>,
+    render_extracted: Res<RenderExtractedOutlineEntities>,
+    views: Query<(Entity, &ExtractedView, &OutlineViewUniform)>,
     mut uniforms: ResMut<ComposeOutputUniforms>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
@@ -48,13 +55,30 @@ pub(crate) fn prepare_compose_output_uniform(
     let uniforms = uniforms.as_mut();
     uniforms.buffer.clear();
     uniforms.offsets.clear();
-    for (main_entity, outline) in render_outlines.iter() {
-        if outline.draw_mode == DrawMode::JumpFlood {
+    for (view_entity, view_extracted, view) in views.iter() {
+        let Some(render_view_extracted) = render_extracted
+            .views
+            .get(&view_extracted.retained_view_entity)
+        else {
+            continue;
+        };
+        let model_eye = view_extracted.world_from_view.forward();
+        for (_, main_entity) in render_view_extracted.visible_entities.entities.iter() {
+            let Some(outline) = render_outlines.get(main_entity) else {
+                continue;
+            };
+            if outline.draw_mode != DrawMode::JumpFlood {
+                continue;
+            }
+            let world_plane = outline.instance_data.world_plane_origin
+                + *model_eye * outline.instance_data.world_plane_offset;
+            let clip = view.clip_from_world * world_plane.extend(1.0);
             let offset = uniforms.buffer.push(&ComposeOutputUniform {
+                flat_depth: clip.z / clip.w,
                 volume_offset: outline.instance_data.volume_offset,
                 volume_colour: outline.instance_data.volume_colour,
             });
-            uniforms.offsets.insert(*main_entity, offset);
+            uniforms.offsets.insert((view_entity, *main_entity), offset);
         }
     }
     uniforms.buffer.write_buffer(&render_device, &render_queue);
@@ -101,13 +125,17 @@ impl ComposeOutputPipeline {
         key: ViewPipelineKey,
     ) -> CachedRenderPipelineId {
         *self.pipeline_cache.entry(key).or_insert_with(|| {
+            let mut shader_defs = vec![];
+            if key.msaa().samples() > 1 {
+                shader_defs.push(ShaderDefVal::from("MSAA"));
+            }
             pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
                 label: Some("outline_flood_compose_output_pipeline".into()),
                 layout: vec![self.layout.clone()],
                 vertex: fullscreen_shader.to_vertex_state(),
                 fragment: Some(FragmentState {
                     shader: COMPOSE_OUTPUT_SHADER_HANDLE,
-                    shader_defs: vec![],
+                    shader_defs,
                     entry_point: None,
                     targets: vec![Some(ColorTargetState {
                         format: key.target_format(),
@@ -214,7 +242,7 @@ impl<'w> ComposeOutputPass<'w> {
         let dynamic_index = *self
             .compose_output_uniforms
             .offsets
-            .get(&main_entity)
+            .get(&(view_entity, main_entity))
             .unwrap();
 
         let bind_group = render_context.render_device().create_bind_group(

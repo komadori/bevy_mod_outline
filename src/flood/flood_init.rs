@@ -158,7 +158,7 @@ impl<'w> FloodInitPass<'w> {
         }
     }
 
-    pub fn execute(
+    pub fn execute_direct(
         &mut self,
         render_context: &mut RenderContext<'_, '_>,
         range: Range<usize>,
@@ -172,13 +172,42 @@ impl<'w> FloodInitPass<'w> {
                 load: LoadOp::Clear(wgpu_types::Color {
                     r: -1.0,
                     g: -1.0,
-                    b: -1.0,
+                    b: 0.0,
                     a: 0.0,
                 }),
                 store: StoreOp::Store,
             },
         };
 
+        self.run(render_context, range, color_attachment);
+    }
+
+    pub fn execute_coverage(
+        &mut self,
+        render_context: &mut RenderContext<'_, '_>,
+        range: Range<usize>,
+        coverage_msaa: &CachedTexture,
+        resolve_target: &CachedTexture,
+    ) {
+        let color_attachment = RenderPassColorAttachment {
+            view: &coverage_msaa.default_view,
+            depth_slice: None,
+            resolve_target: Some(&resolve_target.default_view),
+            ops: Operations {
+                load: LoadOp::Clear(wgpu_types::Color::TRANSPARENT),
+                store: StoreOp::Store,
+            },
+        };
+
+        self.run(render_context, range, color_attachment);
+    }
+
+    fn run(
+        &mut self,
+        render_context: &mut RenderContext<'_, '_>,
+        range: Range<usize>,
+        color_attachment: RenderPassColorAttachment<'_>,
+    ) {
         let mut init_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("outline_flood_init"),
             color_attachments: &[Some(color_attachment)],

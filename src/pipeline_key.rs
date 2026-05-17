@@ -232,12 +232,16 @@ impl DerivedPipelineKey {
                 }
                 #[cfg(feature = "flood")]
                 PassType::FloodInit => {
-                    entity_key
-                        .with_transparent(false)
-                        .with_vertex_offset_zero(true)
-                        .with_stencil_vertex_offset_zero(false)
-                        .with_plane_offset_zero(true)
+                    view_key
+                        .with_target_format(TextureFormat::R8Unorm)
+                        .with_motion_vector_prepass(false)
                         .0
+                        | entity_key
+                            .with_transparent(false)
+                            .with_vertex_offset_zero(true)
+                            .with_stencil_vertex_offset_zero(false)
+                            .with_plane_offset_zero(true)
+                            .0
                 }
             }
             .with_pass_type(pass_type),

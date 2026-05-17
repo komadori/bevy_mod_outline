@@ -25,6 +25,7 @@ use crate::OutlineViewUniform;
 use super::compose_output::{ComposeOutputPass, ComposeOutputView};
 use super::flood_init::FloodInitPass;
 use super::jump_flood::JumpFloodPass;
+use super::sobel_init::SobelInitPass;
 use super::FloodTextures;
 
 #[derive(Debug)]
@@ -119,24 +120,42 @@ pub(crate) fn flood_render_pass(
         &OutlineViewUniform,
         &FloodTextures,
         &ComposeOutputView,
+        &Msaa,
     )>,
     flood_phases: Res<ViewSortedRenderPhases<FloodOutline>>,
     pipeline_cache: Res<PipelineCache>,
     mut render_context: RenderContext,
 ) {
     let view_entity = view.entity();
-    let (view_extracted, camera, target, depth, view_uniform, flood_textures, compose_output_view) =
-        view.into_inner();
+    let (
+        view_extracted,
+        camera,
+        target,
+        depth,
+        view_uniform,
+        flood_textures,
+        compose_output_view,
+        msaa,
+    ) = view.into_inner();
 
     let Some(flood_phase) = flood_phases.get(&view_extracted.retained_view_entity) else {
         return;
     };
 
     let mut flood_textures = flood_textures.clone();
+    let coverage_init = msaa.samples() > 1;
 
     let mut flood_init_pass = FloodInitPass::new(world, view_entity, flood_phase, camera);
     let Some(mut jump_flood_pass) = JumpFloodPass::new(world) else {
         return;
+    };
+    let sobel_init_pass = if coverage_init {
+        let Some(pass) = SobelInitPass::new(world) else {
+            return;
+        };
+        Some(pass)
+    } else {
+        None
     };
     let Some(compose_output_pass) =
         ComposeOutputPass::new(world, compose_output_view, target, depth)
@@ -163,11 +182,29 @@ pub(crate) fn flood_render_pass(
             screen_space_bounds = screen_space_bounds.union(item.screen_space_bounds);
         }
 
-        flood_init_pass.execute(
-            &mut render_context,
-            first_index..last_index + 1,
-            flood_textures.output(),
-        );
+        if let (Some(sobel_init_pass), Some(coverage)) =
+            (sobel_init_pass.as_ref(), flood_textures.coverage.as_ref())
+        {
+            flood_init_pass.execute_coverage(
+                &mut render_context,
+                first_index..last_index + 1,
+                &coverage.msaa_tex,
+                &coverage.resolved,
+            );
+            sobel_init_pass.execute(
+                &mut render_context,
+                &coverage.resolved,
+                flood_textures.output(),
+                &pipeline_cache,
+                &screen_space_bounds,
+            );
+        } else {
+            flood_init_pass.execute_direct(
+                &mut render_context,
+                first_index..last_index + 1,
+                flood_textures.output(),
+            );
+        }
         flood_textures.flip();
 
         let scaled_offset = view_uniform.scale_physical_from_logical * volume_offset;
