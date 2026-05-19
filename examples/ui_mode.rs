@@ -267,10 +267,14 @@ fn change_mode(
             commands
                 .entity(entity)
                 .insert(match event.entered.unwrap() {
-                    DrawMethod::Extrude => OutlineMode::ExtrudeFlat,
-                    DrawMethod::ExtrudeDoubleSided => OutlineMode::ExtrudeFlatDoubleSided,
-                    DrawMethod::JumpFlood => OutlineMode::FloodFlat,
-                    DrawMethod::JumpFloodDoubleSided => OutlineMode::FloodFlatDoubleSided,
+                    DrawMethod::Extrude => (OutlineMode::ExtrudeFlat, OutlineFace::Front),
+                    DrawMethod::ExtrudeDoubleSided => {
+                        (OutlineMode::ExtrudeFlat, OutlineFace::DoubleSided)
+                    }
+                    DrawMethod::JumpFlood => (OutlineMode::FloodFlat, OutlineFace::Front),
+                    DrawMethod::JumpFloodDoubleSided => {
+                        (OutlineMode::FloodFlat, OutlineFace::DoubleSided)
+                    }
                 });
         }
     }

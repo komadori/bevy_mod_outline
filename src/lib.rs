@@ -268,16 +268,24 @@ pub enum OutlineMode {
     /// Vertex extrusion flattened into a billboard. (default)
     #[default]
     ExtrudeFlat,
-    /// Vertex extrusion flattened into a double-sided billboard.
-    ExtrudeFlatDoubleSided,
     /// Vertex extrusion in real model-space.
     ExtrudeReal,
     // Jump-flood into a billboard.
     #[cfg(feature = "flood")]
     FloodFlat,
-    // Jump-flood into a double-sided billboard.
-    #[cfg(feature = "flood")]
-    FloodFlatDoubleSided,
+}
+
+/// A component which controls which faces of an outline are rendered.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+#[non_exhaustive]
+pub enum OutlineFace {
+    /// Render only the front face of the outline. (default)
+    #[default]
+    Front,
+    /// Render both the front and back faces of the outline.
+    DoubleSided,
 }
 
 /// A component which controls the depth sorting of flat outlines and stencils.
@@ -553,6 +561,7 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineVolume>()
             .register_type::<OutlineRenderLayers>()
             .register_type::<OutlineMode>()
+            .register_type::<OutlineFace>()
             .register_type::<OutlineAlphaMask>()
             .register_type::<InheritOutline>()
             .register_type::<OutlineMsaa>();

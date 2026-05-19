@@ -155,6 +155,9 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
         };
+        if key.depth_mode() == DepthMode::Real && key.double_sided() {
+            warn!("OutlineFace::DoubleSided is incompatible with OutlineMode::ExtrudeReal");
+        }
         let cull_mode = match (key.pass_type(), key.depth_mode()) {
             (PassType::Stencil, DepthMode::Real) => Some(Face::Back),
             (PassType::Volume, DepthMode::Real) => Some(Face::Front),

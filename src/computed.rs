@@ -3,8 +3,8 @@ use bevy::{camera::visibility::RenderLayers, ecs::query::QueryItem, prelude::*};
 use crate::{
     pipeline_key::ComputedOutlineKey,
     uniforms::{DepthMode, DrawMode},
-    InheritOutline, OutlineAlphaMask, OutlineMode, OutlinePlaneDepth, OutlineRenderLayers,
-    OutlineStencil, OutlineStencilEnabled, OutlineVolume, OutlineWarmUp,
+    InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMode, OutlinePlaneDepth,
+    OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled, OutlineVolume, OutlineWarmUp,
 };
 
 #[derive(Clone)]
@@ -24,6 +24,10 @@ pub(crate) struct ComputedStencil {
 pub(crate) struct ComputedMode {
     pub(crate) depth_mode: DepthMode,
     pub(crate) draw_mode: DrawMode,
+}
+
+#[derive(Clone)]
+pub(crate) struct ComputedFace {
     pub(crate) double_sided: bool,
 }
 
@@ -124,6 +128,7 @@ pub(crate) struct ComputedInternal {
     pub(crate) volume: Sourced<ComputedVolume>,
     pub(crate) stencil: Sourced<ComputedStencil>,
     pub(crate) mode: Sourced<ComputedMode>,
+    pub(crate) face: Sourced<ComputedFace>,
     pub(crate) depth: Sourced<ComputedDepth>,
     pub(crate) layers: Sourced<RenderLayers>,
     pub(crate) alpha_mask: Sourced<OutlineAlphaMask>,
@@ -141,6 +146,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, OutlineVolume>>,
     Option<Ref<'a, OutlineStencil>>,
     Option<Ref<'a, OutlineMode>>,
+    Option<Ref<'a, OutlineFace>>,
     Option<Ref<'a, OutlinePlaneDepth>>,
     Option<Ref<'a, OutlineRenderLayers>>,
     Option<Ref<'a, RenderLayers>>,
@@ -220,6 +226,7 @@ fn update_computed_outline(
         volume,
         stencil,
         mode,
+        face,
         depth,
         layers,
         fallback_layers,
@@ -239,6 +246,7 @@ fn update_computed_outline(
                 || computed.volume.is_changed(&volume, has_parent)
                 || computed.stencil.is_changed(&stencil, has_parent)
                 || computed.mode.is_changed(&mode, has_parent)
+                || computed.face.is_changed(&face, has_parent)
                 || computed.depth.is_changed(&depth, has_parent)
                 || computed
                     .layers
@@ -279,30 +287,23 @@ fn update_computed_outline(
                     OutlineMode::ExtrudeFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::Extrude,
-                        double_sided: false,
-                    },
-                    OutlineMode::ExtrudeFlatDoubleSided => ComputedMode {
-                        depth_mode: DepthMode::Flat,
-                        draw_mode: DrawMode::Extrude,
-                        double_sided: true,
                     },
                     OutlineMode::ExtrudeReal => ComputedMode {
                         depth_mode: DepthMode::Real,
                         draw_mode: DrawMode::Extrude,
-                        double_sided: false,
                     },
                     #[cfg(feature = "flood")]
                     OutlineMode::FloodFlat => ComputedMode {
                         depth_mode: DepthMode::Flat,
                         draw_mode: DrawMode::JumpFlood,
-                        double_sided: false,
                     },
-                    #[cfg(feature = "flood")]
-                    OutlineMode::FloodFlatDoubleSided => ComputedMode {
-                        depth_mode: DepthMode::Flat,
-                        draw_mode: DrawMode::JumpFlood,
-                        double_sided: true,
-                    },
+                },
+            ),
+            face: Sourced::set(
+                face,
+                parent_computed.map(|p| p.face.value.clone()),
+                |face| ComputedFace {
+                    double_sided: matches!(face, OutlineFace::DoubleSided),
                 },
             ),
             depth: Sourced::set(

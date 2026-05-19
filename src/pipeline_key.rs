@@ -293,7 +293,7 @@ pub(crate) fn compute_outline_key(
             .with_vertex_offset_zero(outline.volume.value.offset == 0.0)
             .with_stencil_vertex_offset_zero(outline.stencil.value.offset == 0.0)
             .with_plane_offset_zero(outline.depth.value.world_plane_offset == Vec3::ZERO)
-            .with_double_sided(outline.mode.value.double_sided)
+            .with_double_sided(outline.face.value.double_sided)
             .with_alpha_mask_texture(outline.alpha_mask.value.texture.is_some())
             .with_alpha_mask_channel(outline.alpha_mask.value.channel);
     }
