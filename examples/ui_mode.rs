@@ -93,7 +93,7 @@ impl Shapes {
 impl FromWorld for Shapes {
     fn from_world(world: &mut World) -> Self {
         let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
-        let settings = GenerateOutlineNormalsSettings::default().with_stretch_edges(true);
+        let settings = GenerateOutlineNormalsFrom::ExternalBisector.into();
         Self {
             cone: meshes.add(
                 Cone::new(1.0, 1.0)

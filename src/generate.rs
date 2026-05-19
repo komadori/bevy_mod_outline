@@ -47,27 +47,38 @@ impl Iterator for IndexIterator<'_> {
 
 impl ExactSizeIterator for IndexIterator<'_> {}
 
+/// Source from which outline normals are derived.
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum GenerateOutlineNormalsFrom {
+    /// Use vertex normals provided by the mesh. This falls back to
+    /// `FaceNormal` if no vertex normals are available.
+    #[default]
+    VertexNormal,
+    /// Use normals computed from face geometry.
+    FaceNormal,
+    /// Use the external bisector at each vertex. This is suitable for
+    /// non-manifold meshes.
+    ExternalBisector,
+}
+
 /// Settings for generating mesh outline normals.
 #[derive(Clone, Default)]
 pub struct GenerateOutlineNormalsSettings {
-    ignore_vertex_normals: bool,
-    stretch_edges: bool,
+    from: GenerateOutlineNormalsFrom,
 }
 
 /// Settings for generating mesh outline normals.
 impl GenerateOutlineNormalsSettings {
-    /// If true, any pre-existing vertex normals are ignored and freshly
-    /// calculated face normals are used when generating outline normals.
-    pub fn with_ignore_vertex_normals(mut self, value: bool) -> Self {
-        self.ignore_vertex_normals = value;
+    pub fn with_from(mut self, value: GenerateOutlineNormalsFrom) -> Self {
+        self.from = value;
         self
     }
+}
 
-    /// If true, an extra component is added to the generated outline normals
-    /// to angle them outwards at edges of non-manifold meshes.
-    pub fn with_stretch_edges(mut self, value: bool) -> Self {
-        self.stretch_edges = value;
-        self
+impl From<GenerateOutlineNormalsFrom> for GenerateOutlineNormalsSettings {
+    fn from(value: GenerateOutlineNormalsFrom) -> Self {
+        Self::default().with_from(value)
     }
 }
 
@@ -128,7 +139,11 @@ impl OutlineMeshExt for Mesh {
             )),
         }?;
         let normals = match self.attribute(Mesh::ATTRIBUTE_NORMAL) {
-            Some(VertexAttributeValues::Float32x3(p)) if !settings.ignore_vertex_normals => Some(p),
+            Some(VertexAttributeValues::Float32x3(p))
+                if settings.from == GenerateOutlineNormalsFrom::VertexNormal =>
+            {
+                Some(p)
+            }
             _ => None,
         };
         let mut map = HashMap::<[FloatOrd; 3], Vec3>::with_capacity(positions.len());
@@ -142,21 +157,20 @@ impl OutlineMeshExt for Mesh {
                 let n = map
                     .entry([FloatOrd(p0.x), FloatOrd(p0.y), FloatOrd(p0.z)])
                     .or_default();
-                *n += angle
-                    * if let Some(ns) = normals {
-                        // Use vertex normal
-                        Vec3::from(ns[j0])
-                    } else {
-                        // Calculate face normal
-                        (p1 - p0).cross(p2 - p0).normalize_or_zero()
-                    };
-                if settings.stretch_edges {
+                let vector = if settings.from == GenerateOutlineNormalsFrom::ExternalBisector {
+                    // External bisector
                     let face_normal = (p1 - p0).cross(p2 - p0);
                     let perp1 = Dir3::new(face_normal.cross(p0 - p1)).unwrap();
                     let perp2 = Dir3::new(face_normal.cross(p2 - p0)).unwrap();
-                    let stretch = perp1.slerp(perp2, 0.5).as_vec3();
-                    *n += angle * stretch;
-                }
+                    perp1.slerp(perp2, 0.5).as_vec3()
+                } else if let Some(ns) = normals {
+                    // Use vertex normal
+                    Vec3::from(ns[j0])
+                } else {
+                    // Calculate face normal
+                    (p1 - p0).cross(p2 - p0).normalize_or_zero()
+                };
+                *n += angle * vector;
             }
         }
         let mut outlines = Vec::with_capacity(positions.len());
