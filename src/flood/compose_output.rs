@@ -9,7 +9,7 @@ use bevy::{
             binding_types::{texture_2d, uniform_buffer},
             BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
             CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, PipelineCache,
-            RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderType, StoreOp,
+            RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderType,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         sync_world::MainEntity,
@@ -23,7 +23,10 @@ use wgpu_types::{
 };
 
 use crate::{
-    culling::RenderExtractedOutlineEntities, pipeline_key::ViewPipelineKey,
+    culling::RenderExtractedOutlineEntities,
+    msaa::{OutlineViewTextures, ResolvedOutlineMsaa},
+    node::{outline_colour_attachment, outline_depth_attachment},
+    pipeline_key::ViewPipelineKey,
     uniforms::RenderOutlineInstances,
 };
 
@@ -160,7 +163,7 @@ pub struct ComposeOutputView {
 
 pub(crate) fn prepare_compose_output_pass(
     mut commands: Commands,
-    query: Query<(Entity, &ExtractedView, &Msaa), With<OutlineViewUniform>>,
+    query: Query<(Entity, &ExtractedView, &ResolvedOutlineMsaa), With<OutlineViewUniform>>,
     pipeline_cache: Res<PipelineCache>,
     fullscreen_shader: Res<FullscreenShader>,
     mut compose_output_pipeline: ResMut<ComposeOutputPipeline>,
@@ -170,7 +173,7 @@ pub(crate) fn prepare_compose_output_pass(
             &pipeline_cache,
             &fullscreen_shader,
             ViewPipelineKey::new()
-                .with_msaa(*msaa)
+                .with_msaa(**msaa)
                 .with_target_format(view.target_format),
         );
         commands
@@ -187,6 +190,7 @@ pub(crate) struct ComposeOutputPass<'w> {
     compose_output_uniforms: &'w ComposeOutputUniforms,
     view_target: &'w ViewTarget,
     view_depth: &'w ViewDepthTexture,
+    outline_textures: Option<&'w OutlineViewTextures>,
 }
 
 impl<'w> ComposeOutputPass<'w> {
@@ -195,6 +199,7 @@ impl<'w> ComposeOutputPass<'w> {
         compose_output_view: &ComposeOutputView,
         view_target: &'w ViewTarget,
         view_depth: &'w ViewDepthTexture,
+        outline_textures: Option<&'w OutlineViewTextures>,
     ) -> Option<Self> {
         let pipeline = world.resource::<ComposeOutputPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
@@ -211,6 +216,7 @@ impl<'w> ComposeOutputPass<'w> {
             compose_output_uniforms,
             view_target,
             view_depth,
+            outline_textures,
         })
     }
 
@@ -247,8 +253,14 @@ impl<'w> ComposeOutputPass<'w> {
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("outline_flood_compose_output_pass"),
-            color_attachments: &[Some(self.view_target.get_color_attachment())],
-            depth_stencil_attachment: Some(self.view_depth.get_attachment(StoreOp::Store)),
+            color_attachments: &[Some(outline_colour_attachment(
+                self.view_target,
+                self.outline_textures,
+            ))],
+            depth_stencil_attachment: Some(outline_depth_attachment(
+                self.view_depth,
+                self.outline_textures,
+            )),
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,

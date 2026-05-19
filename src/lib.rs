@@ -45,7 +45,7 @@ use bevy::render::batching::no_gpu_preprocessing::{
     clear_batched_cpu_instance_buffers, write_batched_instance_buffer, BatchedInstanceBuffer,
 };
 use bevy::render::camera::DirtySpecializationSystems;
-use bevy::render::extract_component::UniformComponentPlugin;
+use bevy::render::extract_component::{ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::render_phase::{
     sort_phase_system, AddRenderCommand, BinnedRenderPhasePlugin, DrawFunctions, PhaseItem,
     SortedRenderPhasePlugin,
@@ -53,6 +53,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::{SpecializedMeshPipelines, VertexFormat};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::texture::FallbackImage;
+use bevy::render::view::Msaa;
 use bevy::render::{
     init_gpu_resource, Render, RenderApp, RenderDebugFlags, RenderStartup, RenderSystems,
 };
@@ -62,7 +63,10 @@ use crate::culling::{
     extract_outline_visible_entities, OutlineVisibleEntities, RenderExtractedOutlineEntities,
     RenderOutlineEntities,
 };
-use crate::msaa::msaa_extra_writeback_pass;
+use crate::msaa::{
+    msaa_extra_writeback_pass, prepare_msaa_extra_writeback_pipelines,
+    prepare_outline_view_textures, ResolvedOutlineMsaa,
+};
 use crate::node::{outline_render_pass, OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::{
     init_outline_pipeline, OutlinePipeline, COMMON_SHADER_HANDLE, FRAGMENT_SHADER_HANDLE,
@@ -380,6 +384,24 @@ impl OutlineWarmUp {
     }
 }
 
+/// A view-level component which controls the MSAA setting used when rendering
+/// outlines, independently of the MSAA setting used for the rest of the scene.
+///
+/// Add this component to a camera to override the multi-sample anti-aliasing
+/// level for outline rendering. When set to [`OutlineMsaa::Auto`] (the default,
+/// also implied when the component is absent) the outline MSAA level matches
+/// the camera's [`Msaa`] setting.
+#[derive(Component, Clone, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub enum OutlineMsaa {
+    /// Match the camera's [`Msaa`] setting.
+    #[default]
+    Auto,
+    /// Use a fixed MSAA setting for outline rendering.
+    Msaa(Msaa),
+}
+
 // This makes `SetMeshBindGroup` work with CPU drawn outlines when GPU pre-processing is enabled
 pub(crate) fn add_dummy_phase_buffer<P: PhaseItem + 'static>(
     bibs: &mut gpu_preprocessing::BatchedInstanceBuffers<MeshUniform, MeshInputUniform>,
@@ -422,6 +444,7 @@ impl Plugin for OutlinePlugin {
         );
 
         app.add_plugins((
+            ExtractComponentPlugin::<ResolvedOutlineMsaa>::default(),
             UniformComponentPlugin::<OutlineViewUniform>::default(),
             BinnedRenderPhasePlugin::<StencilOutline, OutlinePipeline>::new(
                 RenderDebugFlags::empty(),
@@ -477,7 +500,11 @@ impl Plugin for OutlinePlugin {
         )
         .add_systems(
             Render,
-            msaa::prepare_msaa_extra_writeback_pipelines.in_set(RenderSystems::Prepare),
+            (
+                prepare_outline_view_textures,
+                prepare_msaa_extra_writeback_pipelines,
+            )
+                .in_set(RenderSystems::Prepare),
         )
         .add_systems(
             Render,
@@ -527,7 +554,8 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineRenderLayers>()
             .register_type::<OutlineMode>()
             .register_type::<OutlineAlphaMask>()
-            .register_type::<InheritOutline>();
+            .register_type::<InheritOutline>()
+            .register_type::<OutlineMsaa>();
 
         #[cfg(feature = "world_serialisation")]
         app.init_resource::<AsyncWorldInheritOutlineSystems>();

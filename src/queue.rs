@@ -16,6 +16,7 @@ use bevy::render::sync_world::MainEntityHashMap;
 use bevy::render::view::{ExtractedView, RetainedViewEntity};
 use bevy::render::Extract;
 
+use crate::msaa::ResolvedOutlineMsaa;
 use crate::node::{
     OpaqueOutline, OutlineBatchSetKey, OutlineBinKey, OutlineSortingInfo, StencilOutline,
     TransparentOutline,
@@ -123,7 +124,11 @@ pub(crate) fn specialise_outlines(
     mut warm_up_keys: Local<Vec<EntityPipelineKey>>,
     outline_pipeline: Res<OutlinePipeline>,
     pipeline_cache: Res<PipelineCache>,
-    views: Query<(&ExtractedView, Has<MotionVectorPrepass>, &Msaa)>,
+    views: Query<(
+        &ExtractedView,
+        Has<MotionVectorPrepass>,
+        &ResolvedOutlineMsaa,
+    )>,
 ) {
     all_views.clear();
 
@@ -131,7 +136,7 @@ pub(crate) fn specialise_outlines(
         all_views.insert(view.retained_view_entity);
 
         let view_key = ViewPipelineKey::new()
-            .with_msaa(*msaa)
+            .with_msaa(**msaa)
             .with_target_format(view.target_format)
             .with_motion_vector_prepass(motion_vector_prepass);
 

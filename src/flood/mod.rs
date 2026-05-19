@@ -28,6 +28,7 @@ use node::{flood_render_pass, FloodOutline};
 use sobel_init::init_sobel_init_pipeline;
 
 use crate::add_dummy_phase_buffer;
+use crate::msaa::ResolvedOutlineMsaa;
 use crate::node::outline_render_pass;
 use crate::pipeline::OutlinePipeline;
 use crate::render::DrawOutline;
@@ -87,7 +88,7 @@ pub fn prepare_flood_textures(
     mut commands: Commands,
     mut texture_cache: ResMut<TextureCache>,
     render_device: Res<RenderDevice>,
-    cameras: Query<(Entity, &ExtractedCamera, &Msaa)>,
+    cameras: Query<(Entity, &ExtractedCamera, &ResolvedOutlineMsaa)>,
 ) {
     for (entity, camera, msaa) in cameras.iter() {
         let Some(target_size) = camera.physical_target_size else {

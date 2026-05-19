@@ -19,6 +19,7 @@ use indexmap::IndexMap;
 use itertools::*;
 use std::ops::Range;
 
+use crate::msaa::{OutlineViewTextures, ResolvedOutlineMsaa};
 use crate::node::{OutlineRangefinder, OutlineSortingInfo};
 use crate::OutlineViewUniform;
 
@@ -120,7 +121,8 @@ pub(crate) fn flood_render_pass(
         &OutlineViewUniform,
         &FloodTextures,
         &ComposeOutputView,
-        &Msaa,
+        &ResolvedOutlineMsaa,
+        Option<&OutlineViewTextures>,
     )>,
     flood_phases: Res<ViewSortedRenderPhases<FloodOutline>>,
     pipeline_cache: Res<PipelineCache>,
@@ -136,8 +138,8 @@ pub(crate) fn flood_render_pass(
         flood_textures,
         compose_output_view,
         msaa,
+        outline_textures,
     ) = view.into_inner();
-
     let Some(flood_phase) = flood_phases.get(&view_extracted.retained_view_entity) else {
         return;
     };
@@ -158,7 +160,7 @@ pub(crate) fn flood_render_pass(
         None
     };
     let Some(compose_output_pass) =
-        ComposeOutputPass::new(world, compose_output_view, target, depth)
+        ComposeOutputPass::new(world, compose_output_view, target, depth, outline_textures)
     else {
         return;
     };

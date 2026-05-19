@@ -11,14 +11,15 @@ use bevy::render::render_phase::{
     ViewRangefinder3d, ViewSortedRenderPhases,
 };
 use bevy::render::render_resource::{
-    CachedRenderPipelineId, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-    StoreOp,
+    CachedRenderPipelineId, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp,
 };
 use bevy::render::renderer::{RenderContext, ViewQuery};
 use bevy::render::sync_world::MainEntity;
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
 use indexmap::IndexMap;
 
+use crate::msaa::OutlineViewTextures;
 use crate::view_uniforms::OutlineQueueStatus;
 
 #[derive(Clone, Copy, Debug)]
@@ -283,6 +284,41 @@ impl CachedRenderPipelinePhaseItem for TransparentOutline {
     }
 }
 
+pub(crate) fn outline_colour_attachment<'a>(
+    target: &'a ViewTarget,
+    outline_textures: Option<&'a OutlineViewTextures>,
+) -> RenderPassColorAttachment<'a> {
+    match outline_textures {
+        Some(t) => {
+            let (view, resolve_target) = match &t.color {
+                Some(color) => (&color.default_view, Some(target.main_texture_view())),
+                None => (target.main_texture_view(), None),
+            };
+            RenderPassColorAttachment {
+                view,
+                depth_slice: None,
+                resolve_target: resolve_target.map(|v| &**v),
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            }
+        }
+        None => target.get_color_attachment(),
+    }
+}
+
+pub(crate) fn outline_depth_attachment<'a>(
+    depth: &'a ViewDepthTexture,
+    outline_textures: Option<&'a OutlineViewTextures>,
+) -> RenderPassDepthStencilAttachment<'a> {
+    match outline_textures {
+        Some(t) => t.depth.get_attachment(StoreOp::Store),
+        None => depth.get_attachment(StoreOp::Store),
+    }
+}
+
+#[allow(clippy::type_complexity)]
 pub(crate) fn outline_render_pass(
     world: &World,
     view: ViewQuery<(
@@ -292,6 +328,7 @@ pub(crate) fn outline_render_pass(
         &ViewTarget,
         &ViewDepthTexture,
         &OutlineQueueStatus,
+        Option<&OutlineViewTextures>,
     )>,
     stencil_phases: Res<ViewBinnedRenderPhases<StencilOutline>>,
     opaque_phases: Res<ViewBinnedRenderPhases<OpaqueOutline>>,
@@ -299,7 +336,8 @@ pub(crate) fn outline_render_pass(
     mut render_context: RenderContext,
 ) {
     let view_entity = view.entity();
-    let (view_extracted, camera, camera_3d, target, depth, queue_status) = view.into_inner();
+    let (view_extracted, camera, camera_3d, target, depth, queue_status, outline_textures) =
+        view.into_inner();
 
     let (Some(stencil_phase), Some(opaque_phase), Some(transparent_phase)) = (
         stencil_phases.get(&view_extracted.retained_view_entity),
@@ -311,17 +349,17 @@ pub(crate) fn outline_render_pass(
 
     // If drawing anything, run stencil pass to clear the depth buffer
     if queue_status.has_volume {
+        let depth_stencil_attachment = Some(RenderPassDepthStencilAttachment {
+            depth_ops: Some(Operations {
+                load: camera_3d.depth_load_op.clone().into(),
+                store: StoreOp::Store,
+            }),
+            ..outline_depth_attachment(depth, outline_textures)
+        });
         let pass_descriptor = RenderPassDescriptor {
             label: Some("outline_stencil_pass"),
             color_attachments: &[],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: depth.view(),
-                depth_ops: Some(Operations {
-                    load: camera_3d.depth_load_op.clone().into(),
-                    store: StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
+            depth_stencil_attachment,
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,
@@ -338,8 +376,8 @@ pub(crate) fn outline_render_pass(
     if !opaque_phase.is_empty() {
         let pass_descriptor = RenderPassDescriptor {
             label: Some("outline_opaque_pass"),
-            color_attachments: &[Some(target.get_color_attachment())],
-            depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
+            color_attachments: &[Some(outline_colour_attachment(target, outline_textures))],
+            depth_stencil_attachment: Some(outline_depth_attachment(depth, outline_textures)),
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,
@@ -356,8 +394,8 @@ pub(crate) fn outline_render_pass(
     if !transparent_phase.items.is_empty() {
         let pass_descriptor = RenderPassDescriptor {
             label: Some("outline_transparent_pass"),
-            color_attachments: &[Some(target.get_color_attachment())],
-            depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
+            color_attachments: &[Some(outline_colour_attachment(target, outline_textures))],
+            depth_stencil_attachment: Some(outline_depth_attachment(depth, outline_textures)),
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,
