@@ -7,7 +7,7 @@ struct Selected;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, MeshPickingPlugin, OutlinePlugin))
+        .add_plugins((DefaultPlugins, MeshPickingPlugin, OutlinePlugin::JUMP_FLOOD))
         .add_systems(Startup, setup)
         .add_systems(Update, rotate_selected)
         .run();
@@ -50,7 +50,6 @@ fn setup(
                     width: 5.0f32,
                     ..default()
                 },
-                OutlineMode::FloodFlat,
                 Pickable::default(),
             ))
             .observe(on_click);

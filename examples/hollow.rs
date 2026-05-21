@@ -14,7 +14,7 @@ fn main() {
                     .add_custom_vertex_attribute("_OUTLINE_NORMAL", ATTRIBUTE_OUTLINE_NORMAL),
             ),
         )
-        .add_plugins(OutlinePlugin)
+        .add_plugins(OutlinePlugin::EXTRUDE_VERTEX)
         .insert_resource(GlobalAmbientLight::default())
         .add_systems(Startup, setup)
         .add_systems(

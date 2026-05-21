@@ -3,8 +3,9 @@ use bevy::{camera::visibility::RenderLayers, ecs::query::QueryItem, prelude::*};
 use crate::{
     pipeline_key::ComputedOutlineKey,
     uniforms::{DepthMode, DrawMode},
-    InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMode, OutlinePlaneDepth,
-    OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled, OutlineVolume, OutlineWarmUp,
+    GlobalOutlineMode, InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMode,
+    OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled, OutlineVolume,
+    OutlineWarmUp,
 };
 
 #[derive(Clone)]
@@ -156,6 +157,7 @@ type OutlineComponents<'a> = (
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn compute_outline(
+    global_outline_mode: Res<GlobalOutlineMode>,
     mut root_query: Query<
         (
             Entity,
@@ -169,7 +171,14 @@ pub(crate) fn compute_outline(
     child_query: Query<&Children>,
 ) {
     for (entity, mut computed, components, children) in root_query.iter_mut() {
-        let changed = update_computed_outline(&mut computed, components, None, None, false);
+        let changed = update_computed_outline(
+            &mut computed,
+            components,
+            None,
+            None,
+            global_outline_mode.is_changed(),
+            &global_outline_mode,
+        );
         if let Some(cs) = children {
             let parent_computed = computed.0.as_ref().unwrap();
             for child in cs.iter() {
@@ -180,6 +189,7 @@ pub(crate) fn compute_outline(
                     child,
                     &mut child_query_mut,
                     &child_query,
+                    &global_outline_mode,
                 );
             }
         }
@@ -193,6 +203,7 @@ fn propagate_computed_outline(
     entity: Entity,
     child_query_mut: &mut Query<(&mut ComputedOutline, OutlineComponents), With<InheritOutline>>,
     child_query: &Query<&Children>,
+    global_outline_mode: &GlobalOutlineMode,
 ) {
     if let Ok((mut computed, components)) = child_query_mut.get_mut(entity) {
         let changed = update_computed_outline(
@@ -201,6 +212,7 @@ fn propagate_computed_outline(
             Some(parent_computed),
             Some(parent_entity),
             parent_changed,
+            global_outline_mode,
         );
         if let Ok(cs) = child_query.get(entity) {
             let parent_computed = &computed.0.as_ref().unwrap().clone();
@@ -212,6 +224,7 @@ fn propagate_computed_outline(
                     child,
                     child_query_mut,
                     child_query,
+                    global_outline_mode,
                 );
             }
         }
@@ -236,6 +249,7 @@ fn update_computed_outline(
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
     force_update: bool,
+    global_outline_mode: &GlobalOutlineMode,
 ) -> bool {
     let has_parent = parent_computed.is_some();
     let changed = force_update
@@ -280,8 +294,9 @@ fn update_computed_outline(
                     offset: sten.offset,
                 },
             ),
-            mode: Sourced::set(
+            mode: Sourced::set_with_default(
                 mode,
+                &global_outline_mode.0,
                 parent_computed.map(|p| p.mode.value.clone()),
                 |mode| match mode {
                     OutlineMode::ExtrudeFlat => ComputedMode {
@@ -352,6 +367,7 @@ mod tests {
 
     fn setup() -> (App, Entity) {
         let mut app = App::new();
+        app.init_resource::<GlobalOutlineMode>();
         app.add_systems(Update, compute_outline);
         let entity = app
             .world_mut()

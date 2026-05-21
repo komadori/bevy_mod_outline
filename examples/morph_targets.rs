@@ -22,7 +22,7 @@ fn main() {
                 }),
                 ..default()
             }),
-            OutlinePlugin,
+            OutlinePlugin::EXTRUDE_VERTEX,
             AutoGenerateOutlineNormalsPlugin::default(),
         ))
         .insert_resource(GlobalAmbientLight::default())

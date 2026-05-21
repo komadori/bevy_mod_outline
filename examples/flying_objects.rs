@@ -8,7 +8,7 @@ use bevy_mod_outline::*;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
-        .add_plugins((DefaultPlugins, OutlinePlugin))
+        .add_plugins((DefaultPlugins, OutlinePlugin::EXTRUDE_VERTEX))
         .add_systems(Startup, setup)
         .add_systems(Update, (spawn_objects, move_objects, despawn_objects))
         .run();

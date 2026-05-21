@@ -5,7 +5,7 @@ use std::f32::consts::TAU;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
-        .add_plugins((DefaultPlugins, OutlinePlugin))
+        .add_plugins((DefaultPlugins, OutlinePlugin::JUMP_FLOOD))
         .add_systems(Startup, setup)
         .add_systems(Update, pulse_outline_thickness)
         .run();
@@ -64,7 +64,6 @@ fn setup(
             colour: Color::srgb(1.0, 1.0, 0.0),
             width: 0.0,
         },
-        OutlineMode::FloodFlat,
         OutlineAlphaMask {
             texture: Some(alpha_mask_handle),
             channel: TextureChannel::R,

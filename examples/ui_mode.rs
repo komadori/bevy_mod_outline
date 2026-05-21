@@ -15,7 +15,7 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((
             DefaultPlugins,
-            OutlinePlugin,
+            OutlinePlugin::EXTRUDE_VERTEX,
             WireframePlugin {
                 debug_flags: RenderDebugFlags::empty(),
             },

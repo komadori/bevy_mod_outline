@@ -21,13 +21,20 @@
 //! Outlines can be inherited from the parent via the [`InheritOutline`]
 //! component.
 //!
-//! Vertex extrusion works best with meshes that have smooth surfaces. To
-//! avoid visual artefacts when outlining meshes with hard edges, see the
-//! [`OutlineMeshExt::generate_outline_normals`] function and the
-//! [`AutoGenerateOutlineNormalsPlugin`].
+//! There are two methods available for rendering outlines: vertex extrusion
+//! and jump flood. The default method is selected by adding either
+//! [`OutlinePlugin::EXTRUDE_VERTEX`] or [`OutlinePlugin::JUMP_FLOOD`], and
+//! can be overridden for individual entities via the [`OutlineMode`]
+//! component.
 //!
-//! Jump flood support is currently experimental and can be enabled by
-//! adding the [`OutlineMode::FloodFlat`] component.
+//! Vertex extrusion is generally more performant, but is sensitive to the
+//! fidelity of meshes and requires smooth outline normals to avoid visual
+//! artefacts. See the [`OutlineMeshExt::generate_outline_normals`] function
+//! and the [`AutoGenerateOutlineNormalsPlugin`] for help generating these.
+//!
+//! Jump flood, as a screen-space technique, is more robust especially with
+//! thicker outlines. However, it requires `log2(n)` shader passes over the
+//! outline's bounding box where `n` is the thickness in screen pixels.
 
 use std::any::TypeId;
 
@@ -270,10 +277,18 @@ pub enum OutlineMode {
     ExtrudeFlat,
     /// Vertex extrusion in real model-space.
     ExtrudeReal,
-    // Jump-flood into a billboard.
+    /// Jump-flood into a billboard.
     #[cfg(feature = "flood")]
     FloodFlat,
 }
+
+/// A resource which controls the default [`OutlineMode`] used when an entity
+/// does not have an [`OutlineMode`] component and does not inherit one from
+/// a parent.
+#[derive(Clone, Default, Resource, Deref)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Resource, Default))]
+pub struct GlobalOutlineMode(pub OutlineMode);
 
 /// A component which controls which faces of an outline are rendered.
 #[derive(Clone, Component, Default)]
@@ -433,7 +448,24 @@ fn add_dummy_phase_buffers(
 }
 
 /// Adds support for rendering outlines.
-pub struct OutlinePlugin;
+pub struct OutlinePlugin {
+    mode: OutlineMode,
+}
+
+impl OutlinePlugin {
+    /// An [`OutlinePlugin`] configured to use vertex extrusion outlines by
+    /// default. See [`OutlineMode::ExtrudeFlat`].
+    pub const EXTRUDE_VERTEX: Self = Self {
+        mode: OutlineMode::ExtrudeFlat,
+    };
+
+    /// An [`OutlinePlugin`] configured to use jump-flood outlines by default.
+    /// See [`OutlineMode::FloodFlat`].
+    #[cfg(feature = "flood")]
+    pub const JUMP_FLOOD: Self = Self {
+        mode: OutlineMode::FloodFlat,
+    };
+}
 
 impl Plugin for OutlinePlugin {
     fn build(&self, app: &mut App) {
@@ -467,6 +499,7 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
+        .insert_resource(GlobalOutlineMode(self.mode.clone()))
         .init_resource::<OutlineEntitiesNeedingSpecialisation>()
         .init_resource::<OutlineVisibleEntities>()
         .add_systems(
@@ -561,6 +594,7 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineVolume>()
             .register_type::<OutlineRenderLayers>()
             .register_type::<OutlineMode>()
+            .register_type::<GlobalOutlineMode>()
             .register_type::<OutlineFace>()
             .register_type::<OutlineAlphaMask>()
             .register_type::<InheritOutline>()

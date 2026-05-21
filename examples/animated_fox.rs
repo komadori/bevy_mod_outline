@@ -12,7 +12,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            OutlinePlugin,
+            OutlinePlugin::EXTRUDE_VERTEX,
             AutoGenerateOutlineNormalsPlugin::default(),
         ))
         .insert_resource(GlobalAmbientLight::default())
