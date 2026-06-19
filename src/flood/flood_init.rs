@@ -114,7 +114,7 @@ pub(crate) fn queue_flood_meshes(
                 world_plane_origin: outline.instance_data.world_plane_origin,
                 world_plane_offset: outline.instance_data.world_plane_offset,
             };
-            flood_phase.add(FloodOutline {
+            flood_phase.add_retained(FloodOutline {
                 sorting_info,
                 distance: 0.0,
                 entity: Entity::PLACEHOLDER,

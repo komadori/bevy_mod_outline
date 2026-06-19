@@ -381,7 +381,7 @@ pub(crate) fn queue_outline_mesh(
                         world_plane_origin: outline.instance_data.world_plane_origin,
                         world_plane_offset: outline.instance_data.world_plane_offset,
                     };
-                    transparent_phase.add(TransparentOutline {
+                    transparent_phase.add_retained(TransparentOutline {
                         sorting_info,
                         entity: Entity::PLACEHOLDER,
                         main_entity: *main_entity,
