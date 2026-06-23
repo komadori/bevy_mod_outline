@@ -38,10 +38,13 @@ world_serialisation = ["bevy/bevy_world_serialization"]
 bevy = { version = "0.19.0-rc.3", default-features = false, features = [
     "gltf_animation",
     "bevy_anti_alias",
+    "bevy_feathers",
     "bevy_gltf",
+    "bevy_input_focus",
     "mesh_picking",
     "bevy_pbr",
     "bevy_post_process",
+    "bevy_scene",
     "bevy_sprite",
     "bevy_state",
     "bevy_text",

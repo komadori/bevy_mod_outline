@@ -1,10 +1,20 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
+    feathers::{
+        controls::{
+            FeathersMenu, FeathersMenuButton, FeathersMenuItem, FeathersMenuPopup, FeathersSlider,
+        },
+        dark_theme::create_dark_theme,
+        theme::{ThemedText, UiTheme},
+        FeathersPlugins,
+    },
+    input_focus::tab_navigation::TabGroup,
     pbr::wireframe::{Wireframe, WireframePlugin},
     prelude::*,
     render::RenderDebugFlags,
     state::state::FreelyMutableState,
+    ui_widgets::{slider_self_update, Activate, SliderPrecision, SliderStep, SliderValue},
 };
 
 use bevy_mod_outline::*;
@@ -16,28 +26,27 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             OutlinePlugin::EXTRUDE_VERTEX,
+            FeathersPlugins,
             WireframePlugin {
                 debug_flags: RenderDebugFlags::empty(),
             },
         ))
-        .insert_state(DrawMethod::Extrude)
-        .insert_state(DrawShape::Cone)
-        .insert_state(DrawOrientation::Front)
+        .insert_resource(UiTheme(create_dark_theme()))
+        .init_state::<DrawMode>()
+        .init_state::<DrawFace>()
+        .init_state::<DrawShape>()
         .init_resource::<Shapes>()
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, ui.spawn()))
         .add_systems(
             Update,
             (
-                highlight::<DrawMethod>,
-                highlight::<DrawShape>,
-                highlight::<DrawOrientation>,
-                interaction::<DrawMethod>,
-                interaction::<DrawShape>,
-                interaction::<DrawOrientation>,
-                change_mode,
-                change_shape,
-                change_orientation,
-                rotate_y,
+                update_label::<DrawMode, ModeLabel>.run_if(state_changed::<DrawMode>),
+                update_label::<DrawFace, FaceLabel>.run_if(state_changed::<DrawFace>),
+                update_label::<DrawShape, ShapeLabel>.run_if(state_changed::<DrawShape>),
+                apply_mode.run_if(state_changed::<DrawMode>),
+                apply_face.run_if(state_changed::<DrawFace>),
+                apply_shape.run_if(state_changed::<DrawShape>),
+                apply_rotation,
             ),
         )
         .run();
@@ -46,30 +55,41 @@ fn main() {
 #[derive(Component)]
 struct TheObject;
 
-#[derive(Copy, Clone, States, Component, Debug, PartialEq, Eq, Hash)]
-enum DrawMethod {
-    Extrude,
-    ExtrudeDoubleSided,
-    JumpFlood,
-    JumpFloodDoubleSided,
+#[derive(Component, Default, Clone)]
+struct ModeLabel;
+
+#[derive(Component, Default, Clone)]
+struct FaceLabel;
+
+#[derive(Component, Default, Clone)]
+struct ShapeLabel;
+
+#[derive(Component, Default, Clone)]
+struct RotationSlider;
+
+#[derive(Copy, Clone, States, Debug, Default, PartialEq, Eq, Hash)]
+enum DrawMode {
+    #[default]
+    ExtrudeFlat,
+    ExtrudeReal,
+    FloodFlat,
 }
 
-#[derive(Copy, Clone, States, Component, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, States, Debug, Default, PartialEq, Eq, Hash)]
+enum DrawFace {
+    #[default]
+    Front,
+    DoubleSided,
+}
+
+#[derive(Copy, Clone, States, Debug, Default, PartialEq, Eq, Hash)]
 enum DrawShape {
+    #[default]
     Cone,
     Triangle,
     Rectangle,
     Circle,
 }
-
-#[derive(Copy, Clone, States, Component, Debug, PartialEq, Eq, Hash)]
-enum DrawOrientation {
-    Front,
-    Back,
-}
-
-#[derive(Component)]
-struct RotateY(f32);
 
 #[derive(Resource)]
 struct Shapes {
@@ -150,41 +170,6 @@ fn setup(
         TheObject,
     ));
 
-    // Add buttons
-    commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            ..default()
-        })
-        .with_children(|parent| {
-            parent
-                .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                })
-                .with_children(|parent| {
-                    create_buttons(
-                        parent,
-                        &[
-                            DrawMethod::Extrude,
-                            DrawMethod::ExtrudeDoubleSided,
-                            DrawMethod::JumpFlood,
-                            DrawMethod::JumpFloodDoubleSided,
-                        ],
-                    );
-                    create_buttons(
-                        parent,
-                        &[
-                            DrawShape::Cone,
-                            DrawShape::Triangle,
-                            DrawShape::Rectangle,
-                            DrawShape::Circle,
-                        ],
-                    );
-                    create_buttons(parent, &[DrawOrientation::Front, DrawOrientation::Back]);
-                });
-        });
-
     // Add light source and camera
     commands.spawn((PointLight::default(), Transform::from_xyz(4.0, 8.0, 4.0)));
     commands.spawn((
@@ -194,144 +179,163 @@ fn setup(
     ));
 }
 
-fn create_buttons<T: Component + States>(builder: &mut ChildSpawnerCommands, values: &[T]) {
-    builder
-        .spawn(Node {
+/// A toolbar pinned to the top-left corner.
+fn ui() -> impl SceneList {
+    bsn_list![(
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(8),
+            left: px(8),
             flex_direction: FlexDirection::Row,
-            ..default()
+            align_items: AlignItems::Center,
+            column_gap: px(8),
+        }
+        TabGroup
+        Children [
+            mode_menu(),
+            face_menu(),
+            shape_menu(),
+            (Text("Rotation") ThemedText),
+            (
+                @FeathersSlider {
+                    @min: -180.0,
+                    @max: 180.0,
+                    @value: 0.0,
+                }
+                Node { width: px(220) }
+                SliderStep(1.0)
+                SliderPrecision(0)
+                RotationSlider
+                on(slider_self_update)
+            ),
+        ]
+    )]
+}
+
+/// A drop-down menu: a button captioned `caption` that opens a popup listing `items`.
+fn menu(caption: impl SceneList + 'static, items: impl SceneList + 'static) -> impl Scene {
+    bsn! {
+        @FeathersMenu
+        Children [
+            (@FeathersMenuButton {
+                @caption: {Box::new(caption) as Box<dyn SceneList>}
+            }),
+            (@FeathersMenuPopup Children [ {Box::new(items) as Box<dyn SceneList>} ])
+        ]
+    }
+}
+
+/// Menu for selecting the outline mode.
+fn mode_menu() -> impl Scene {
+    menu(
+        bsn_list![
+            (Text("Outline mode: ") ThemedText),
+            (Text("") ThemedText ModeLabel),
+        ],
+        bsn_list![
+            menu_item(DrawMode::ExtrudeFlat),
+            menu_item(DrawMode::ExtrudeReal),
+            menu_item(DrawMode::FloodFlat),
+        ],
+    )
+}
+
+/// Menu for selecting which faces of the outline are rendered.
+fn face_menu() -> impl Scene {
+    menu(
+        bsn_list![
+            (Text("Outline face: ") ThemedText),
+            (Text("") ThemedText FaceLabel),
+        ],
+        bsn_list![menu_item(DrawFace::Front), menu_item(DrawFace::DoubleSided),],
+    )
+}
+
+/// Menu for selecting which shape mesh is displayed.
+fn shape_menu() -> impl Scene {
+    menu(
+        bsn_list![
+            (Text("Shape: ") ThemedText),
+            (Text("") ThemedText ShapeLabel),
+        ],
+        bsn_list![
+            menu_item(DrawShape::Cone),
+            menu_item(DrawShape::Triangle),
+            menu_item(DrawShape::Rectangle),
+            menu_item(DrawShape::Circle),
+        ],
+    )
+}
+
+/// A menu item, captioned with the `Debug` representation of `value`, which selects `value` for
+/// state `S` when activated.
+fn menu_item<S: FreelyMutableState + Copy>(value: S) -> impl Scene {
+    let label = format!("{value:?}");
+    bsn! {
+        @FeathersMenuItem {
+            @caption: {bsn! { Text(label) ThemedText }}
+        }
+        on(move |_: On<Activate>, mut next: ResMut<NextState<S>>| {
+            next.set(value);
         })
-        .with_children(|parent| {
-            for value in values {
-                parent
-                    .spawn((
-                        Button,
-                        Node {
-                            margin: UiRect::all(Val::Px(5.0)),
-                            padding: UiRect::all(Val::Px(10.0)),
-                            border: UiRect::all(Val::Px(5.0)),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border_radius: BorderRadius::MAX,
-                            ..default()
-                        },
-                        BorderColor::all(Color::BLACK),
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                        value.clone(),
-                    ))
-                    .with_children(|parent| {
-                        parent
-                            .spawn(Text::new(format!("{:?}", value)))
-                            .insert(TextColor(Color::WHITE));
-                    });
-            }
-        });
-}
-
-fn highlight<T: Component + States>(
-    mut query: Query<(&mut BorderColor, &T)>,
-    state: Res<State<T>>,
-) {
-    for (mut border, m) in query.iter_mut() {
-        *border = if m == state.get() {
-            BorderColor::all(Color::srgb(0.0, 0.0, 1.0))
-        } else {
-            BorderColor::all(Color::BLACK)
-        };
     }
 }
 
-fn interaction<T: Component + FreelyMutableState>(
-    query: Query<(&Interaction, &T)>,
-    mut armed: Local<bool>,
-    mut state: ResMut<NextState<T>>,
+/// Writes the `Debug` representation of state `S` into every `Text` marked with `L`.
+fn update_label<S: States + std::fmt::Debug, L: Component>(
+    state: Res<State<S>>,
+    mut query: Query<&mut Text, With<L>>,
 ) {
-    let mut any_pressed = false;
-    for (i, m) in query.iter() {
-        if *i == Interaction::Pressed {
-            any_pressed = true;
-            if *armed {
-                state.set(m.clone());
-            }
-        }
+    for mut text in query.iter_mut() {
+        text.0 = format!("{:?}", state.get());
     }
-    *armed = !any_pressed;
 }
 
-fn change_mode(
+fn apply_mode(
+    state: Res<State<DrawMode>>,
+    object: Single<Entity, With<TheObject>>,
     mut commands: Commands,
-    mut reader: MessageReader<StateTransitionEvent<DrawMethod>>,
-    query: Query<Entity, With<TheObject>>,
 ) {
-    for event in reader.read() {
-        if let Ok(entity) = query.single() {
-            commands
-                .entity(entity)
-                .insert(match event.entered.unwrap() {
-                    DrawMethod::Extrude => (OutlineMode::ExtrudeFlat, OutlineFace::Front),
-                    DrawMethod::ExtrudeDoubleSided => {
-                        (OutlineMode::ExtrudeFlat, OutlineFace::DoubleSided)
-                    }
-                    DrawMethod::JumpFlood => (OutlineMode::FloodFlat, OutlineFace::Front),
-                    DrawMethod::JumpFloodDoubleSided => {
-                        (OutlineMode::FloodFlat, OutlineFace::DoubleSided)
-                    }
-                });
-        }
-    }
+    let mode = match state.get() {
+        DrawMode::ExtrudeFlat => OutlineMode::ExtrudeFlat,
+        DrawMode::ExtrudeReal => OutlineMode::ExtrudeReal,
+        DrawMode::FloodFlat => OutlineMode::FloodFlat,
+    };
+    commands.entity(*object).insert(mode);
 }
 
-fn change_shape(
+fn apply_face(
+    state: Res<State<DrawFace>>,
+    object: Single<Entity, With<TheObject>>,
     mut commands: Commands,
-    mut reader: MessageReader<StateTransitionEvent<DrawShape>>,
-    query: Query<Entity, With<TheObject>>,
+) {
+    let face = match state.get() {
+        DrawFace::Front => OutlineFace::Front,
+        DrawFace::DoubleSided => OutlineFace::DoubleSided,
+    };
+    commands.entity(*object).insert(face);
+}
+
+fn apply_shape(
+    state: Res<State<DrawShape>>,
+    object: Single<Entity, With<TheObject>>,
     shapes: Res<Shapes>,
+    mut commands: Commands,
 ) {
-    for event in reader.read() {
-        if let Ok(entity) = query.single() {
-            commands
-                .entity(entity)
-                .insert(Mesh3d(shapes.get(event.entered.unwrap())));
-        }
-    }
+    commands
+        .entity(*object)
+        .insert(Mesh3d(shapes.get(*state.get())));
 }
 
-fn change_orientation(
-    mut commands: Commands,
-    mut reader: MessageReader<StateTransitionEvent<DrawOrientation>>,
-    query: Query<Entity, With<TheObject>>,
+fn apply_rotation(
+    slider: Option<Single<&SliderValue, With<RotationSlider>>>,
+    mut query: Query<&mut Transform, With<TheObject>>,
 ) {
-    for event in reader.read() {
-        if let Ok(entity) = query.single() {
-            commands
-                .entity(entity)
-                .insert(RotateY(match event.entered.unwrap() {
-                    DrawOrientation::Front => 0.0,
-                    DrawOrientation::Back => PI,
-                }));
-        }
-    }
-}
-
-fn rotate_y(
-    mut commands: Commands,
-    mut query: Query<(Entity, &RotateY, &mut Transform)>,
-    time: Res<Time>,
-) {
-    for (entity, target, mut transform) in query.iter_mut() {
-        let current_angle = transform.rotation.to_euler(EulerRot::YXZ).0;
-        let target_angle = target.0;
-
-        let delta = target_angle - current_angle;
-        let max_step = 2.0 * time.delta_secs();
-        let step_size = max_step.min(delta.abs());
-
-        transform.rotation = Quat::from_rotation_y(if step_size < max_step {
-            // Target reached, remove the RotateY component
-            commands.entity(entity).remove::<RotateY>();
-            target_angle
-        } else {
-            // Animate towards target
-            current_angle + step_size * delta.signum()
-        });
+    let Some(slider) = slider else {
+        return;
+    };
+    let radians = slider.0.to_radians();
+    for mut transform in query.iter_mut() {
+        transform.rotation = Quat::from_rotation_y(radians);
     }
 }
