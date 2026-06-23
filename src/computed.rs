@@ -1,4 +1,8 @@
-use bevy::{camera::visibility::RenderLayers, ecs::query::QueryItem, prelude::*};
+use bevy::{
+    camera::visibility::RenderLayers,
+    ecs::{lifecycle::HookContext, query::QueryItem, world::DeferredWorld},
+    prelude::*,
+};
 
 use crate::{
     pipeline_key::ComputedOutlineKey,
@@ -139,7 +143,16 @@ pub(crate) struct ComputedInternal {
 /// A component for storing the computed depth at which the outline lies.
 #[derive(Clone, Component, Default)]
 #[require(ComputedOutlineKey)]
+#[component(on_remove = remove_computed_outline_key)]
 pub struct ComputedOutline(pub(crate) Option<ComputedInternal>);
+
+/// Removes the required `ComputedOutlineKey` when `ComputedOutline` is removed.
+fn remove_computed_outline_key(mut world: DeferredWorld<'_>, context: HookContext) {
+    world
+        .commands()
+        .entity(context.entity)
+        .try_remove::<ComputedOutlineKey>();
+}
 
 type OutlineComponents<'a> = (
     Ref<'a, InheritedVisibility>,
@@ -378,6 +391,34 @@ mod tests {
             ))
             .id();
         (app, entity)
+    }
+
+    #[test]
+    fn test_computed_outline_key_added_and_removed() {
+        let (mut app, entity) = setup();
+
+        // The `require` attribute should add ComputedOutlineKey alongside
+        // ComputedOutline.
+        assert!(
+            app.world().get::<ComputedOutlineKey>(entity).is_some(),
+            "ComputedOutlineKey should be present while ComputedOutline is"
+        );
+
+        // Removing ComputedOutline should trigger the hook which removes
+        // ComputedOutlineKey.
+        app.world_mut()
+            .entity_mut(entity)
+            .remove::<ComputedOutline>();
+        app.world_mut().flush();
+
+        assert!(
+            app.world().get::<ComputedOutline>(entity).is_none(),
+            "ComputedOutline should have been removed"
+        );
+        assert!(
+            app.world().get::<ComputedOutlineKey>(entity).is_none(),
+            "ComputedOutlineKey should be removed once ComputedOutline is"
+        );
     }
 
     #[test]
