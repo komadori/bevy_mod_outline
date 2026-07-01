@@ -1,6 +1,5 @@
 use bevy::shader::ShaderDefVal;
 use bevy::{
-    core_pipeline::FullscreenShader,
     platform::collections::HashMap,
     prelude::*,
     render::{
@@ -10,6 +9,7 @@ use bevy::{
             BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
             CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, PipelineCache,
             RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderType,
+            VertexState,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         sync_world::MainEntity,
@@ -34,7 +34,8 @@ use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
 
 #[derive(Clone, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
-    pub flat_depth: f32,
+    pub world_plane_origin: Vec3,
+    pub world_plane_offset: Vec3,
     pub volume_offset: f32,
     pub volume_colour: Vec4,
 }
@@ -48,7 +49,7 @@ pub(crate) struct ComposeOutputUniforms {
 pub(crate) fn prepare_compose_output_uniform(
     render_outlines: Res<RenderOutlineInstances>,
     render_extracted: Res<RenderExtractedOutlineEntities>,
-    views: Query<(Entity, &ExtractedView, &OutlineViewUniform)>,
+    views: Query<(Entity, &ExtractedView), With<OutlineViewUniform>>,
     mut uniforms: ResMut<ComposeOutputUniforms>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
@@ -56,14 +57,13 @@ pub(crate) fn prepare_compose_output_uniform(
     let uniforms = uniforms.as_mut();
     uniforms.buffer.clear();
     uniforms.offsets.clear();
-    for (view_entity, view_extracted, view) in views.iter() {
+    for (view_entity, view_extracted) in views.iter() {
         let Some(render_view_extracted) = render_extracted
             .views
             .get(&view_extracted.retained_view_entity)
         else {
             continue;
         };
-        let model_eye = view_extracted.world_from_view.forward();
         for (_, main_entity) in render_view_extracted.visible_entities.entities.iter() {
             let Some(outline) = render_outlines.get(main_entity) else {
                 continue;
@@ -71,11 +71,9 @@ pub(crate) fn prepare_compose_output_uniform(
             if outline.draw_mode != DrawMode::JumpFlood {
                 continue;
             }
-            let world_plane = outline.instance_data.world_plane_origin
-                + *model_eye * outline.instance_data.world_plane_offset;
-            let clip = view.clip_from_world * world_plane.extend(1.0);
             let offset = uniforms.buffer.push(&ComposeOutputUniform {
-                flat_depth: clip.z / clip.w,
+                world_plane_origin: outline.instance_data.world_plane_origin,
+                world_plane_offset: outline.instance_data.world_plane_offset,
                 volume_offset: outline.instance_data.volume_offset,
                 volume_colour: outline.instance_data.volume_colour,
             });
@@ -95,7 +93,7 @@ pub(crate) fn init_compose_output_pipeline(mut commands: Commands) {
     let layout = BindGroupLayoutDescriptor::new(
         "outline_flood_compose_output_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
-            ShaderStages::FRAGMENT,
+            ShaderStages::VERTEX_FRAGMENT,
             (
                 texture_2d(TextureSampleType::Float { filterable: true }),
                 uniform_buffer::<OutlineViewUniform>(true),
@@ -114,7 +112,6 @@ impl ComposeOutputPipeline {
     pub(crate) fn get_pipeline(
         &mut self,
         pipeline_cache: &PipelineCache,
-        fullscreen_shader: &FullscreenShader,
         key: ViewPipelineKey,
     ) -> CachedRenderPipelineId {
         *self.pipeline_cache.entry(key).or_insert_with(|| {
@@ -125,7 +122,12 @@ impl ComposeOutputPipeline {
             pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
                 label: Some("outline_flood_compose_output_pipeline".into()),
                 layout: vec![self.layout.clone()],
-                vertex: fullscreen_shader.to_vertex_state(),
+                vertex: VertexState {
+                    shader: COMPOSE_OUTPUT_SHADER_HANDLE,
+                    shader_defs: shader_defs.clone(),
+                    entry_point: None,
+                    buffers: vec![],
+                },
                 fragment: Some(FragmentState {
                     shader: COMPOSE_OUTPUT_SHADER_HANDLE,
                     shader_defs,
@@ -165,13 +167,11 @@ pub(crate) fn prepare_compose_output_pass(
     mut commands: Commands,
     query: Query<(Entity, &ExtractedView, &ResolvedOutlineMsaa), With<OutlineViewUniform>>,
     pipeline_cache: Res<PipelineCache>,
-    fullscreen_shader: Res<FullscreenShader>,
     mut compose_output_pipeline: ResMut<ComposeOutputPipeline>,
 ) {
     for (entity, view, msaa) in query.iter() {
         let pipeline_id = compose_output_pipeline.get_pipeline(
             &pipeline_cache,
-            &fullscreen_shader,
             ViewPipelineKey::new()
                 .with_msaa(**msaa)
                 .with_target_format(view.target_format),
