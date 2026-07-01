@@ -14,7 +14,7 @@ use bevy::render::{
     texture::CachedTexture,
 };
 
-use crate::culling::{RenderExtractedOutlineEntities, RenderOutlineEntities};
+use crate::culling::RenderOutlineEntities;
 use crate::node::OutlineSortingInfo;
 use crate::queue::{
     DirtyOutlineSpecialisations, OutlineCache, OutlineCacheEntry, PendingOutlineQueues,
@@ -41,7 +41,6 @@ pub(crate) fn queue_flood_meshes(
     outline_cache: Res<OutlineCache>,
     render_outlines: Res<RenderOutlineInstances>,
     render_visible: Res<RenderOutlineEntities>,
-    render_extracted: Res<RenderExtractedOutlineEntities>,
     pending_queues: ResMut<PendingOutlineQueues>,
     specialisations: Res<DirtyOutlineSpecialisations>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
@@ -60,11 +59,6 @@ pub(crate) fn queue_flood_meshes(
             .unwrap();
 
         let Some(render_view_visible) = render_visible.views.get(&view.retained_view_entity) else {
-            continue;
-        };
-
-        let Some(render_view_extracted) = render_extracted.views.get(&view.retained_view_entity)
-        else {
             continue;
         };
 
@@ -90,14 +84,6 @@ pub(crate) fn queue_flood_meshes(
             if outline.draw_mode != DrawMode::JumpFlood {
                 continue;
             }
-
-            let Some(visible_info) = render_view_extracted
-                .visible_entities_info
-                .get(&main_entity)
-            else {
-                continue;
-            };
-            let screen_space_bounds = visible_info.screen_space_bounds;
 
             let mesh_slabs = mesh_allocator.mesh_slabs(&outline.mesh_id);
             let index_slab = mesh_slabs.and_then(|s| s.index_slab_id);
@@ -126,7 +112,6 @@ pub(crate) fn queue_flood_meshes(
                 indexed: index_slab.is_some(),
                 volume_offset: outline.instance_data.volume_offset,
                 volume_colour: outline.instance_data.volume_colour,
-                screen_space_bounds,
             });
         }
 

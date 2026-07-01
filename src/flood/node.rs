@@ -19,6 +19,7 @@ use indexmap::IndexMap;
 use itertools::*;
 use std::ops::Range;
 
+use crate::culling::RenderExtractedOutlineEntities;
 use crate::msaa::{OutlineViewTextures, ResolvedOutlineMsaa};
 use crate::node::{OutlineRangefinder, OutlineSortingInfo};
 use crate::OutlineViewUniform;
@@ -42,7 +43,6 @@ pub struct FloodOutline {
     pub indexed: bool,
     pub volume_offset: f32,
     pub volume_colour: Vec4,
-    pub screen_space_bounds: URect,
 }
 
 impl PhaseItem for FloodOutline {
@@ -124,6 +124,7 @@ pub(crate) fn flood_render_pass(
         &ResolvedOutlineMsaa,
         Option<&OutlineViewTextures>,
     )>,
+    render_extracted: Res<RenderExtractedOutlineEntities>,
     flood_phases: Res<ViewSortedRenderPhases<FloodOutline>>,
     pipeline_cache: Res<PipelineCache>,
     mut render_context: RenderContext,
@@ -164,6 +165,12 @@ pub(crate) fn flood_render_pass(
     else {
         return;
     };
+    let Some(extracted_view) = render_extracted
+        .views
+        .get(&view_extracted.retained_view_entity)
+    else {
+        return;
+    };
 
     for ((_, volume_offset, _), group) in &flood_phase
         .items
@@ -178,10 +185,20 @@ pub(crate) fn flood_render_pass(
 
         // Sum item range and screen-space bounds
         let mut last_index = first_index;
-        let mut screen_space_bounds = first_item.screen_space_bounds;
+        let mut screen_space_bounds = extracted_view
+            .visible_entities_info
+            .get(&first_item.main_entity)
+            .unwrap()
+            .screen_space_bounds;
         for (index, item) in group_iter {
             last_index = index;
-            screen_space_bounds = screen_space_bounds.union(item.screen_space_bounds);
+            screen_space_bounds = screen_space_bounds.union(
+                extracted_view
+                    .visible_entities_info
+                    .get(&item.main_entity)
+                    .unwrap()
+                    .screen_space_bounds,
+            );
         }
 
         if let (Some(sobel_init_pass), Some(coverage)) =
