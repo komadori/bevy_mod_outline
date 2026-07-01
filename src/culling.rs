@@ -231,7 +231,7 @@ fn compute_screen_space_bounds(
 ) -> Option<URect> {
     let min = aabb.min();
     let max = aabb.max();
-    let corners = [
+    let clip_corners = [
         Vec3::new(min.x, min.y, min.z),
         Vec3::new(min.x, min.y, max.z),
         Vec3::new(min.x, max.y, min.z),
@@ -240,7 +240,11 @@ fn compute_screen_space_bounds(
         Vec3::new(max.x, min.y, max.z),
         Vec3::new(max.x, max.y, min.z),
         Vec3::new(max.x, max.y, max.z),
-    ];
+    ]
+    .map(|c| {
+        let world = world_from_local.transform_point3(c);
+        *clip_from_world * world.extend(1.0)
+    });
 
     let viewport_size = physical_viewport.size();
     let width = viewport_size.x;
@@ -248,20 +252,49 @@ fn compute_screen_space_bounds(
 
     let mut min_screen = UVec2::MAX;
     let mut max_screen = UVec2::MIN;
-
-    for corner in corners.iter() {
-        let world_pos = world_from_local.transform_point3(*corner);
-        let clip_pos = *clip_from_world * world_pos.extend(1.0);
+    let mut accumulate = |clip_pos: Vec4| {
         let ndc = clip_pos.xyz() / clip_pos.w;
-        if ndc.z < -1.0 || ndc.z > 1.0 {
-            continue;
-        }
-        let screen_x = ((ndc.x + 1.0) * 0.5 * width as f32).max(0.0) as u32;
-        let screen_y = ((-ndc.y + 1.0) * 0.5 * height as f32).max(0.0) as u32;
+        let screen_x = ((ndc.x + 1.0) * 0.5 * width as f32).clamp(0.0, width as f32) as u32;
+        let screen_y = ((-ndc.y + 1.0) * 0.5 * height as f32).clamp(0.0, height as f32) as u32;
         min_screen.x = min_screen.x.min(screen_x);
         min_screen.y = min_screen.y.min(screen_y);
         max_screen.x = max_screen.x.max(screen_x);
         max_screen.y = max_screen.y.max(screen_y);
+    };
+
+    // Clip the box against the plane `w = W_MIN`, just in front of the camera.
+    const W_MIN: f32 = 1.0e-4;
+
+    // Include every corner in front of the camera.
+    for clip_pos in clip_corners.iter() {
+        if clip_pos.w > W_MIN {
+            accumulate(*clip_pos);
+        }
+    }
+
+    // The twelve edges of the AABB as index pairs into `clip_corners`.
+    const EDGES: [(usize, usize); 12] = [
+        (0, 1),
+        (2, 3),
+        (4, 5),
+        (6, 7), // along z
+        (0, 2),
+        (1, 3),
+        (4, 6),
+        (5, 7), // along y
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7), // along x
+    ];
+
+    // Clip the edges of the AABB against the camera plane.
+    for (i, j) in EDGES {
+        let (wi, wj) = (clip_corners[i].w, clip_corners[j].w);
+        if (wi > W_MIN) != (wj > W_MIN) {
+            let t = (W_MIN - wi) / (wj - wi);
+            accumulate(clip_corners[i].lerp(clip_corners[j], t));
+        }
     }
 
     if min_screen.x >= max_screen.x || min_screen.y >= max_screen.y {
