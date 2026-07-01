@@ -37,6 +37,12 @@ camera.
 cargo run --example flying_objects
 ```
 
+The camera rotates around a large mesh which clips different parts of the frustum.
+
+```shell
+cargo run --example orbiting_wall
+```
+
 An outlined torus viewed through four cameras with different combinations of render layers
 enabled.
 

@@ -75,6 +75,10 @@ name = "flying_objects"
 path = "examples/flying_objects.rs"
 
 [[example]]
+name = "orbiting_wall"
+path = "examples/orbiting_wall.rs"
+
+[[example]]
 name = "render_layers"
 path = "examples/render_layers.rs"
 
