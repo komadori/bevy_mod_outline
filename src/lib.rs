@@ -19,7 +19,9 @@
 //! [`OutlinePlaneDepth`] component.
 //!
 //! Outlines can be inherited from the parent via the [`InheritOutline`]
-//! component.
+//! component. To inherit an outline across an entire subtree without marking
+//! each entity individually, add [`PropagateOutline`] to the root of the
+//! subtree. [`StopPropagateOutline`] halts propagation below a given entity.
 //!
 //! There are two methods available for rendering outlines: vertex extrusion
 //! and jump flood. The default method is selected by adding either
@@ -105,6 +107,7 @@ mod msaa;
 mod node;
 mod pipeline;
 mod pipeline_key;
+mod propagate;
 mod queue;
 mod render;
 mod uniforms;
@@ -338,6 +341,18 @@ pub struct OutlinePlaneDepth {
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct InheritOutline;
 
+/// A component for propagating [`InheritOutline`] to all descendants of this entity.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct PropagateOutline;
+
+/// A component for halting propagation below this entity.
+#[derive(Clone, Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct StopPropagateOutline;
+
 /// The channel of a texture.
 #[derive(Copy, Clone, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
@@ -499,17 +514,20 @@ impl Plugin for OutlinePlugin {
         .register_required_components::<OutlineStencil, ComputedOutline>()
         .register_required_components::<OutlineVolume, ComputedOutline>()
         .register_required_components::<InheritOutline, ComputedOutline>()
+        .register_required_components::<PropagateOutline, ComputedOutline>()
         .insert_resource(GlobalOutlineMode(self.mode.clone()))
         .init_resource::<OutlineEntitiesNeedingSpecialisation>()
         .init_resource::<OutlineVisibleEntities>()
         .add_systems(
             PostUpdate,
             (
+                clean_up_computed_outline,
                 compute_outline
                     .after(TransformSystems::Propagate)
                     .after(VisibilitySystems::VisibilityPropagate),
                 compute_outline_key
                     .after(compute_outline)
+                    .after(clean_up_computed_outline)
                     .after(AssetEventSystems),
                 check_outline_entities_needing_specialisation.after(compute_outline_key),
                 check_outline_view_visibility
@@ -589,6 +607,8 @@ impl Plugin for OutlinePlugin {
                 .before(smaa),
         );
 
+        propagate::add_propagate_observers(app);
+
         #[cfg(feature = "reflect")]
         app.register_type::<OutlineStencil>()
             .register_type::<OutlineVolume>()
@@ -597,8 +617,10 @@ impl Plugin for OutlinePlugin {
             .register_type::<GlobalOutlineMode>()
             .register_type::<OutlineFace>()
             .register_type::<OutlineAlphaMask>()
+            .register_type::<OutlineMsaa>()
             .register_type::<InheritOutline>()
-            .register_type::<OutlineMsaa>();
+            .register_type::<PropagateOutline>()
+            .register_type::<StopPropagateOutline>();
 
         #[cfg(feature = "world_serialisation")]
         app.init_resource::<AsyncWorldInheritOutlineSystems>();

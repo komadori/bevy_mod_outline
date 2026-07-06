@@ -1,9 +1,7 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{gltf::GltfPlugin, prelude::*, world_serialization::WorldInstance};
-use bevy_mod_outline::{
-    AsyncWorldInheritOutline, OutlinePlugin, OutlineVolume, ATTRIBUTE_OUTLINE_NORMAL,
-};
+use bevy_mod_outline::{OutlinePlugin, OutlineVolume, PropagateOutline, ATTRIBUTE_OUTLINE_NORMAL};
 
 fn main() {
     App::new()
@@ -55,7 +53,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             width: 0.0,
             colour: Color::srgb(0.0, 0.0, 1.0),
         },
-        AsyncWorldInheritOutline::default(),
+        PropagateOutline,
     ));
 }
 

@@ -9,7 +9,7 @@ use crate::{
     uniforms::{DepthMode, DrawMode},
     GlobalOutlineMode, InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMode,
     OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled, OutlineVolume,
-    OutlineWarmUp,
+    OutlineWarmUp, PropagateOutline,
 };
 
 #[derive(Clone)]
@@ -370,6 +370,27 @@ fn update_computed_outline(
         });
     }
     changed
+}
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn clean_up_computed_outline(
+    mut commands: Commands,
+    query: Query<
+        Entity,
+        (
+            With<ComputedOutline>,
+            Without<OutlineStencil>,
+            Without<OutlineVolume>,
+            Without<InheritOutline>,
+            Without<PropagateOutline>,
+        ),
+    >,
+) {
+    for entity in query.iter() {
+        commands
+            .entity(entity)
+            .try_remove::<(ComputedOutline, ComputedOutlineKey)>();
+    }
 }
 
 #[cfg(test)]
