@@ -465,6 +465,7 @@ fn add_dummy_phase_buffers(
 /// Adds support for rendering outlines.
 pub struct OutlinePlugin {
     mode: OutlineMode,
+    core3d_system_set: Core3dSystems,
 }
 
 impl OutlinePlugin {
@@ -472,6 +473,7 @@ impl OutlinePlugin {
     /// default. See [`OutlineMode::ExtrudeFlat`].
     pub const EXTRUDE_VERTEX: Self = Self {
         mode: OutlineMode::ExtrudeFlat,
+        core3d_system_set: Core3dSystems::PostProcess,
     };
 
     /// An [`OutlinePlugin`] configured to use jump-flood outlines by default.
@@ -479,6 +481,7 @@ impl OutlinePlugin {
     #[cfg(feature = "flood")]
     pub const JUMP_FLOOD: Self = Self {
         mode: OutlineMode::FloodFlat,
+        core3d_system_set: Core3dSystems::PostProcess,
     };
 }
 
@@ -601,7 +604,7 @@ impl Plugin for OutlinePlugin {
             Core3d,
             (msaa_extra_writeback_pass, outline_render_pass)
                 .chain()
-                .in_set(Core3dSystems::PostProcess)
+                .in_set(self.core3d_system_set)
                 .after(tonemapping)
                 .before(fxaa)
                 .before(smaa),
