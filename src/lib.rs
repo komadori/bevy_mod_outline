@@ -353,6 +353,16 @@ pub struct PropagateOutline;
 #[cfg_attr(feature = "reflect", reflect(Component, Default))]
 pub struct StopPropagateOutline;
 
+/// A component for fusing jump-flood outlines into a single silhouette.
+///
+/// Entities with the same group id, [`OutlineVolume`] width, and colour share
+/// one flood mask, so interior edges between them vanish. Only affects
+/// [`OutlineMode::FloodFlat`]; not inherited from parent entities.
+#[derive(Clone, Copy, Component, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default))]
+pub struct OutlineMergeGroup(pub u32);
+
 /// The channel of a texture.
 #[derive(Copy, Clone, Default)]
 #[cfg_attr(feature = "reflect", derive(Reflect))]
@@ -620,7 +630,8 @@ impl Plugin for OutlinePlugin {
             .register_type::<OutlineMsaa>()
             .register_type::<InheritOutline>()
             .register_type::<PropagateOutline>()
-            .register_type::<StopPropagateOutline>();
+            .register_type::<StopPropagateOutline>()
+            .register_type::<OutlineMergeGroup>();
 
         #[cfg(feature = "world_serialisation")]
         app.init_resource::<AsyncWorldInheritOutlineSystems>();

@@ -112,6 +112,7 @@ pub(crate) fn queue_flood_meshes(
                 indexed: index_slab.is_some(),
                 volume_offset: outline.instance_data.volume_offset,
                 volume_colour: outline.instance_data.volume_colour,
+                merge_group: outline.merge_group,
             });
         }
 
