@@ -18,6 +18,7 @@ use crate::computed::ComputedOutline;
 pub(crate) struct OutlineVisibleEntity {
     /// Screen-space bounds of the outline, in physical pixels of the render
     /// target.
+    #[cfg_attr(not(feature = "flood"), allow(dead_code))]
     pub screen_space_bounds: URect,
 }
 
