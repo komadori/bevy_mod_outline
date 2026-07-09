@@ -33,7 +33,7 @@ fn fragment(vertex: VertexOutput) -> FragmentOutput {
 #ifdef MSAA
     out.colour = vec4<f32>(1.0, 0.0, 0.0, 0.0);
 #else
-    out.colour = vec4<f32>(vertex.position.xy, 0.0, 0.0);
+    out.colour = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 #endif
 #endif
     return out;

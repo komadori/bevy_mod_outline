@@ -26,6 +26,7 @@ use flood_init::{prepare_flood_phases, queue_flood_meshes};
 use jump_flood::init_jump_flood_pipeline;
 use node::{flood_render_pass, FloodOutline};
 use sobel_init::init_sobel_init_pipeline;
+use wgpu_types::{LoadOp, Operations, StoreOp};
 
 use crate::add_dummy_phase_buffer;
 use crate::msaa::ResolvedOutlineMsaa;
@@ -47,6 +48,16 @@ const COMPOSE_OUTPUT_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("3c0c1990-4202-48ef-8aa4-bbbb3a334471");
 const SOBEL_INIT_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("e011500d-544c-4a0a-85ee-e7de0b1fda3f");
+
+const FLOOD_OPS: Operations<wgpu_types::Color> = Operations {
+    load: LoadOp::Clear(wgpu_types::Color {
+        r: -10000.0,
+        g: -10000.0,
+        b: 0.0,
+        a: 0.0,
+    }),
+    store: StoreOp::Store,
+};
 
 #[derive(Clone)]
 pub(crate) struct FloodCoverageTextures {

@@ -23,7 +23,7 @@ use crate::uniforms::RenderOutlineInstances;
 use crate::view_uniforms::OutlineQueueStatus;
 
 use super::node::FloodOutline;
-use super::{DrawMode, DrawOutline, OutlineViewUniform};
+use super::{DrawMode, DrawOutline, OutlineViewUniform, FLOOD_OPS};
 
 pub(crate) fn prepare_flood_phases(
     query: Query<&ExtractedView, With<OutlineViewUniform>>,
@@ -153,15 +153,7 @@ impl<'w> FloodInitPass<'w> {
             view: &output.default_view,
             depth_slice: None,
             resolve_target: None,
-            ops: Operations {
-                load: LoadOp::Clear(wgpu_types::Color {
-                    r: -1.0,
-                    g: -1.0,
-                    b: 0.0,
-                    a: 0.0,
-                }),
-                store: StoreOp::Store,
-            },
+            ops: FLOOD_OPS,
         };
 
         self.run(render_context, range, color_attachment);

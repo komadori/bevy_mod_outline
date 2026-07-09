@@ -33,11 +33,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     // Sobel `g` points from low coverage to high coverage (into the silhouette),
     // so `-g/len` is the outward edge normal.
-    var seed = in.position.xy;
+    var delta = vec2<f32>(0.0);
     if len > 1e-4 {
         let outward = -g / len;
-        seed = seed + outward * (coverage - 0.5);
+        delta = outward * (coverage - 0.5);
     }
 
-    return vec4<f32>(seed, 0.0, 0.0);
+    return vec4<f32>(delta, 0.0, 0.0);
 }

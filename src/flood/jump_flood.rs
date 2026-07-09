@@ -3,22 +3,22 @@ use bevy::{
     prelude::*,
     render::{
         render_resource::{
-            binding_types::{sampler, texture_2d, uniform_buffer},
+            binding_types::{texture_2d, uniform_buffer},
             BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
-            CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, Operations, PipelineCache,
+            CachedRenderPipelineId, DynamicUniformBuffer, FragmentState, PipelineCache,
             RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-            RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderType,
+            RenderPipelineDescriptor, ShaderType,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         texture::CachedTexture,
     },
 };
 use wgpu_types::{
-    ColorTargetState, ColorWrites, MultisampleState, PrimitiveState, SamplerBindingType,
-    ShaderStages, TextureFormat, TextureSampleType,
+    ColorTargetState, ColorWrites, MultisampleState, PrimitiveState, ShaderStages, TextureFormat,
+    TextureSampleType,
 };
 
-use super::JUMP_FLOOD_SHADER_HANDLE;
+use super::{FLOOD_OPS, JUMP_FLOOD_SHADER_HANDLE};
 
 #[derive(ShaderType)]
 pub(crate) struct JumpFloodUniform {
@@ -29,7 +29,6 @@ pub(crate) struct JumpFloodUniform {
 #[derive(Resource)]
 pub(crate) struct JumpFloodPipeline {
     pub(crate) layout: BindGroupLayoutDescriptor,
-    pub(crate) sampler: Sampler,
     pub(crate) pipeline_id: CachedRenderPipelineId,
     pub(crate) lookup_buffer: DynamicUniformBuffer<JumpFloodUniform>,
     pub(crate) lookup_offsets: Vec<u32>,
@@ -48,13 +47,10 @@ pub(crate) fn init_jump_flood_pipeline(
             ShaderStages::FRAGMENT,
             (
                 texture_2d(TextureSampleType::Float { filterable: true }),
-                sampler(SamplerBindingType::Filtering),
                 uniform_buffer::<JumpFloodUniform>(true),
             ),
         ),
     );
-
-    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
     let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
         label: Some("outline_jump_flood_pipeline".into()),
@@ -91,7 +87,6 @@ pub(crate) fn init_jump_flood_pipeline(
 
     commands.insert_resource(JumpFloodPipeline {
         layout,
-        sampler,
         pipeline_id,
         lookup_buffer: uniform_buffer,
         lookup_offsets: offsets,
@@ -129,7 +124,6 @@ impl<'w> JumpFloodPass<'w> {
             &pipeline_cache.get_bind_group_layout(&self.pipeline.layout),
             &BindGroupEntries::sequential((
                 &input.default_view,
-                &self.pipeline.sampler,
                 self.pipeline.lookup_buffer.binding().unwrap(),
             )),
         );
@@ -140,7 +134,7 @@ impl<'w> JumpFloodPass<'w> {
                 view: &output.default_view,
                 depth_slice: None,
                 resolve_target: None,
-                ops: Operations::default(),
+                ops: FLOOD_OPS,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,

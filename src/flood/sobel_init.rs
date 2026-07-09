@@ -4,8 +4,8 @@ use bevy::{
     render::{
         render_resource::{
             binding_types::texture_2d, BindGroupEntries, BindGroupLayoutDescriptor,
-            BindGroupLayoutEntries, CachedRenderPipelineId, FragmentState, Operations,
-            PipelineCache, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+            BindGroupLayoutEntries, CachedRenderPipelineId, FragmentState, PipelineCache,
+            RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
             RenderPipelineDescriptor,
         },
         renderer::{RenderContext, RenderDevice},
@@ -17,7 +17,7 @@ use wgpu_types::{
     TextureSampleType,
 };
 
-use super::SOBEL_INIT_SHADER_HANDLE;
+use super::{FLOOD_OPS, SOBEL_INIT_SHADER_HANDLE};
 
 #[derive(Resource)]
 pub(crate) struct SobelInitPipeline {
@@ -102,7 +102,7 @@ impl<'w> SobelInitPass<'w> {
                 view: &output.default_view,
                 depth_slice: None,
                 resolve_target: None,
-                ops: Operations::default(),
+                ops: FLOOD_OPS,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,

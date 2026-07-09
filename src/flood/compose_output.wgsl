@@ -37,7 +37,9 @@ fn vertex(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 fn fragment(in: VertexOutput) -> FragmentOutput {
     let tex = textureLoad(screen_texture, vec2<i32>(in.position.xy), 0);
     let threshold = view.scale_physical_from_logical * instance.volume_offset;
-    let dist = distance(in.position.xy, tex.xy);
+    // The flood texture stores the delta from each pixel to its nearest seed,
+    // so the distance to that seed is the length of the stored delta.
+    let dist = length(tex.xy);
     var out: FragmentOutput;
 #ifdef MSAA
     let inner = max(threshold - 1.0, 0.0);
