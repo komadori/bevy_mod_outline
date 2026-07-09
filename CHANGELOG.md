@@ -1,15 +1,29 @@
 # Changelog
 
-## bevy_mod_outline 0.13.0 (unreleased)
+## bevy_mod_outline 0.13.0 (2026-07-09)
 
-###
-- Added frustum culling.
+### Added
+- Added frustum culling of outlines.
+- Added PropagateOutline and StopPropagateOutline components.
+- Added GlobalOutlineMode resource to control the default outline method.
+- Added OutlineMsaa component to control outline MSAA independently.
+- Added anti-aliasing of jump-flood outlines when MSAA is enabled.
+- Added clean-up of internal components when no longer needed.
+- Added orbiting_wall example.
 
 ### Removed
 - Removed facility to warm-up invisible outlines.
 
+### Fixed
+- Fixed screen-space bounds of AABBs which clip the near plane.
+- Fixed jump-flood artefacts in the top-left corner.
+- Fixed building without the flood feature enabled.
+
 ### Changed
 - Updated Bevy dependency to 0.19.
+- Changed OutlinePlugin to require selecting the default outline method.
+- Moved double-sided mesh support from OutlineMode to OutlineFace.
+- Improved outline normal generation for flat meshes.
 
 ## bevy_mod_outline 0.12.1 (2026-05-11)
 
