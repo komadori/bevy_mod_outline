@@ -531,4 +531,38 @@ mod tests {
         assert_eq!(child_internal.volume.source, Source::Inherited);
         assert_eq!(child_internal.inherited_from, Some(parent));
     }
+
+    #[test]
+    fn test_clean_up_computed_outline() {
+        let (mut app, entity) = setup();
+        app.add_systems(Update, clean_up_computed_outline);
+
+        // While an OutlineVolume is present, ComputedOutline must be retained.
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(OutlineVolume::default());
+        app.update();
+
+        assert!(
+            app.world().get::<ComputedOutline>(entity).is_some(),
+            "ComputedOutline should be retained while OutlineVolume is present"
+        );
+        assert!(
+            app.world().get::<ComputedOutlineKey>(entity).is_some(),
+            "ComputedOutlineKey should be retained alongside ComputedOutline"
+        );
+
+        // Once the last outline component is gone, so is ComputedOutline.
+        app.world_mut().entity_mut(entity).remove::<OutlineVolume>();
+        app.update();
+
+        assert!(
+            app.world().get::<ComputedOutline>(entity).is_none(),
+            "ComputedOutline should be removed from an entity with no outline components"
+        );
+        assert!(
+            app.world().get::<ComputedOutlineKey>(entity).is_none(),
+            "ComputedOutlineKey should be removed alongside ComputedOutline"
+        );
+    }
 }
