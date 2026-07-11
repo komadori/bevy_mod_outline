@@ -32,6 +32,7 @@ pub struct ExtractedOutline {
     pub(crate) automatic_batching: bool,
     pub(crate) instance_data: OutlineInstanceUniform,
     pub(crate) warm_up: OutlineWarmUp,
+    pub(crate) merge_group: Option<u32>,
 }
 
 #[derive(Resource, Default, Deref)]
@@ -145,6 +146,7 @@ pub(crate) fn extract_outlines(
                 current_morph_index: 0,
             },
             warm_up: computed.warm_up.value.clone(),
+            merge_group: computed.merge_group,
         };
         render_outlines
             .entity_map
