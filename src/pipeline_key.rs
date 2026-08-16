@@ -28,13 +28,14 @@ bitfield_bitrange! {struct RawPipelineKey(u32)}
 impl RawPipelineKey {
     bitfield_fields! {
         u32;
-        // View parameters (0:7)
+        // View parameters (0:8)
         msaa_samples_minus_one, set_msaa_samples_minus_one: 2, 0;
         pub motion_vector_prepass, set_motion_vector_prepass: 3;
-        target_format_code, set_target_format_code: 7, 4;
-        // Mesh parameters (8:15)
-        primitive_topology_int, set_primitive_topology_int: 10, 8;
-        pub morph_targets, set_morph_targets: 11;
+        // target_format_code must be size of COLOR_TARGET_FORMAT_MASK_BITS
+        target_format_code, set_target_format_code: 8, 4;
+        // Mesh parameters (9:15)
+        primitive_topology_int, set_primitive_topology_int: 11, 9;
+        pub morph_targets, set_morph_targets: 12;
         // Entity parameters (16:29)
         depth_mode_int, set_depth_mode_int: 17, 16;
         pub transparent, set_transparent: 18;
