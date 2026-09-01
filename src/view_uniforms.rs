@@ -11,6 +11,7 @@ use bevy::render::sync_world::RenderEntity;
 use bevy::render::view::RetainedViewEntity;
 use bevy::render::Extract;
 
+use crate::culling::live_viewport;
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::OutlinePipeline;
 
@@ -57,15 +58,7 @@ pub(crate) fn extract_outline_view_uniforms(
     live_views.clear();
 
     for (main_entity, entity, camera, transform) in query.iter() {
-        if !camera.is_active {
-            commands.entity(entity.id()).remove::<(
-                OutlineViewUniform,
-                OutlineQueueStatus,
-                DynamicUniformIndex<OutlineViewUniform>,
-            )>();
-            continue;
-        }
-        if let Some(size) = camera.logical_viewport_size() {
+        if let Some(size) = live_viewport(camera).and(camera.logical_viewport_size()) {
             let view_from_world = transform.to_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             commands

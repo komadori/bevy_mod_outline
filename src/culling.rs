@@ -152,7 +152,8 @@ pub(crate) fn check_outline_view_visibility(
     }
 }
 
-fn live_viewport(camera: &Camera) -> Option<URect> {
+/// The rectangle a camera is drawing into, or `None` if it is not drawing this frame.
+pub(crate) fn live_viewport(camera: &Camera) -> Option<URect> {
     if !camera.is_active {
         return None;
     }
