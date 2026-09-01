@@ -262,10 +262,19 @@ pub(crate) fn specialise_outlines(
         }
     }
 
-    // Delete specialized pipelines belonging to views that have expired.
+    expire_outline_caches_for_views(&mut pending_queues, &mut outline_cache, &all_views);
+}
+
+/// Discards the pending queues and specialised pipelines of views that no longer exist.
+fn expire_outline_caches_for_views(
+    pending_queues: &mut PendingOutlineQueues,
+    outline_cache: &mut OutlineCache,
+    live_views: &HashSet<RetainedViewEntity>,
+) {
+    pending_queues.expire_stale_views(live_views);
     outline_cache
         .view_map
-        .retain(|retained_view_entity, _| all_views.contains(retained_view_entity));
+        .retain(|retained_view_entity, _| live_views.contains(retained_view_entity));
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]

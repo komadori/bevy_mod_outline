@@ -1,10 +1,11 @@
 use std::ops::Range;
 
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
-use bevy::render::view::ExtractedView;
+use bevy::render::view::{ExtractedView, RetainedViewEntity};
 use bevy::render::{
     render_phase::SortedRenderPhase,
     render_resource::{
@@ -28,10 +29,16 @@ use super::{DrawMode, DrawOutline, OutlineViewUniform, FLOOD_OPS};
 pub(crate) fn prepare_flood_phases(
     query: Query<&ExtractedView, With<OutlineViewUniform>>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
+    mut live_views: Local<HashSet<RetainedViewEntity>>,
 ) {
+    live_views.clear();
+
     for view in query.iter() {
+        live_views.insert(view.retained_view_entity);
         flood_phases.prepare_for_new_frame(view.retained_view_entity);
     }
+
+    flood_phases.retain(|view, _| live_views.contains(view));
 }
 
 #[allow(clippy::too_many_arguments)]

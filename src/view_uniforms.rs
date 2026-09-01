@@ -1,7 +1,8 @@
 use bevy::math::Affine3A;
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode;
-use bevy::render::extract_component::ComponentUniforms;
+use bevy::render::extract_component::{ComponentUniforms, DynamicUniformIndex};
 use bevy::render::render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases};
 use bevy::render::render_resource::{BindGroup, BindGroupEntry};
 use bevy::render::render_resource::{PipelineCache, ShaderType};
@@ -40,6 +41,7 @@ pub(crate) fn extract_outline_view_uniforms(
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     query: Extract<Query<(Entity, &RenderEntity, &Camera, &GlobalTransform), With<Camera3d>>>,
+    mut live_views: Local<HashSet<RetainedViewEntity>>,
 ) {
     fn transpose_3x3(m: &Affine3A) -> ([Vec4; 2], f32) {
         let transpose_3x3 = m.matrix3.transpose();
@@ -52,8 +54,15 @@ pub(crate) fn extract_outline_view_uniforms(
         )
     }
 
+    live_views.clear();
+
     for (main_entity, entity, camera, transform) in query.iter() {
         if !camera.is_active {
+            commands.entity(entity.id()).remove::<(
+                OutlineViewUniform,
+                OutlineQueueStatus,
+                DynamicUniformIndex<OutlineViewUniform>,
+            )>();
             continue;
         }
         if let Some(size) = camera.logical_viewport_size() {
@@ -72,11 +81,22 @@ pub(crate) fn extract_outline_view_uniforms(
                 .insert(OutlineQueueStatus::default());
 
             let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
+            live_views.insert(retained_view_entity);
             stencil_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
             opaque_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
             transparent_phases.prepare_for_new_frame(retained_view_entity);
+        } else {
+            commands.entity(entity.id()).remove::<(
+                OutlineViewUniform,
+                OutlineQueueStatus,
+                DynamicUniformIndex<OutlineViewUniform>,
+            )>();
         }
     }
+
+    stencil_phases.retain(|view, _| live_views.contains(view));
+    opaque_phases.retain(|view, _| live_views.contains(view));
+    transparent_phases.retain(|view, _| live_views.contains(view));
 }
 
 pub(crate) fn prepare_outline_view_bind_group(
