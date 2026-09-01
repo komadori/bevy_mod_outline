@@ -426,3 +426,47 @@ pub(crate) fn queue_outline_mesh(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn a_view(index: u32) -> RetainedViewEntity {
+        RetainedViewEntity::new(Entity::PLACEHOLDER.into(), None, index)
+    }
+
+    #[test]
+    fn test_expiring_views_keeps_the_ones_still_alive() {
+        let mut pending_queues = PendingOutlineQueues::default();
+        let mut outline_cache = OutlineCache::default();
+        let (live, gone) = (a_view(0), a_view(1));
+        for view in [live, gone] {
+            pending_queues.prepare_for_new_frame(view);
+            outline_cache.view_map.entry(view).or_default();
+        }
+        assert!(pending_queues.get(&gone).is_some(), "test set-up");
+
+        expire_outline_caches_for_views(
+            &mut pending_queues,
+            &mut outline_cache,
+            &HashSet::from_iter([live]),
+        );
+
+        assert!(
+            pending_queues.get(&live).is_some(),
+            "a live view lost its pending queue"
+        );
+        assert!(
+            outline_cache.view_map.contains_key(&live),
+            "a live view lost its specialised pipelines"
+        );
+        assert!(
+            pending_queues.get(&gone).is_none(),
+            "an expired view kept its pending queue"
+        );
+        assert!(
+            !outline_cache.view_map.contains_key(&gone),
+            "an expired view kept its specialised pipelines"
+        );
+    }
+}
