@@ -1,3 +1,4 @@
+use bevy::asset::load_embedded_asset;
 use bevy::shader::ShaderDefVal;
 use bevy::{
     platform::collections::HashMap,
@@ -14,7 +15,7 @@ use bevy::{
         renderer::{RenderContext, RenderDevice, RenderQueue},
         sync_world::MainEntity,
         texture::CachedTexture,
-        view::{ExtractedView, ViewDepthTexture, ViewTarget},
+        view::{ExtractedView, ViewDepthStencilTexture, ViewTarget},
     },
 };
 use wgpu_types::{
@@ -30,7 +31,7 @@ use crate::{
     uniforms::RenderOutlineInstances,
 };
 
-use super::{DrawMode, OutlineViewUniform, COMPOSE_OUTPUT_SHADER_HANDLE};
+use super::{DrawMode, OutlineViewUniform};
 
 #[derive(Clone, ShaderType)]
 pub(crate) struct ComposeOutputUniform {
@@ -87,9 +88,10 @@ pub(crate) fn prepare_compose_output_uniform(
 pub(crate) struct ComposeOutputPipeline {
     pub(crate) layout: BindGroupLayoutDescriptor,
     pub(crate) pipeline_cache: HashMap<ViewPipelineKey, CachedRenderPipelineId>,
+    pub(crate) shader: Handle<Shader>,
 }
 
-pub(crate) fn init_compose_output_pipeline(mut commands: Commands) {
+pub(crate) fn init_compose_output_pipeline(mut commands: Commands, asset_server: Res<AssetServer>) {
     let layout = BindGroupLayoutDescriptor::new(
         "outline_flood_compose_output_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
@@ -105,6 +107,7 @@ pub(crate) fn init_compose_output_pipeline(mut commands: Commands) {
     commands.insert_resource(ComposeOutputPipeline {
         layout,
         pipeline_cache: HashMap::new(),
+        shader: load_embedded_asset!(asset_server.as_ref(), "compose_output.wesl"),
     });
 }
 
@@ -123,13 +126,14 @@ impl ComposeOutputPipeline {
                 label: Some("outline_flood_compose_output_pipeline".into()),
                 layout: vec![self.layout.clone()],
                 vertex: VertexState {
-                    shader: COMPOSE_OUTPUT_SHADER_HANDLE,
+                    shader: self.shader.clone(),
                     shader_defs: shader_defs.clone(),
                     entry_point: None,
                     buffers: vec![],
+                    ..default()
                 },
                 fragment: Some(FragmentState {
-                    shader: COMPOSE_OUTPUT_SHADER_HANDLE,
+                    shader: self.shader.clone(),
                     shader_defs,
                     entry_point: None,
                     targets: vec![Some(ColorTargetState {
@@ -137,6 +141,7 @@ impl ComposeOutputPipeline {
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     })],
+                    ..default()
                 }),
                 primitive: PrimitiveState::default(),
                 depth_stencil: Some(DepthStencilState {
@@ -189,7 +194,7 @@ pub(crate) struct ComposeOutputPass<'w> {
     outline_view_uniforms: &'w ComponentUniforms<OutlineViewUniform>,
     compose_output_uniforms: &'w ComposeOutputUniforms,
     view_target: &'w ViewTarget,
-    view_depth: &'w ViewDepthTexture,
+    view_depth: &'w ViewDepthStencilTexture,
     outline_textures: Option<&'w OutlineViewTextures>,
 }
 
@@ -198,7 +203,7 @@ impl<'w> ComposeOutputPass<'w> {
         world: &'w World,
         compose_output_view: &ComposeOutputView,
         view_target: &'w ViewTarget,
-        view_depth: &'w ViewDepthTexture,
+        view_depth: &'w ViewDepthStencilTexture,
         outline_textures: Option<&'w OutlineViewTextures>,
     ) -> Option<Self> {
         let pipeline = world.resource::<ComposeOutputPipeline>();

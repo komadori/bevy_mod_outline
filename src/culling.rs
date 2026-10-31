@@ -1,7 +1,6 @@
 use bevy::camera::primitives::{Aabb, Frustum};
 use bevy::camera::visibility::{NoFrustumCulling, RenderLayers, SetViewVisibility};
 use bevy::camera::Camera;
-use bevy::math::primitives::ViewFrustum;
 use bevy::math::{Affine3A, Mat4, UVec2, Vec3, Vec4Swizzles};
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -10,6 +9,7 @@ use bevy::render::view::{
     RenderExtractedVisibleEntitiesClass, RenderVisibleEntitiesClass, RetainedViewEntity,
 };
 use bevy::render::Extract;
+use bevy::shape::ViewFrustum;
 
 use crate::computed::ComputedOutline;
 

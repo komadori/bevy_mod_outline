@@ -19,7 +19,8 @@ use bevy::{
         renderer::{RenderContext, RenderDevice, ViewQuery},
         sync_component::SyncComponent,
         texture::{CachedTexture, TextureCache},
-        view::{Msaa, ViewDepthTexture, ViewTarget},
+        view::{Msaa, ViewDepthStencilTexture, ViewTarget},
+        RenderApp,
     },
 };
 
@@ -29,11 +30,11 @@ use crate::OutlineMsaa;
 #[derive(Component, Copy, Clone, Deref)]
 pub(crate) struct ResolvedOutlineMsaa(pub Msaa);
 
-impl SyncComponent for ResolvedOutlineMsaa {
+impl SyncComponent<RenderApp> for ResolvedOutlineMsaa {
     type Target = ResolvedOutlineMsaa;
 }
 
-impl ExtractComponent for ResolvedOutlineMsaa {
+impl ExtractComponent<RenderApp> for ResolvedOutlineMsaa {
     type QueryData = (&'static Msaa, Option<&'static OutlineMsaa>);
     type QueryFilter = ();
     type Out = ResolvedOutlineMsaa;
@@ -52,7 +53,7 @@ impl ExtractComponent for ResolvedOutlineMsaa {
 #[derive(Component)]
 pub(crate) struct OutlineViewTextures {
     pub color: Option<CachedTexture>,
-    pub depth: ViewDepthTexture,
+    pub depth: ViewDepthStencilTexture,
 }
 
 pub(crate) fn prepare_outline_view_textures(
@@ -122,7 +123,7 @@ pub(crate) fn prepare_outline_view_textures(
 
         commands.entity(entity).insert(OutlineViewTextures {
             color,
-            depth: ViewDepthTexture::new(depth, Some(0.0)),
+            depth: ViewDepthStencilTexture::new(depth, Some(0.0), None),
         });
     }
 }

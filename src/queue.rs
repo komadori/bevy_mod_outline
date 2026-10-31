@@ -12,7 +12,7 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::{
     CachedRenderPipelineId, PipelineCache, SpecializedMeshPipelines,
 };
-use bevy::render::sync_world::MainEntityHashMap;
+use bevy::render::sync_world::{MainEntityHashMap, MainEntityHashSet};
 use bevy::render::view::{ExtractedView, RetainedViewEntity};
 use bevy::render::Extract;
 
@@ -283,6 +283,7 @@ pub(crate) fn queue_outline_mesh(
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
     mut views: Query<(&ExtractedView, &mut OutlineQueueStatus)>,
+    mut queued_scratch: Local<MainEntityHashSet>,
 ) {
     let draw_stencil = stencil_draw_functions
         .read()
@@ -331,6 +332,7 @@ pub(crate) fn queue_outline_mesh(
             view.retained_view_entity,
             &render_view_visible.0,
             &view_pending_queues.prev_frame,
+            &mut queued_scratch,
         ) {
             let Some(outline) = render_outlines.get(main_entity) else {
                 continue;

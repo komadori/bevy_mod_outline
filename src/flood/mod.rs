@@ -1,4 +1,4 @@
-use bevy::asset::{load_internal_asset, uuid_handle};
+use bevy::asset::embedded_asset;
 use bevy::core_pipeline::{Core3d, Core3dSystems};
 use bevy::pbr::{MeshInputUniform, MeshUniform};
 use bevy::render::batching::gpu_preprocessing::{BatchedInstanceBuffers, GpuPreprocessingSupport};
@@ -41,13 +41,6 @@ mod flood_init;
 mod jump_flood;
 mod node;
 mod sobel_init;
-
-const JUMP_FLOOD_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("66f5981f-0cc2-4e62-8221-cd495062f3ac");
-const COMPOSE_OUTPUT_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("3c0c1990-4202-48ef-8aa4-bbbb3a334471");
-const SOBEL_INIT_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("e011500d-544c-4a0a-85ee-e7de0b1fda3f");
 
 const FLOOD_OPS: Operations<wgpu_types::Color> = Operations {
     load: LoadOp::Clear(wgpu_types::Color {
@@ -169,24 +162,9 @@ pub struct FloodPlugin;
 
 impl Plugin for FloodPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
-            JUMP_FLOOD_SHADER_HANDLE,
-            "jump_flood.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            COMPOSE_OUTPUT_SHADER_HANDLE,
-            "compose_output.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            SOBEL_INIT_SHADER_HANDLE,
-            "sobel_init.wgsl",
-            Shader::from_wgsl
-        );
+        embedded_asset!(app, "jump_flood.wesl");
+        embedded_asset!(app, "compose_output.wesl");
+        embedded_asset!(app, "sobel_init.wesl");
 
         app.add_plugins(SortedRenderPhasePlugin::<FloodOutline, OutlinePipeline>::new(
             RenderDebugFlags::empty(),
