@@ -31,11 +31,10 @@ impl RawPipelineKey {
         // View parameters (0:8)
         msaa_samples_minus_one, set_msaa_samples_minus_one: 2, 0;
         pub motion_vector_prepass, set_motion_vector_prepass: 3;
-        // target_format_code must be size of COLOR_TARGET_FORMAT_MASK_BITS
-        target_format_code, set_target_format_code: 8, 4;
-        // Mesh parameters (9:15)
-        primitive_topology_int, set_primitive_topology_int: 11, 9;
-        pub morph_targets, set_morph_targets: 12;
+        mask TARGET_FORMAT_CODE_MASK(u32), target_format_code, set_target_format_code: 8, 4;
+        // Mesh parameters (12:15)
+        mask PRIMITIVE_TOPOLOGY_INT_MASK(u32), primitive_topology_int, set_primitive_topology_int: 14, 12;
+        pub morph_targets, set_morph_targets: 15;
         // Entity parameters (16:29)
         depth_mode_int, set_depth_mode_int: 17, 16;
         pub transparent, set_transparent: 18;
@@ -101,6 +100,18 @@ impl RawPipelineKey {
         }
     }
 }
+
+const _RAW_PIPELINE_KEY_ASSERTS: () = {
+    // Check fields match the width of Bevy types
+    assert!(
+        RawPipelineKey::TARGET_FORMAT_CODE_MASK.count_ones()
+            == bevy::render::view::COLOR_TARGET_FORMAT_MASK_BITS.count_ones()
+    );
+    assert!(
+        RawPipelineKey::PRIMITIVE_TOPOLOGY_INT_MASK.count_ones()
+            == bevy::mesh::BaseMeshPipelineKey::PRIMITIVE_TOPOLOGY_MASK_BITS.count_ones()
+    );
+};
 
 impl BitOr for RawPipelineKey {
     type Output = Self;
