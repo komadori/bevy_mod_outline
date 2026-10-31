@@ -21,7 +21,7 @@ bevy = { version = "0.20.1", default-features = false, features = [
     "bevy_anti_alias",
     "bevy_pbr",
 ] }
-bitfield = "0.15"
+bitfield = "0.20"
 indexmap = "2"
 interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
