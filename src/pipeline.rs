@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use bevy::asset::uuid_handle;
+use bevy::asset::load_embedded_asset;
 use bevy::ecs::system::lifetimeless::SRes;
 use bevy::ecs::system::SystemParamItem;
 use bevy::mesh::MeshVertexBufferLayoutRef;
@@ -34,15 +34,6 @@ use crate::uniforms::{DepthMode, OutlineInstanceUniform, RenderOutlineInstances}
 use crate::view_uniforms::OutlineViewUniform;
 use crate::ATTRIBUTE_OUTLINE_NORMAL;
 
-pub(crate) const COMMON_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("aee41cd9-fc8f-4788-9ea4-f85bd8070c65");
-
-pub(crate) const OUTLINE_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("910c269f-f115-47ba-b757-6ae51bf0c79f");
-
-pub(crate) const FRAGMENT_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("1f5b5967-7cbb-4392-8f34-421587938a12");
-
 #[derive(Resource)]
 pub(crate) struct OutlinePipeline {
     mesh_pipeline: MeshPipeline,
@@ -51,12 +42,15 @@ pub(crate) struct OutlinePipeline {
     pub alpha_mask_bind_group_layout: BindGroupLayoutDescriptor,
     pub instance_batch_size: Option<u32>,
     pub skins_use_uniform_buffers: bool,
+    pub outline_shader: Handle<Shader>,
+    pub fragment_shader: Handle<Shader>,
 }
 
 pub(crate) fn init_outline_pipeline(
     mut commands: Commands,
     mesh_pipeline: Res<MeshPipeline>,
     render_device: Res<RenderDevice>,
+    asset_server: Res<AssetServer>,
 ) {
     let limits = render_device.limits();
     let outline_view_bind_group_layout = BindGroupLayoutDescriptor::new(
@@ -93,6 +87,8 @@ pub(crate) fn init_outline_pipeline(
         alpha_mask_bind_group_layout,
         instance_batch_size,
         skins_use_uniform_buffers,
+        outline_shader: load_embedded_asset!(asset_server.as_ref(), "outline.wesl"),
+        fragment_shader: load_embedded_asset!(asset_server.as_ref(), "fragment.wesl"),
     });
 }
 
@@ -129,20 +125,15 @@ impl SpecializedMeshPipeline for OutlinePipeline {
             vertex_defs.push(val.clone());
             fragment_defs.push(val);
 
-            let channel_def = ShaderDefVal::UInt(
-                "ALPHA_MASK_CHANNEL".to_string(),
-                key.alpha_mask_channel_int(),
-            );
+            let channel_def =
+                ShaderDefVal::UInt("ALPHA_MASK_CHANNEL".into(), key.alpha_mask_channel_int());
             fragment_defs.push(channel_def);
 
             buffer_attrs.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
         }
 
         if let Some(sz) = self.instance_batch_size {
-            vertex_defs.push(ShaderDefVal::Int(
-                "INSTANCE_BATCH_SIZE".to_string(),
-                sz as i32,
-            ));
+            vertex_defs.push(ShaderDefVal::UInt("INSTANCE_BATCH_SIZE".into(), sz));
         }
 
         if key.msaa() != Msaa::Off {
@@ -236,16 +227,18 @@ impl SpecializedMeshPipeline for OutlinePipeline {
         };
         Ok(RenderPipelineDescriptor {
             vertex: VertexState {
-                shader: OUTLINE_SHADER_HANDLE,
+                shader: self.outline_shader.clone(),
                 entry_point: None,
                 shader_defs: vertex_defs,
                 buffers,
+                ..default()
             },
             fragment: Some(FragmentState {
-                shader: FRAGMENT_SHADER_HANDLE,
+                shader: self.fragment_shader.clone(),
                 shader_defs: fragment_defs,
                 entry_point: None,
                 targets,
+                ..default()
             }),
             layout: bind_layouts,
             primitive: PrimitiveState {

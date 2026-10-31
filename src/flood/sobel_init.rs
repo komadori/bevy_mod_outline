@@ -1,3 +1,4 @@
+use bevy::asset::load_embedded_asset;
 use bevy::{
     core_pipeline::FullscreenShader,
     prelude::*,
@@ -17,7 +18,7 @@ use wgpu_types::{
     TextureSampleType,
 };
 
-use super::{FLOOD_OPS, SOBEL_INIT_SHADER_HANDLE};
+use super::FLOOD_OPS;
 
 #[derive(Resource)]
 pub(crate) struct SobelInitPipeline {
@@ -30,6 +31,7 @@ pub(crate) fn init_sobel_init_pipeline(
     _render_device: Res<RenderDevice>,
     fullscreen_shader: Res<FullscreenShader>,
     pipeline_cache: Res<PipelineCache>,
+    asset_server: Res<AssetServer>,
 ) {
     let layout = BindGroupLayoutDescriptor::new(
         "outline_flood_sobel_init_bind_group_layout",
@@ -44,7 +46,7 @@ pub(crate) fn init_sobel_init_pipeline(
         layout: vec![layout.clone()],
         vertex: fullscreen_shader.to_vertex_state(),
         fragment: Some(FragmentState {
-            shader: SOBEL_INIT_SHADER_HANDLE,
+            shader: load_embedded_asset!(asset_server.as_ref(), "sobel_init.wesl"),
             shader_defs: vec![],
             entry_point: None,
             targets: vec![Some(ColorTargetState {
@@ -52,6 +54,7 @@ pub(crate) fn init_sobel_init_pipeline(
                 blend: None,
                 write_mask: ColorWrites::ALL,
             })],
+            ..default()
         }),
         primitive: PrimitiveState::default(),
         depth_stencil: None,

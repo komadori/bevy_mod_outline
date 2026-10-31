@@ -1,6 +1,6 @@
 [package]
 name = "bevy_mod_outline"
-version = "0.13.0"
+version = "0.14.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A mesh outlining plugin for Bevy."
@@ -11,11 +11,12 @@ keywords = ["gamedev", "bevy", "outline"]
 categories = ["game-engines", "rendering"]
 
 [dependencies]
-bevy = { version = "0.19.0", default-features = false, features = [
+bevy = { version = "0.20.1", default-features = false, features = [
     "std",
     "async_executor",
     "bevy_log",
     "bevy_color",
+    "bevy_curve",
     "bevy_image",
     "bevy_anti_alias",
     "bevy_pbr",
@@ -25,7 +26,7 @@ indexmap = "2"
 interpolation = { version = "0.3", optional = true }
 thiserror = "1.0"
 nonmax = "0.5"
-wgpu-types = "29"
+wgpu-types = "30"
 itertools = { version = "0.14", optional = true }
 
 [features]
@@ -35,7 +36,7 @@ reflect = []
 world_serialisation = ["bevy/bevy_world_serialization"]
 
 [dev-dependencies]
-bevy = { version = "0.19.0", default-features = false, features = [
+bevy = { version = "0.20.1", default-features = false, features = [
     "gltf_animation",
     "bevy_anti_alias",
     "bevy_feathers",
@@ -52,6 +53,7 @@ bevy = { version = "0.19.0", default-features = false, features = [
     "bevy_ui_render",
     "bevy_window",
     "bevy_winit",
+    "custom_cursor",
     "default_font",
     "reflect_auto_register",
     "png",

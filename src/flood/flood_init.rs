@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::mesh::allocator::MeshAllocator;
 use bevy::render::render_phase::{DrawFunctions, PhaseItemExtraIndex, ViewSortedRenderPhases};
+use bevy::render::sync_world::MainEntityHashSet;
 use bevy::render::view::ExtractedView;
 use bevy::render::{
     render_phase::SortedRenderPhase,
@@ -45,6 +46,7 @@ pub(crate) fn queue_flood_meshes(
     specialisations: Res<DirtyOutlineSpecialisations>,
     mut flood_phases: ResMut<ViewSortedRenderPhases<FloodOutline>>,
     mut views: Query<(&ExtractedView, &mut OutlineQueueStatus)>,
+    mut queued_scratch: Local<MainEntityHashSet>,
 ) {
     let draw_flood = flood_draw_functions.read().get_id::<DrawOutline>().unwrap();
 
@@ -76,6 +78,7 @@ pub(crate) fn queue_flood_meshes(
             view.retained_view_entity,
             &render_view_visible.0,
             &view_pending_queues.prev_frame,
+            &mut queued_scratch,
         ) {
             let Some(outline) = render_outlines.get(&main_entity) else {
                 continue;

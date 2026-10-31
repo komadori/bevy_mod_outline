@@ -1,40 +1,36 @@
-#import bevy_mod_outline::common::VertexOutput
+import package::common::VertexOutput;
+@if(ALPHA_MASK_TEXTURE)
+import constants::ALPHA_MASK_CHANNEL;
 
 struct FragmentOutput {
     @location(0) colour: vec4<f32>,
-#ifdef FLAT_DEPTH
+    @if(FLAT_DEPTH)
     @builtin(frag_depth) frag_depth: f32,
-#endif
 };
 
-#ifdef ALPHA_MASK_TEXTURE
+@if(ALPHA_MASK_TEXTURE)
 @group(3) @binding(0) var alpha_mask_texture: texture_2d<f32>;
+@if(ALPHA_MASK_TEXTURE)
 @group(3) @binding(1) var alpha_mask_sampler: sampler;
-#endif
 
 @fragment
 fn fragment(vertex: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
 
-#ifdef ALPHA_MASK_TEXTURE
-    let alpha_mask = textureSample(alpha_mask_texture, alpha_mask_sampler, vertex.uv)[#{ALPHA_MASK_CHANNEL}];
-    if (alpha_mask < vertex.alpha_mask_threshold) {
-        discard;
+    @if(ALPHA_MASK_TEXTURE) {
+        let alpha_mask = textureSample(alpha_mask_texture, alpha_mask_sampler, vertex.uv)[ALPHA_MASK_CHANNEL];
+        if (alpha_mask < vertex.alpha_mask_threshold) {
+            discard;
+        }
     }
-#endif
 
-#ifdef FLAT_DEPTH
+    @if(FLAT_DEPTH)
     out.frag_depth = vertex.flat_depth;
-#endif
-#ifdef VOLUME
+    @if(VOLUME)
     out.colour = vertex.volume_colour;
-#endif
-#ifdef FLOOD_INIT
-#ifdef MSAA
+    @if(FLOOD_INIT && MSAA)
     out.colour = vec4<f32>(1.0, 0.0, 0.0, 0.0);
-#else
+    @if(FLOOD_INIT && !MSAA)
     out.colour = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-#endif
-#endif
     return out;
 }
