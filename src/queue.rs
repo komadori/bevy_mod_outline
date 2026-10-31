@@ -262,10 +262,19 @@ pub(crate) fn specialise_outlines(
         }
     }
 
-    // Delete specialized pipelines belonging to views that have expired.
+    expire_outline_caches_for_views(&mut pending_queues, &mut outline_cache, &all_views);
+}
+
+/// Discards the pending queues and specialised pipelines of views that no longer exist.
+fn expire_outline_caches_for_views(
+    pending_queues: &mut PendingOutlineQueues,
+    outline_cache: &mut OutlineCache,
+    live_views: &HashSet<RetainedViewEntity>,
+) {
+    pending_queues.expire_stale_views(live_views);
     outline_cache
         .view_map
-        .retain(|retained_view_entity, _| all_views.contains(retained_view_entity));
+        .retain(|retained_view_entity, _| live_views.contains(retained_view_entity));
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -415,5 +424,49 @@ pub(crate) fn queue_outline_mesh(
         if !opaque_phase.is_empty() || !transparent_phase.items.is_empty() {
             queue_status.has_volume = true;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn a_view(index: u32) -> RetainedViewEntity {
+        RetainedViewEntity::new(Entity::PLACEHOLDER.into(), None, index)
+    }
+
+    #[test]
+    fn test_expiring_views_keeps_the_ones_still_alive() {
+        let mut pending_queues = PendingOutlineQueues::default();
+        let mut outline_cache = OutlineCache::default();
+        let (live, gone) = (a_view(0), a_view(1));
+        for view in [live, gone] {
+            pending_queues.prepare_for_new_frame(view);
+            outline_cache.view_map.entry(view).or_default();
+        }
+        assert!(pending_queues.get(&gone).is_some(), "test set-up");
+
+        expire_outline_caches_for_views(
+            &mut pending_queues,
+            &mut outline_cache,
+            &HashSet::from_iter([live]),
+        );
+
+        assert!(
+            pending_queues.get(&live).is_some(),
+            "a live view lost its pending queue"
+        );
+        assert!(
+            outline_cache.view_map.contains_key(&live),
+            "a live view lost its specialised pipelines"
+        );
+        assert!(
+            pending_queues.get(&gone).is_none(),
+            "an expired view kept its pending queue"
+        );
+        assert!(
+            !outline_cache.view_map.contains_key(&gone),
+            "an expired view kept its specialised pipelines"
+        );
     }
 }
