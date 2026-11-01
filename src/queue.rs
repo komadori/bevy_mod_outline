@@ -266,6 +266,7 @@ pub(crate) fn specialise_outlines(
     outline_cache
         .view_map
         .retain(|retained_view_entity, _| all_views.contains(retained_view_entity));
+    pending_queues.expire_stale_views(&all_views);
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]

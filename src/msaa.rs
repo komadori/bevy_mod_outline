@@ -59,7 +59,7 @@ pub(crate) fn prepare_outline_view_textures(
     mut commands: Commands,
     mut texture_cache: ResMut<TextureCache>,
     render_device: Res<RenderDevice>,
-    views: Query<
+    cameras: Query<
         (
             Entity,
             &Msaa,
@@ -69,8 +69,9 @@ pub(crate) fn prepare_outline_view_textures(
         ),
         With<OutlineViewUniform>,
     >,
+    old_cameras: Query<Entity, (With<OutlineViewTextures>, Without<OutlineViewUniform>)>,
 ) {
-    for (entity, msaa, resolved, camera, view_target) in views.iter() {
+    for (entity, msaa, resolved, camera, view_target) in cameras.iter() {
         if resolved.0 == *msaa {
             commands.entity(entity).remove::<OutlineViewTextures>();
             continue;
@@ -124,6 +125,10 @@ pub(crate) fn prepare_outline_view_textures(
             color,
             depth: ViewDepthTexture::new(depth, Some(0.0)),
         });
+    }
+
+    for entity in old_cameras.iter() {
+        commands.entity(entity).remove::<OutlineViewTextures>();
     }
 }
 

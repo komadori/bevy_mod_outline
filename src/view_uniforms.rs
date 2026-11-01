@@ -1,4 +1,5 @@
 use bevy::math::Affine3A;
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use bevy::render::batching::gpu_preprocessing::GpuPreprocessingMode;
 use bevy::render::extract_component::ComponentUniforms;
@@ -39,6 +40,7 @@ pub(crate) fn extract_outline_view_uniforms(
     mut stencil_phases: ResMut<ViewBinnedRenderPhases<StencilOutline>>,
     mut opaque_phases: ResMut<ViewBinnedRenderPhases<OpaqueOutline>>,
     mut transparent_phases: ResMut<ViewSortedRenderPhases<TransparentOutline>>,
+    mut live_views: Local<HashSet<RetainedViewEntity>>,
     query: Extract<Query<(Entity, &RenderEntity, &Camera, &GlobalTransform), With<Camera3d>>>,
 ) {
     fn transpose_3x3(m: &Affine3A) -> ([Vec4; 2], f32) {
@@ -52,31 +54,41 @@ pub(crate) fn extract_outline_view_uniforms(
         )
     }
 
+    live_views.clear();
     for (main_entity, entity, camera, transform) in query.iter() {
-        if !camera.is_active {
-            continue;
-        }
-        if let Some(size) = camera.logical_viewport_size() {
+        if let Some(size) = camera
+            .is_active
+            .then(|| camera.logical_viewport_size())
+            .flatten()
+        {
             let view_from_world = transform.to_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
-            commands
-                .entity(entity.id())
-                .insert(OutlineViewUniform {
+            commands.entity(entity.id()).insert((
+                OutlineViewUniform {
                     clip_from_world: camera.clip_from_view() * view_from_world,
                     world_from_view_a,
                     world_from_view_b,
                     aspect: size.x / size.y,
                     scale_clip_from_logical: 2.0 / size,
                     scale_physical_from_logical: camera.target_scaling_factor().unwrap_or(1.0),
-                })
-                .insert(OutlineQueueStatus::default());
+                },
+                OutlineQueueStatus::default(),
+            ));
 
             let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
             stencil_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
             opaque_phases.prepare_for_new_frame(retained_view_entity, GpuPreprocessingMode::None);
             transparent_phases.prepare_for_new_frame(retained_view_entity);
+            live_views.insert(retained_view_entity);
+        } else {
+            commands
+                .entity(entity.id())
+                .remove::<(OutlineViewUniform, OutlineQueueStatus)>();
         }
     }
+    stencil_phases.retain(|view_entity, _| live_views.contains(view_entity));
+    opaque_phases.retain(|view_entity, _| live_views.contains(view_entity));
+    transparent_phases.retain(|view_entity, _| live_views.contains(view_entity));
 }
 
 pub(crate) fn prepare_outline_view_bind_group(
