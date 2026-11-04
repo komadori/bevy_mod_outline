@@ -107,3 +107,97 @@ pub(crate) fn prepare_outline_view_bind_group(
         commands.insert_resource(OutlineViewBindGroup { bind_group });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use bevy::camera::RenderTargetInfo;
+    use bevy::render::MainWorld;
+
+    use super::*;
+
+    /// Builds a render app with a single camera in the main world, returning
+    /// the camera's main and render entities.
+    fn setup() -> (App, Entity, Entity) {
+        let mut app = App::new();
+        app.init_resource::<ViewBinnedRenderPhases<StencilOutline>>()
+            .init_resource::<ViewBinnedRenderPhases<OpaqueOutline>>()
+            .init_resource::<ViewSortedRenderPhases<TransparentOutline>>()
+            .insert_resource(MainWorld::default())
+            .add_systems(Update, extract_outline_view_uniforms);
+        let render_entity = app.world_mut().spawn_empty().id();
+        let main_entity = app
+            .world_mut()
+            .resource_mut::<MainWorld>()
+            .spawn((
+                Camera3d::default(),
+                GlobalTransform::default(),
+                RenderEntity::from(render_entity),
+            ))
+            .id();
+        set_camera(&mut app, main_entity, true, UVec2::new(800, 600));
+        (app, main_entity, render_entity)
+    }
+
+    fn set_camera(app: &mut App, main_entity: Entity, is_active: bool, size: UVec2) {
+        let mut main_world = app.world_mut().resource_mut::<MainWorld>();
+        let mut camera = main_world.get_mut::<Camera>(main_entity).unwrap();
+        camera.is_active = is_active;
+        camera.computed.target_info = Some(RenderTargetInfo {
+            physical_size: size,
+            scale_factor: 1.0,
+        });
+    }
+
+    fn is_live(app: &App, render_entity: Entity) -> bool {
+        let world = app.world();
+        let has_uniform = world.get::<OutlineViewUniform>(render_entity).is_some();
+        let phase_counts = [
+            world
+                .resource::<ViewBinnedRenderPhases<StencilOutline>>()
+                .len(),
+            world
+                .resource::<ViewBinnedRenderPhases<OpaqueOutline>>()
+                .len(),
+            world
+                .resource::<ViewSortedRenderPhases<TransparentOutline>>()
+                .len(),
+        ];
+        assert_eq!(
+            phase_counts, [has_uniform as usize; 3],
+            "Render phases should exist only while the view uniform does"
+        );
+        has_uniform
+    }
+
+    #[test]
+    fn test_enable_and_disable_camera() {
+        let (mut app, main_entity, render_entity) = setup();
+        app.update();
+        assert!(is_live(&app, render_entity), "Active camera should be live");
+
+        // Deactivating the camera should release its per-view state.
+        set_camera(&mut app, main_entity, false, UVec2::new(800, 600));
+        app.update();
+        assert!(
+            !is_live(&app, render_entity),
+            "Inactive camera should not be live"
+        );
+
+        // Reactivating the camera should restore it.
+        set_camera(&mut app, main_entity, true, UVec2::new(800, 600));
+        app.update();
+        assert!(
+            is_live(&app, render_entity),
+            "Reactivated camera should be live"
+        );
+
+        // A camera with a collapsed viewport (e.g. a minimised window) is
+        // effectively disabled even though it is still active.
+        set_camera(&mut app, main_entity, true, UVec2::new(800, 0));
+        app.update();
+        assert!(
+            !is_live(&app, render_entity),
+            "Camera with a zero-size viewport should not be live"
+        );
+    }
+}
