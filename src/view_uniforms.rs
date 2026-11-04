@@ -13,6 +13,7 @@ use bevy::render::Extract;
 
 use crate::node::{OpaqueOutline, StencilOutline, TransparentOutline};
 use crate::pipeline::OutlinePipeline;
+use crate::util::live_viewport;
 
 #[derive(Clone, Component, ShaderType)]
 pub(crate) struct OutlineViewUniform {
@@ -56,11 +57,7 @@ pub(crate) fn extract_outline_view_uniforms(
 
     live_views.clear();
     for (main_entity, entity, camera, transform) in query.iter() {
-        if let Some(size) = camera
-            .is_active
-            .then(|| camera.logical_viewport_size())
-            .flatten()
-        {
+        if let Some(viewport_info) = live_viewport(camera) {
             let view_from_world = transform.to_matrix().inverse();
             let (world_from_view_a, world_from_view_b) = transpose_3x3(&transform.affine());
             commands.entity(entity.id()).insert((
@@ -68,9 +65,9 @@ pub(crate) fn extract_outline_view_uniforms(
                     clip_from_world: camera.clip_from_view() * view_from_world,
                     world_from_view_a,
                     world_from_view_b,
-                    aspect: size.x / size.y,
-                    scale_clip_from_logical: 2.0 / size,
-                    scale_physical_from_logical: camera.target_scaling_factor().unwrap_or(1.0),
+                    aspect: viewport_info.logical_size.x / viewport_info.logical_size.y,
+                    scale_clip_from_logical: 2.0 / viewport_info.logical_size,
+                    scale_physical_from_logical: viewport_info.scaling_factor,
                 },
                 OutlineQueueStatus::default(),
             ));
