@@ -1,5 +1,14 @@
 # Changelog
 
+## bevy_mod_outline 0.13.1 (2026-11-06)
+
+### Added
+- Added Clone and Reflect impls to AsyncWorldInheritOutline.
+
+### Fixed
+- Fixed pipeline key too narrow for target formats. (@barsoosayque)
+- Fixed leaking for inactive or removed cameras. (@kevthedawg)
+
 ## bevy_mod_outline 0.13.0 (2026-07-09)
 
 ### Added
