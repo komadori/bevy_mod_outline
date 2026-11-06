@@ -22,9 +22,19 @@ enum InternalState {
 /// `InheritOutline` to all of the world's entities. If this component is
 /// removed then the `InheritOutline` components will be removed too.
 #[derive(Component, Default)]
+#[cfg_attr(feature = "reflect", derive(Reflect))]
+#[cfg_attr(feature = "reflect", reflect(Component, Default, Clone))]
 #[component(on_add = add_hook, on_remove = remove_hook)]
 pub struct AsyncWorldInheritOutline {
+    #[cfg_attr(feature = "reflect", reflect(ignore))]
     state: InternalState,
+}
+
+impl Clone for AsyncWorldInheritOutline {
+    fn clone(&self) -> Self {
+        // Reset internal state when cloning
+        default()
+    }
 }
 
 fn add_hook(mut world: DeferredWorld<'_>, context: HookContext) {
