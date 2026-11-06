@@ -110,6 +110,7 @@ mod propagate;
 mod queue;
 mod render;
 mod uniforms;
+mod util;
 mod view_uniforms;
 
 pub use computed::*;

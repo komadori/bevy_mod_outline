@@ -92,10 +92,12 @@ pub fn prepare_flood_textures(
     mut commands: Commands,
     mut texture_cache: ResMut<TextureCache>,
     render_device: Res<RenderDevice>,
-    cameras: Query<(Entity, &ExtractedCamera, &ResolvedOutlineMsaa)>,
+    cameras: Query<(Entity, &ExtractedCamera, &ResolvedOutlineMsaa), With<OutlineViewUniform>>,
+    old_cameras: Query<Entity, (With<FloodTextures>, Without<OutlineViewUniform>)>,
 ) {
     for (entity, camera, msaa) in cameras.iter() {
         let Some(target_size) = camera.physical_target_size else {
+            commands.entity(entity).remove::<FloodTextures>();
             continue;
         };
 
@@ -148,6 +150,10 @@ pub fn prepare_flood_textures(
             texture_b: texture_cache.get(&render_device, texture_descriptor),
             coverage,
         });
+    }
+
+    for entity in old_cameras.iter() {
+        commands.entity(entity).remove::<FloodTextures>();
     }
 }
 
