@@ -12,6 +12,7 @@ use bevy::render::view::{
 use bevy::render::Extract;
 
 use crate::computed::ComputedOutline;
+use crate::util::live_viewport;
 
 /// Per-entity, per-view information collected during visibility checking.
 #[derive(Default, Clone, Copy, Debug)]
@@ -81,7 +82,7 @@ pub(crate) fn check_outline_view_visibility(
     });
 
     for (view_entity, camera, view_transform, view_mask, frustum) in views.iter() {
-        let Some(physical_viewport) = live_viewport(camera) else {
+        let Some(viewport_info) = live_viewport(camera) else {
             continue;
         };
 
@@ -131,14 +132,14 @@ pub(crate) fn check_outline_view_visibility(
                     aabb,
                     &world_from_local,
                     &clip_from_world,
-                    physical_viewport,
+                    viewport_info.physical_rect,
                     border,
                 ) else {
                     continue;
                 };
                 bounds
             } else {
-                physical_viewport
+                viewport_info.physical_rect
             };
 
             view_visible.visible_entities.push((
@@ -150,18 +151,6 @@ pub(crate) fn check_outline_view_visibility(
             entity_in_view.set_visible();
         }
     }
-}
-
-fn live_viewport(camera: &Camera) -> Option<URect> {
-    if !camera.is_active {
-        return None;
-    }
-    let physical_viewport = camera.physical_viewport_rect()?;
-    let viewport_size = physical_viewport.size();
-    if viewport_size.x == 0 || viewport_size.y == 0 {
-        return None;
-    }
-    Some(physical_viewport)
 }
 
 pub(crate) fn extract_outline_visible_entities(
