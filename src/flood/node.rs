@@ -43,6 +43,7 @@ pub struct FloodOutline {
     pub indexed: bool,
     pub volume_offset: f32,
     pub volume_colour: Vec4,
+    pub merge_group: Option<u32>,
 }
 
 impl PhaseItem for FloodOutline {
@@ -89,10 +90,10 @@ impl CachedRenderPipelinePhaseItem for FloodOutline {
 }
 
 impl SortedPhaseItem for FloodOutline {
-    type SortKey = FloatOrd;
+    type SortKey = (Option<u32>, FloatOrd);
 
     fn sort_key(&self) -> Self::SortKey {
-        FloatOrd(self.distance)
+        (self.merge_group, FloatOrd(self.distance))
     }
 
     fn recalculate_sort_keys(
@@ -172,11 +173,24 @@ pub(crate) fn flood_render_pass(
         return;
     };
 
-    for ((_, volume_offset, _), group) in &flood_phase
-        .items
-        .values()
-        .enumerate()
-        .chunk_by(|(_, item)| (item.distance, item.volume_offset, item.volume_colour))
+    // When merge_group is Some, distance drops out of the key so members fuse.
+    for ((_, _, volume_offset, _), group) in
+        &flood_phase
+            .items
+            .values()
+            .enumerate()
+            .chunk_by(|(_, item)| {
+                let distance_key = match item.merge_group {
+                    Some(_) => FloatOrd(0.0),
+                    None => FloatOrd(item.distance),
+                };
+                (
+                    item.merge_group,
+                    distance_key,
+                    item.volume_offset,
+                    item.volume_colour,
+                )
+            })
     {
         let mut group_iter = group.into_iter();
         let Some((first_index, first_item)) = group_iter.next() else {

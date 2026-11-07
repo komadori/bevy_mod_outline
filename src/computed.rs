@@ -7,9 +7,9 @@ use bevy::{
 use crate::{
     pipeline_key::ComputedOutlineKey,
     uniforms::{DepthMode, DrawMode},
-    GlobalOutlineMode, InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMode,
-    OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled, OutlineVolume,
-    OutlineWarmUp, PropagateOutline,
+    GlobalOutlineMode, InheritOutline, OutlineAlphaMask, OutlineFace, OutlineMergeGroup,
+    OutlineMode, OutlinePlaneDepth, OutlineRenderLayers, OutlineStencil, OutlineStencilEnabled,
+    OutlineVolume, OutlineWarmUp, PropagateOutline,
 };
 
 #[derive(Clone)]
@@ -138,6 +138,7 @@ pub(crate) struct ComputedInternal {
     pub(crate) layers: Sourced<RenderLayers>,
     pub(crate) alpha_mask: Sourced<OutlineAlphaMask>,
     pub(crate) warm_up: Sourced<OutlineWarmUp>,
+    pub(crate) merge_group: Option<u32>,
 }
 
 /// A component for storing the computed depth at which the outline lies.
@@ -166,6 +167,7 @@ type OutlineComponents<'a> = (
     Option<Ref<'a, RenderLayers>>,
     Option<Ref<'a, OutlineAlphaMask>>,
     Option<Ref<'a, OutlineWarmUp>>,
+    Option<Ref<'a, OutlineMergeGroup>>,
 );
 
 #[allow(clippy::type_complexity)]
@@ -258,6 +260,7 @@ fn update_computed_outline(
         fallback_layers,
         alpha_mask,
         warm_up,
+        merge_group,
     ): QueryItem<'_, '_, OutlineComponents>,
     parent_computed: Option<&ComputedInternal>,
     parent_entity: Option<Entity>,
@@ -265,6 +268,7 @@ fn update_computed_outline(
     global_outline_mode: &GlobalOutlineMode,
 ) -> bool {
     let has_parent = parent_computed.is_some();
+    let new_merge_group = merge_group.as_ref().map(|mg| mg.0);
     let changed = force_update
         || if let ComputedOutline(Some(computed)) = computed.as_ref() {
             computed.inherited_from != parent_entity
@@ -279,6 +283,7 @@ fn update_computed_outline(
                     .layers
                     .is_changed_with_fallback(&layers, &fallback_layers, has_parent)
                 || computed.alpha_mask.is_changed(&alpha_mask, has_parent)
+                || computed.merge_group != new_merge_group
         } else {
             true
         };
@@ -367,6 +372,7 @@ fn update_computed_outline(
                 parent_computed.map(|p| p.warm_up.value.clone()),
                 |warm_up| warm_up.clone(),
             ),
+            merge_group: new_merge_group,
         });
     }
     changed
