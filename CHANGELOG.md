@@ -1,5 +1,10 @@
 # Changelog
 
+## bevy_mod_outline 0.14.0 (2026-11-07)
+
+### Changed
+- Updated Bevy dependency to 0.20.
+
 ## bevy_mod_outline 0.13.1 (2026-11-06)
 
 ### Added
