@@ -2,7 +2,7 @@ use bevy::ecs::entity::EntityHash;
 use bevy::render::render_phase::{
     CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, ViewSortedRenderPhases,
 };
-use bevy::render::view::{ExtractedView, ViewDepthTexture};
+use bevy::render::view::{ExtractedView, ViewDepthStencilTexture};
 use bevy::{
     math::FloatOrd,
     prelude::*,
@@ -117,7 +117,7 @@ pub(crate) fn flood_render_pass(
         &ExtractedView,
         &ExtractedCamera,
         &ViewTarget,
-        &ViewDepthTexture,
+        &ViewDepthStencilTexture,
         &OutlineViewUniform,
         &FloodTextures,
         &ComposeOutputView,

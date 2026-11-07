@@ -16,7 +16,7 @@ use bevy::render::render_resource::{
 };
 use bevy::render::renderer::{RenderContext, ViewQuery};
 use bevy::render::sync_world::MainEntity;
-use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget};
+use bevy::render::view::{ExtractedView, ViewDepthStencilTexture, ViewTarget};
 use indexmap::IndexMap;
 
 use crate::msaa::OutlineViewTextures;
@@ -309,7 +309,7 @@ pub(crate) fn outline_colour_attachment<'a>(
 }
 
 pub(crate) fn outline_depth_attachment<'a>(
-    depth: &'a ViewDepthTexture,
+    depth: &'a ViewDepthStencilTexture,
     outline_textures: Option<&'a OutlineViewTextures>,
 ) -> RenderPassDepthStencilAttachment<'a> {
     match outline_textures {
@@ -326,7 +326,7 @@ pub(crate) fn outline_render_pass(
         &ExtractedCamera,
         &Camera3d,
         &ViewTarget,
-        &ViewDepthTexture,
+        &ViewDepthStencilTexture,
         &OutlineQueueStatus,
         Option<&OutlineViewTextures>,
     )>,

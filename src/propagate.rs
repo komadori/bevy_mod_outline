@@ -74,7 +74,7 @@ fn propagates_to_children(
 }
 
 fn on_add_child_marker(
-    add: On<Add, PropagateOutlineChild>,
+    add: On<Add<PropagateOutlineChild>>,
     children_q: Query<&Children>,
     stop_q: Query<(), With<StopPropagateOutline>>,
     source_q: Query<(), With<PropagateOutline>>,
@@ -90,7 +90,7 @@ fn on_add_child_marker(
 }
 
 fn on_remove_child_marker(
-    remove: On<Remove, PropagateOutlineChild>,
+    remove: On<Remove<PropagateOutlineChild>>,
     children_q: Query<&Children>,
     stop_q: Query<(), With<StopPropagateOutline>>,
     source_q: Query<(), With<PropagateOutline>>,
@@ -106,7 +106,7 @@ fn on_remove_child_marker(
 }
 
 fn on_add_propagate(
-    add: On<Add, PropagateOutline>,
+    add: On<Add<PropagateOutline>>,
     children_q: Query<&Children>,
     stop_q: Query<(), With<StopPropagateOutline>>,
     source_q: Query<(), With<PropagateOutline>>,
@@ -118,7 +118,7 @@ fn on_add_propagate(
 }
 
 fn on_remove_propagate(
-    remove: On<Remove, PropagateOutline>,
+    remove: On<Remove<PropagateOutline>>,
     children_q: Query<&Children>,
     parent_q: Query<&ChildOf>,
     stop_q: Query<(), With<StopPropagateOutline>>,
@@ -138,7 +138,7 @@ fn on_remove_propagate(
 }
 
 fn on_add_stop(
-    add: On<Add, StopPropagateOutline>,
+    add: On<Add<StopPropagateOutline>>,
     children_q: Query<&Children>,
     source_q: Query<(), With<PropagateOutline>>,
     marker_q: Query<(), With<PropagateOutlineChild>>,
@@ -151,7 +151,7 @@ fn on_add_stop(
 }
 
 fn on_remove_stop(
-    remove: On<Remove, StopPropagateOutline>,
+    remove: On<Remove<StopPropagateOutline>>,
     children_q: Query<&Children>,
     source_q: Query<(), With<PropagateOutline>>,
     marker_q: Query<(), With<PropagateOutlineChild>>,
@@ -164,7 +164,7 @@ fn on_remove_stop(
 }
 
 fn on_insert_child_of(
-    insert: On<Insert, ChildOf>,
+    insert: On<Insert<ChildOf>>,
     parent_q: Query<&ChildOf>,
     stop_q: Query<(), With<StopPropagateOutline>>,
     source_q: Query<(), With<PropagateOutline>>,
@@ -187,7 +187,7 @@ fn on_insert_child_of(
 }
 
 fn on_remove_child_of(
-    remove: On<Remove, ChildOf>,
+    remove: On<Remove<ChildOf>>,
     marker_q: Query<(), With<PropagateOutlineChild>>,
     mut commands: Commands,
 ) {

@@ -12,7 +12,7 @@ vertex extrusion and jump flood methods.
 
 ```toml
 [dependencies]
-bevy_mod_outline = "0.13"
+bevy_mod_outline = "0.14"
 ```
 
 ## Examples
@@ -102,6 +102,7 @@ cargo run --example picking
 
 | This Version | Bevy version |
 |--------------|--------------|
+| 0.14.x       | 0.20.x       |
 | 0.13.x       | 0.19.x       |
 | 0.12.x       | 0.18.x       |
 | 0.11.x       | 0.17.x       |

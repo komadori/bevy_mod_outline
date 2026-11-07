@@ -1,4 +1,4 @@
-#import bevy_mod_outline::common::{OutlineViewUniform, outline_flat_depth}
+import package::common::{OutlineViewUniform, outline_flat_depth};
 
 struct ComposeOutputUniform {
     world_plane_origin: vec3<f32>,
@@ -41,20 +41,21 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     // so the distance to that seed is the length of the stored delta.
     let dist = length(tex.xy);
     var out: FragmentOutput;
-#ifdef MSAA
-    let inner = max(threshold - 1.0, 0.0);
-    let coverage = 1.0 - smoothstep(inner, threshold, dist);
-    if coverage <= 0.0 {
-        discard;
+    @if(MSAA) {
+        let inner = max(threshold - 1.0, 0.0);
+        let coverage = 1.0 - smoothstep(inner, threshold, dist);
+        if coverage <= 0.0 {
+            discard;
+        }
+        out.colour = vec4<f32>(instance.volume_colour.rgb, instance.volume_colour.a * coverage);
     }
-    out.colour = vec4<f32>(instance.volume_colour.rgb, instance.volume_colour.a * coverage);
-#else
-    if dist <= threshold {
-        out.colour = instance.volume_colour;
-    } else {
-        discard;
+    @if(!MSAA) {
+        if dist <= threshold {
+            out.colour = instance.volume_colour;
+        } else {
+            discard;
+        }
     }
-#endif
     out.frag_depth = in.flat_depth;
     return out;
 }

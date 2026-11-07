@@ -1,6 +1,4 @@
-#define_import_path bevy_mod_outline::common
-
-#import bevy_render::maths
+import bevy_render::maths::mat2x4_f32_to_mat3x3_unpack;
 
 struct OutlineViewUniform {
     clip_from_world: mat4x4<f32>,
@@ -13,16 +11,14 @@ struct OutlineViewUniform {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-#ifdef FLAT_DEPTH
+    @if(FLAT_DEPTH)
     @location(0) @interpolate(flat) flat_depth: f32,
-#endif
-#ifdef VOLUME
+    @if(VOLUME)
     @location(1) @interpolate(flat) volume_colour: vec4<f32>,
-#endif
-#ifdef ALPHA_MASK_TEXTURE
+    @if(ALPHA_MASK_TEXTURE)
     @location(2) @interpolate(flat) alpha_mask_threshold: f32,
+    @if(ALPHA_MASK_TEXTURE)
     @location(3) uv: vec2<f32>,
-#endif
 };
 
 fn model_origin_z(plane: vec3<f32>, view_proj: mat4x4<f32>) -> f32 {
@@ -38,7 +34,7 @@ fn outline_flat_depth(
     world_plane_origin: vec3<f32>,
     world_plane_offset: vec3<f32>,
 ) -> f32 {
-    let world_from_view = bevy_render::maths::mat2x4_f32_to_mat3x3_unpack(
+    let world_from_view = mat2x4_f32_to_mat3x3_unpack(
         view.world_from_view_a,
         view.world_from_view_b,
     );

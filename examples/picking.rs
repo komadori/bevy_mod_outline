@@ -89,7 +89,7 @@ fn setup(
 
 /// Observer system that manages what pickable objects are selected
 fn on_click(
-    mut event: On<Pointer<Click>>,
+    mut event: On<PointerClick>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut OutlineVolume, Option<&Selected>)>,
     keys: Res<ButtonInput<KeyCode>>,
